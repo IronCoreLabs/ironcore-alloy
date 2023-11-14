@@ -1,0 +1,46 @@
+site_name: IronCore Labs Alloy SDK
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  language: en
+  palette:
+    # https://github.com/squidfunk/mkdocs-material/blob/master/src/templates/assets/stylesheets/main/_colors.scss
+    - scheme: default
+      primary: custom
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+plugins:
+- search
+- mkdocstrings:
+    default_handler: python  
+    handlers:
+        python:
+          options:
+            show_if_no_docstring: true
+            merge_init_into_class: true
+            docstring_section_style: list
+            docstring_style: numpy
+            show_category_heading: true
+            show_root_heading: true
+            show_root_toc_entry: false
+            filters:
+              - "!^_"
+extra_css:
+  - stylesheets/extra.css
+copyright: |
+  &copy; 2023 <a href="https://ironcorelabs.com" target="_blank" rel="noopener">IronCore Labs, Inc.</a>
