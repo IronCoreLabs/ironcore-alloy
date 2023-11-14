@@ -1,0 +1,63 @@
+# using https://hatch.pypa.io/latest/
+# hatch build -t wheel
+# hatch run test
+# hatch run coverage
+# hatch shell
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cloaked-ai"
+authors = [{ name = "IronCore Labs", email = "info@ironcorelabs.com" }]
+description = "Python bindings to the IronCore Labs Cloaked AI SDK. Used for encrypting and decrypting embeddings and their related metadata."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+]
+dependencies = []
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://ironcorelabs.com"
+
+[tool.hatch.version]
+# version is locked to the Rust SDK version in core/Cargo.toml
+path = "../../Cargo.toml"
+pattern = "^version = \"(?P<version>[^\"]+)\"$"
+
+[tool.hatch.build]
+artifacts = ["*.so", "*.dylib"]
+
+# tells hatch to use our `hatch_build.py` file
+[tool.hatch.build.targets.wheel.hooks.custom]
+
+[tool.hatch.envs.default]
+dependencies = ["pytest", "pytest-cov", "pytest-metadata"]
+python = "3.10"
+
+[tool.hatch.envs.default.scripts]
+coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=cloaked_ai --cov=tests {args}"
+test = "coverage --no-cov {args}"
+
+[[tool.hatch.envs.test.matrix]]
+python = ["37", "38", "39", "310", "311"]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+omit = ["cloaked_ai/__about__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "class _Uniffi",
+  "def _uniffi",
+  "_Uniffi",
+]

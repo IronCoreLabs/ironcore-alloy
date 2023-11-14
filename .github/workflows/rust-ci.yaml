@@ -1,0 +1,21 @@
+name: Rust CI
+on:
+  push:
+    branches:
+      - main
+  pull_request: null
+  workflow_dispatch: null
+  schedule:
+    - cron: 0 14 * * 1
+
+jobs:
+  rust-ci:
+    uses: IronCoreLabs/workflows/.github/workflows/rust-ci.yaml@rust-ci-v1
+    with:
+      run_clippy: true
+      minimum_coverage: "50"
+      cargo_command_test_args: "--lib" # Doesn't generate or test Python/Kotlin
+      test_matrix_rust_version: '[""]'
+      test_matrix_build_only: "[false]"
+      test_matrix_include: "[]"
+    secrets: inherit

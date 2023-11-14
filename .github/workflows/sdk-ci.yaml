@@ -1,0 +1,104 @@
+name: Python/Kotlin CI
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-cdylibs:
+    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
+    with:
+      # This should stay in sync with the `runs-on` from the other jobs in this file
+      os_matrix: '["buildjet-2vcpu-ubuntu-2204"]' # TODO: add back: "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", ["self-hosted", "macOS", "ARM64"]]'
+      build_profile: "release"
+    secrets: inherit
+
+  kotlin-test:
+    needs: generate-cdylibs
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        # This should stay in sync with the `os_matrix` above
+        runs-on: ["buildjet-2vcpu-ubuntu-2204"] # TODO: add back: "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", ["self-hosted", "macOS", "ARM64"] ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ join(matrix.runs-on) }}-
+          path: ${{ github.workspace }}/core/kotlin/src/main/resources/
+      - if: startsWith(matrix.runs-on, 'buildjet')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - if: startsWith(matrix.runs-on, 'macos')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate Kotlin files
+        run: cargo run --bin uniffi-bindgen generate --library resources/libcloaked_ai.* --language kotlin --out-dir kotlin
+        working-directory: core/kotlin/src/main
+      - name: Run Kotlin tests
+        run: ./gradlew test
+        working-directory: core/kotlin
+
+  python-test:
+    needs: generate-cdylibs
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # This should stay in sync with the `os_matrix` above and the `runs-on` from the other jobs in this file
+        runs-on: ["buildjet-2vcpu-ubuntu-2204"] # TODO: add back: "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", ["self-hosted", "macOS", "ARM64"] ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: ${{ join(matrix.runs-on) }}-
+          path: ${{ github.workspace }}/core/python/cloaked-ai/cloaked_ai
+      - if: startsWith(matrix.runs-on, 'buildjet')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - if: startsWith(matrix.runs-on, 'macos')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate Python files
+        run: cargo run --bin uniffi-bindgen generate --library libcloaked_ai.* --language python --out-dir .
+        working-directory: core/python/cloaked-ai/cloaked_ai
+      - name: Install hatch
+        if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm'
+        # The buildjet arm machine has a permissions error if we don't use sudo
+        run: sudo pipx install hatch
+      - name: Install hatch
+        if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm'
+        run: pipx install hatch
+      - name: Install Python test matrix
+        uses: actions/setup-python@v4
+        if: endsWith(matrix.runs-on, 'arm') != true  && contains(matrix.runs-on, 'self-hosted') != true
+        with:
+          # there are no builds for arm linux at all, so we'll make do with the system ones
+          python-version: |
+            3.7
+            3.8
+            3.9
+            3.10
+            3.11
+      - name: Install Python test matrix (self-hosted)
+        if: contains(matrix.runs-on, 'self-hosted')
+        uses: actions/setup-python@v4
+        with:
+          # arm mac builds don't exist for pre-3.10
+          python-version: |
+            3.10
+            3.11
+      - name: Run Python tests
+        run: hatch run test:test
+        working-directory: core/python/cloaked-ai/cloaked_ai

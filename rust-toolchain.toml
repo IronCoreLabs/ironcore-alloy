@@ -1,0 +1,6 @@
+[toolchain]
+profile = "default"
+# for async_fn_in_trait. Slated for release in 1.75, beta in 1.74 in a week. We can release all supported languages
+# from nightly just fine. Rust users would be annoying initially here if there were any but us.
+channel = "nightly"
+components = ["rust-src", "rust-analyzer", "llvm-tools-preview"]

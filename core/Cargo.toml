@@ -1,0 +1,66 @@
+[package]
+name = "cloaked-ai"
+version = "0.4.4-pre.20"
+edition = "2021"
+
+[dependencies]
+aes-gcm = { version = "0.10" }
+aes-siv = { version = "0.7" }
+async-trait = "0.1.74"
+base64 = "0.21"
+base64_type = { git = "https://github.com/IronCoreLabs/base64_type", version = "0.1.0" }
+bytes = { version = "1.4.0", features = ["serde"] }
+hmac = { version = "0.12.1", features = ["std"] }
+ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", branch = "add-vector-header" }
+itertools = "0.11"
+ndarray = "0.15.6"
+ndarray-rand = "0.14.0"
+protobuf = { version = "3.3", features = ["with-bytes"] }
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+rand_distr = "0.4.3"
+reqwest = { version = "0.11", features = ["json"] }
+ring = "0.16.20"
+serde = { version = "1.0.163", features = ["derive"] }
+serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
+thiserror = "1.0.50"
+uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
+    "cli",
+], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
+z85 = "3.0.5"
+
+[dev-dependencies]
+approx = "0.5.1"
+ascii85 = "0.2.1"
+assertables = "7.0.1"
+base64 = "0.21.5"
+base85 = "2.0.0"
+camino = "1.1"
+criterion = { version = "0.5" }
+hex = "0.4.3"
+hex-literal = "0.4.1"
+lazy_static = "1.4"
+proptest = "1.2.0"
+tokio = { version = "1.33", features = ["macros", "rt-multi-thread"] }
+uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
+    "bindgen-tests",
+], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
+uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
+z85 = "3.0.5"
+
+[[bench]]
+name = "cloaked_ai_bench"
+path = "../benches/cloaked_ai_bench.rs"
+harness = false
+
+# This is needed to allow extra options to be passed to criterion
+# https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
+[lib]
+bench = false
+crate-type = ["cdylib", "lib"]
+name = "cloaked_ai"
+
+[[bin]]
+# This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
