@@ -1,0 +1,10 @@
+name: Rust Daily
+on:
+  schedule:
+    - cron: 0 14 * * 1-5
+  workflow_dispatch:
+
+jobs:
+  rust-daily:
+    uses: IronCoreLabs/workflows/.github/workflows/rust-daily.yaml@rust-daily-v0
+    secrets: inherit

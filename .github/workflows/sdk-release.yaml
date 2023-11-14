@@ -1,0 +1,106 @@
+name: Python/Kotlin Release
+on:
+  # https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#release
+  # The Bump Version workflow will make a Github release if it isn't a prerelease version
+  release:
+    types:
+      - created
+  workflow_dispatch:
+
+jobs:
+  generate-cdylibs:
+    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
+    with:
+      os_matrix: '["buildjet-2vcpu-ubuntu-2204", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", ["self-hosted", "macOS", "ARM64"]]'
+      build_profile: "release"
+    secrets: inherit
+
+  kotlin-release:
+    needs: generate-cdylibs
+    runs-on: buildjet-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          path: ${{ github.workspace }}/core/kotlin/src/main/resources/
+      - name: Rename directories
+        run: |
+          mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
+          mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
+          mv macos-12- darwin-x86-64
+          mv self-hosted,macOS,ARM64- darwin-aarch64
+        working-directory: core/kotlin/src/main/resources/
+      - name: Decrypt GPG key and gradle.properties
+        uses: IronCoreLabs/ironhide-actions/decrypt@v3
+        with:
+          keys: ${{ secrets.IRONHIDE_KEYS }}
+          input: .github/9FA43559.asc.iron .github/gradle.properties.iron
+      - name: Move gradle properties and GPG key
+        run: |
+          mv .github/gradle.properties core/kotlin/gradle.properties
+      - name: Import GPG key
+        run: |
+          gpg --batch --import .github/9FA43559.asc
+      - name: Export GPG signing key
+        run: gpg --export-secret-keys > /tmp/9FA43559.asc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - name: Generate Kotlin files
+        run: cargo run --bin uniffi-bindgen generate --library resources/linux-x86-64/libcloaked_ai.so --language kotlin --out-dir kotlin
+        working-directory: core/kotlin/src/main
+      - name: Publish
+        run: ./gradlew publish
+        working-directory: core/kotlin
+        env:
+          ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.SONATYPE_USERNAME }}
+          ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.SONATYPE_PASSWORD }}
+
+  python-release:
+    needs: generate-cdylibs
+    runs-on: buildjet-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          path: ${{ github.workspace }}/core/python/cloaked-ai
+      - name: Rename directories
+        run: |
+          mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
+          mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
+          mv macos-12- darwin-x86-64
+          mv self-hosted,macOS,ARM64- darwin-aarch64
+        working-directory: core/python/cloaked-ai
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - name: Generate Python files
+        run: cargo run --bin uniffi-bindgen generate --library ../linux-x86-64/libcloaked_ai.so --language python --out-dir .
+        working-directory: core/python/cloaked-ai/cloaked_ai
+      - name: Install hatch
+        run: pipx install hatch
+      - name: Make wheels
+        run: |
+          archs="darwin-aarch64 darwin-x86-64 linux-arm linux-x86-64"
+          for arch in $archs; do
+            mv ../$arch/* ./
+            CDYLIB_PLATFORM=$arch hatch build -t wheel
+            rm libcloaked_ai.*
+          done
+        working-directory: core/python/cloaked-ai/cloaked_ai
+      - name: Release to PyPi
+        run: hatch publish --repo main --user __token__ --auth "${{ secrets.PYPI_TOKEN }}"
+        working-directory: core/python/cloaked-ai/cloaked_ai
+
+  mark-github-release:
+    if: github.event.release != null
+    needs: [kotlin-release, python-release]
+    runs-on: buildjet-2vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Mark GitHub release as not prerelease
+        env:
+          GH_TOKEN: ${{ secrets.WORKFLOW_PAT }}
+        run: gh release edit --tag "${{ github.event.release.tag_name }}" --prerelease=false "${{ github.event.release.name }}"
