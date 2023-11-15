@@ -33,7 +33,7 @@ mod test {
         )?;
         // run the hatch test command and print the output as though it were our output
         let o = Command::new("hatch")
-            .args(["run", "test", "--color=yes"])
+            .args(["run", "test:test", "--color=yes"])
             .current_dir(python_dir)
             .output()
             .unwrap();

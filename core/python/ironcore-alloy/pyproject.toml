@@ -37,13 +37,6 @@ artifacts = ["*.so", "*.dylib"]
 [tool.hatch.build.targets.wheel.hooks.custom]
 
 [tool.hatch.envs.default]
-<<<<<<< HEAD:core/python/ironcore-alloy/pyproject.toml
-dependencies = ["pytest", "pytest-cov", "pytest-metadata", "pytest-asyncio"]
-python = "3.10"
-
-[tool.hatch.envs.default.scripts]
-coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=ironcore_alloy --cov=tests {args}"
-=======
 python = "3.10"
 
 [tool.hatch.envs.docs]
@@ -63,7 +56,6 @@ dependencies = [
 
 [tool.hatch.envs.test.scripts]
 coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=cloaked_ai --cov=tests {args}"
->>>>>>> main:core/python/cloaked-ai/pyproject.toml
 test = "coverage --no-cov {args}"
 
 [[tool.hatch.envs.test.matrix]]
