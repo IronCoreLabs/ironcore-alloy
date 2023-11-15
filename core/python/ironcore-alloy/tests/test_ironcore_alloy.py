@@ -2,10 +2,10 @@ import base64
 from ironcore_alloy import *
 import pytest
 
+
 class TestIroncoreAlloy:
     key_bytes = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".encode("utf-8")
     scaling_factor = 12345.0
-    key = VectorEncryptionKey(scaling_factor, key_bytes)
     approximation_factor = 1.1
     standard_secrets = StandardSecrets(10, [StandaloneSecret(10, Secret(key_bytes))])
     deterministic_secrets = {
@@ -66,7 +66,9 @@ class TestIroncoreAlloy:
         field = PlaintextField(b"My data", "", "")
         fields = {"foo": field}
         metadata = AlloyMetadata.new_simple("tenant")
-        queries = await self.sdk.deterministic().generate_query_field_values(fields, metadata)
+        queries = await self.sdk.deterministic().generate_query_field_values(
+            fields, metadata
+        )
         expected = b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="
         assert base64.b64encode(queries["foo"][0].encrypted_field) == expected
 
@@ -83,61 +85,57 @@ class TestIroncoreAlloy:
 
     @pytest.mark.asyncio
     async def test_decrypt_deterministic_metadata(self):
-        field = EncryptedField(base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "", "")
+        field = EncryptedField(
+            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "", ""
+        )
         metadata = AlloyMetadata.new_simple("tenant")
         decrypted = await self.sdk.deterministic().decrypt(field, metadata)
         expected = b"My data"
         assert decrypted.plaintext_field == expected
 
     @pytest.mark.skip(reason="need seeded client")
-    def test_encrypt_probabilistic_metadata(self):
-        seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
-            self.key, self.approximation_factor, 123
-        )
+    @pytest.mark.asyncio
+    async def test_encrypt_probabilistic_metadata(self):
+        # seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
+        #     self.key, self.approximation_factor, 123
+        # )
         document = {"foo": b"My data"}
         metadata = AlloyMetadata.new_simple("tenant")
-        encrypted = seeded_sdk.encrypt_document(document, metadata)
+        encrypted = await self.sdk.standard().encrypt(document, metadata)
         expected = b"AElST047XW9umwlxe053wEV18Vn5REOO4xh1s+2PAJk9E/h2lSug0A=="
+        print(base64.b64encode(encrypted.edek))
+        print(base64.b64encode(encrypted.document["foo"]))
         assert len(encrypted.document["foo"]) == 40
         assert base64.b64encode(encrypted.document["foo"]) == expected
 
-    @pytest.mark.skip(reason="not implemented yet")
     @pytest.mark.asyncio
-    async def test_consecutive_test_encrypt_standard_calls_different(self):
-        seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
-            self.key, self.approximation_factor, 123
-        )
+    async def test_consecutive_encrypt_standard_calls_different(self):
         document = {"foo": b"My data"}
         metadata = AlloyMetadata.new_simple("tenant")
-        encrypted1 = seeded_sdk.encrypt_document(document, metadata)
-        encrypted2 = seeded_sdk.encrypt_document(document, metadata)
+        encrypted1 = await self.sdk.standard().encrypt(document, metadata)
+        encrypted2 = await self.sdk.standard().encrypt(document, metadata)
         assert encrypted1.document["foo"] != encrypted2.document["foo"]
 
-    @pytest.mark.skip(reason="not implemented yet")
     @pytest.mark.asyncio
     async def test_decrypt_standard(self):
-        seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
-            self.key, self.approximation_factor, 123
-        )
         ciphertext = {
             "foo": base64.b64decode(
-                b"AElST047XW9umwlxe053wEV18Vn5REOO4xh1s+2PAJk9E/h2lSug0A=="
+                b"AElST07h7vW2rFal+zxZTznlxWv9Cght683STVYhaOXuHUE/F2ib0A=="
             )
         }
         metadata = AlloyMetadata.new_simple("tenant")
         document = EncryptedDocument(
             base64.b64decode(
-                b"CiQKIJpn4wkFfEtcl3DurQ/wLGcWK+Fr0nDEJ86y+faCyiDrEAESRBJCGkAKDO+cie3HH99isWQqoRIwUX9m/SzbhApKnZynLtX2ZDFTQXt5+Mol3qCQby5DfwqqQ8D/HdmFsmwpia5XqQHk"
+                b"AAAACoIACiQKIN4xdr7dvQBFroI6JDHyeDktSkAAOsKEgv9P/VtM+qVEEAESSBJGGkQKDOpZqVwXBoutX3E0jRIwHp364nCATXkfLhIeYpkHLqLa0lzM3J/y9ZYEAlEPFu/VF4ErphypZRe/ReSbm9ZFGgIxMA=="
             ),
             ciphertext,
         )
-        decrypted = seeded_sdk.decrypt_document(document, metadata)
+        decrypted = await self.sdk.standard().decrypt(document, metadata)
         assert decrypted["foo"] == b"My data"
 
-    @pytest.mark.skip(reason="not implemented yet")
     @pytest.mark.asyncio
     async def test_decrypt_wrong_type(self):
-        with pytest.raises(AlloyError.DocumentError):
+        with pytest.raises(AlloyError.IronCoreDocumentsError):
             ciphertext = {
                 "foo": base64.b64decode(b"AAAAAAAAMs7OVNXWuwUuW1DJVxlTbqoRTFdWKzM=")
             }
@@ -148,7 +146,7 @@ class TestIroncoreAlloy:
                 ciphertext,
             )
             metadata = AlloyMetadata.new_simple("tenant")
-            self.sdk.decrypt_document(encrypted, metadata)
+            await self.sdk.standard().decrypt(encrypted, metadata)
 
     @pytest.mark.asyncio
     async def test_error_handling(self):
