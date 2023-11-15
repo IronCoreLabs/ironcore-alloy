@@ -38,11 +38,11 @@ fn benches(c: &mut Criterion) {
     let mut key_bytes = [0u8; 64];
     rng.fill_bytes(&mut key_bytes);
     let secret = Secret::new([1u8; 64].to_vec()).unwrap();
-    let standalone_secret = StandaloneSecret::new(1, secret.clone());
+    let standalone_secret = StandaloneSecret::new_u32(1, secret.clone());
     let rotatable_secret = RotatableSecret::new(Some(standalone_secret), None).unwrap();
 
     let standard_secrets =
-        StandardSecrets::new(Some(1), vec![StandaloneSecret::new(1, secret.clone())]).unwrap();
+        StandardSecrets::new(Some(1), vec![StandaloneSecret::new_u32(1, secret.clone())]).unwrap();
     let deterministic_secrets = [(
         SecretPath("secret_path".to_string()),
         rotatable_secret.clone(),

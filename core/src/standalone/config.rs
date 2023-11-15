@@ -12,11 +12,16 @@ pub struct StandaloneSecret {
 impl StandaloneSecret {
     /// Create a standalone secret. The secret needs to be cryptographically random bytes.
     #[uniffi::constructor]
-    pub fn new(id: u32, secret: Arc<Secret>) -> Arc<Self> {
-        Arc::new(Self { id, secret })
+    pub(crate) fn new(id: i32, secret: Arc<Secret>) -> Arc<Self> {
+        Self::new_u32(id as u32, secret)
     }
 }
 
+impl StandaloneSecret {
+    pub fn new_u32(id: u32, secret: Arc<Secret>) -> Arc<Self> {
+        Arc::new(Self { id, secret })
+    }
+}
 /// A collection of secrets for standalone standard mode used to derive encryption keys.
 /// The primary secret id is used to look up the primary secret, which will be used for encrypting new documents.
 /// The rest of the secrets will only be used to decrypt existing documents when encountered.
