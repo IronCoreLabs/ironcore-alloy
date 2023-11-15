@@ -5,9 +5,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --defaul
 source "$HOME/.cargo/env"
 # download a jq binary and add it somewhere on the path we can twrite to, install other dependencies
 curl -s -L -o /home/docs/.cargo/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 && chmod +x /home/docs/.cargo/bin/jq
-jq -h
-cp ./jq /home/docs/.cargo/bin/
-jq -h
 pip install yq tomlq
 # pull the rust-toolchain.toml info
 for F in rust-toolchain.toml rust-toolchain ; do
