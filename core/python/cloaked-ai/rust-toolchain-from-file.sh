@@ -1,7 +1,9 @@
 #! /usr/bin/env bash
 # Used by readthedocs to get the right version of rust installed. Based on our github action that does the same.
 source "$HOME/.cargo/env"
-pip install yq tomlq jq
+apt update
+apt install jq
+pip install yq tomlq
 for F in rust-toolchain.toml rust-toolchain ; do
   if [ -f "$F" ] ; then
     TOML_FILE="$F"
