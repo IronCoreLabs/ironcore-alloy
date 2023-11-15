@@ -1,5 +1,7 @@
 # Building
 
+_Note that we expect releases to be done by automation (directions in [root RELEASING.md](../../../RELEASING.md)), but manual directions are here for reference.
+
 ## Table of Contents
 
 - [Build](#build)

@@ -9,5 +9,9 @@ This project defaults to compiling with the `metadata` feature on for now, but `
 After either of the non-`--lib` `cargo` commands have been run, the Kotlin and Python project directories will be in a state that you can play around with them as though they were native libraries of that language.
 
 - `cd kotlin; ./gradlew test` will manually run only the Kotlin tests.
-- `cd python/ironcore-alloy; hatch run test` will manually run only the Python tests.
+- `cd python/ironcore-alloy; hatch run test:test` will manually run only the Python tests.
 - See `python/ironcore-alloy/README.md` for more information about manually releasing that package and other available `hatch` commands.
+
+## License
+
+`ironcore-alloy` is licensed under the [GNU Affero General Public License](https://github.com/IronCoreLabs/ironoxide/blob/main/LICENSE). We also offer commercial licenses - [email](mailto:info@ironcorelabs.com) for more information or check pricing on our [website](https://ironcorelabs.com/).
