@@ -7,7 +7,7 @@ build:
     python: "3.10"
   commands:
     # these rust sections are mostly cribbed from our github action https://github.com/IronCoreLabs/rust-toolchain/blob/main/action.yml
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -y
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - |
         # once https://github.com/mikefarah/yq/pull/1439 is merged, the yq already on the system will have toml support
         pip install yq
