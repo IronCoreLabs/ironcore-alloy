@@ -8,11 +8,11 @@ build:
   commands:
     # install rust. If we automate/otherwise committing the generated python module we can avoid rust at all and
     # only would need to install hatch here. Doc builds would then be a few seconds instead of a few minutes.
-    - ./core/python/cloaked-ai/rust-toolchain-from-file.sh
+    - ./core/python/ironcore-alloy/rust-toolchain-from-file.sh
     - ~/.cargo/bin/cargo b --release
     - ~/.cargo/bin/cargo run --bin uniffi-bindgen generate --library ./target/release/libcloaked_ai.so --language python  --out-dir core/python/cloaked-ai/cloaked_ai
     # actual doc building part
     - pip install -v "hatch==1.7.0"
-    - cd core/python/cloaked-ai && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
+    - cd core/python/ironcore-alloy && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
 
    
