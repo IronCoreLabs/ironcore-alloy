@@ -4,9 +4,8 @@
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 source "$HOME/.cargo/env"
 # download a jq binary and add it somewhere on the path we can twrite to, install other dependencies
-echo "$PATH"
-curl -s -o ./jq https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 && chmod +x ./jq
-./jq -h
+curl -s -L -o /home/docs/.cargo/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7/jq-linux-amd64 && chmod +x /home/docs/.cargo/bin/jq
+jq -h
 cp ./jq /home/docs/.cargo/bin/
 jq -h
 pip install yq tomlq
