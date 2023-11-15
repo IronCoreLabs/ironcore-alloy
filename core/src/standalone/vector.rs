@@ -6,7 +6,7 @@ use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryResult, PlaintextVector,
     PlaintextVectors, VectorEncryptionKey, VectorOps,
 };
-use crate::{DerivationPath, IronCoreMetadata, SecretPath, StandaloneConfiguration};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use rand::SeedableRng;
@@ -43,7 +43,7 @@ impl VectorOps for StandaloneVectorClient {
     async fn encrypt(
         &self,
         plaintext_vector: PlaintextVector,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError> {
         let vector_secret = self
             .config
@@ -81,7 +81,7 @@ impl VectorOps for StandaloneVectorClient {
     async fn decrypt(
         &self,
         encrypted_vector: EncryptedVector,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
         let (
             KeyIdHeader {
@@ -134,7 +134,7 @@ impl VectorOps for StandaloneVectorClient {
     async fn generate_query_vectors(
         &self,
         vectors_to_query: PlaintextVectors,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError> {
         vectors_to_query
             .into_iter()
@@ -191,7 +191,7 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         secret_path: SecretPath,
         _derivation_path: DerivationPath,
-        _metadata: &IronCoreMetadata,
+        _metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
         let vector_secret = self.config.get(&secret_path).ok_or_else(|| {
             AlloyError::InvalidConfiguration(format!(
@@ -258,8 +258,8 @@ mod test {
         }
     }
 
-    fn get_metadata() -> Arc<IronCoreMetadata> {
-        IronCoreMetadata::new_simple(TenantId("foo".to_string()))
+    fn get_metadata() -> Arc<AlloyMetadata> {
+        AlloyMetadata::new_simple(TenantId("foo".to_string()))
     }
 
     #[tokio::test]

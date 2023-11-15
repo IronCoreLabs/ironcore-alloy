@@ -1,5 +1,5 @@
 use crate::{
-    errors::AlloyError, util, DerivationPath, EncryptedBytes, FieldId, IronCoreMetadata,
+    errors::AlloyError, util, AlloyMetadata, DerivationPath, EncryptedBytes, FieldId,
     PlaintextBytes, Secret, SecretPath, TenantId,
 };
 use aes_gcm::KeyInit;
@@ -54,20 +54,20 @@ pub trait DeterministicFieldOps {
     async fn encrypt(
         &self,
         plaintext_field: PlaintextField,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedField, AlloyError>;
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError>;
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
     /// The resulting encrypted fields should be used in tandem when querying the data store.
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError>;
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
@@ -78,7 +78,7 @@ pub trait DeterministicFieldOps {
         &self,
         secret_path: SecretPath,
         derivation_path: DerivationPath,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError>;
 }
 

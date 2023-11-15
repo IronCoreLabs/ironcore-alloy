@@ -4,7 +4,7 @@ use crate::standard::{
     StandardDocumentOps,
 };
 use crate::util::{get_rng, hash256, OurReseedingRng};
-use crate::{IronCoreMetadata, TenantId};
+use crate::{AlloyMetadata, TenantId};
 use ironcore_documents::aes::{generate_aes_edek_and_sign, EncryptionKey};
 use ironcore_documents::icl_header_v4;
 use ironcore_documents::key_id_header::{
@@ -68,7 +68,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
     async fn encrypt(
         &self,
         plaintext_document: PlaintextDocument,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
         let (secret_id, secret) = self
             .config
@@ -103,7 +103,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
     async fn decrypt(
         &self,
         encrypted_document: EncryptedDocument,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
         let (
             KeyIdHeader {
@@ -211,7 +211,7 @@ mod test {
     #[tokio::test]
     async fn encrypt_decrypt_roundtrip() -> Result<(), AlloyError> {
         let client = default_client();
-        let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
         let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
         let (key_id_header, _) =
@@ -227,7 +227,7 @@ mod test {
     #[tokio::test]
     async fn decrypt_missing_key_from_config() -> Result<(), AlloyError> {
         let client = default_client();
-        let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
             //The header having a `4` means that the edek is for key id 4.
             edek: EdekWithKeyIdHeader(vec![0, 0, 0, 4, 130, 0]),
@@ -246,7 +246,7 @@ mod test {
     #[tokio::test]
     async fn encrypt_missing_primary() -> Result<(), AlloyError> {
         let client = new_client(None);
-        let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
@@ -262,7 +262,7 @@ mod test {
     async fn encrypt_primary_not_found() -> Result<(), AlloyError> {
         // This id isn't in the config map.
         let client = new_client(Some(1000));
-        let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
@@ -278,7 +278,7 @@ mod test {
     async fn decrypt_id_not_primary() -> Result<(), AlloyError> {
         //The edek below is for key_id 1, setting primary to 2 in the sdk to 2.
         let client = new_client(Some(2));
-        let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
         let encrypted = EncryptedDocument {
             edek: EdekWithKeyIdHeader(vec![
@@ -308,7 +308,7 @@ mod test {
     #[tokio::test]
     async fn decrypt_edek_type_not_match() -> Result<(), AlloyError> {
         let client = default_client();
-        let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
             edek: EdekWithKeyIdHeader(vec![0, 0, 0, 1, 0, 0]),
             document: HashMap::new(),

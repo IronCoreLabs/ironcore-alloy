@@ -9,7 +9,7 @@ use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryResult, PlaintextVector,
     PlaintextVectors, VectorOps,
 };
-use crate::{DerivationPath, IronCoreMetadata, SecretPath, VectorEncryptionKey};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, VectorEncryptionKey};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
@@ -68,7 +68,7 @@ impl VectorOps for SaasShieldVectorClient {
     async fn encrypt(
         &self,
         plaintext_vector: PlaintextVector,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError> {
         let paths = [(
             plaintext_vector.secret_path.clone(),
@@ -98,7 +98,7 @@ impl VectorOps for SaasShieldVectorClient {
     async fn decrypt(
         &self,
         encrypted_vector: EncryptedVector,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
         let approximation_factor = self.approximation_factor.ok_or_else(|| {
             AlloyError::InvalidConfiguration(
@@ -165,7 +165,7 @@ impl VectorOps for SaasShieldVectorClient {
     async fn generate_query_vectors(
         &self,
         vectors_to_query: PlaintextVectors,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError> {
         let paths = vectors_to_query
             .values()
@@ -205,7 +205,7 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         secret_path: SecretPath,
         derivation_path: DerivationPath,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
         let paths = [(secret_path.clone(), [derivation_path.clone()].into())].into();
         let derived_keys = self

@@ -2,7 +2,7 @@ use self::crypto::{shuffle, unshuffle, EncryptResult};
 use crate::{
     errors::AlloyError,
     util::{self, AuthHash},
-    DerivationPath, IronCoreMetadata, Secret, SecretPath, TenantId,
+    AlloyMetadata, DerivationPath, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
 use ironcore_documents::{
@@ -97,7 +97,7 @@ pub trait VectorOps {
     async fn encrypt(
         &self,
         plaintext_vector: PlaintextVector,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError>;
 
     /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
@@ -105,7 +105,7 @@ pub trait VectorOps {
     async fn decrypt(
         &self,
         encrypted_vector: EncryptedVector,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError>;
 
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
@@ -113,7 +113,7 @@ pub trait VectorOps {
     async fn generate_query_vectors(
         &self,
         vectors_to_query: PlaintextVectors,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError>;
 
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
@@ -125,7 +125,7 @@ pub trait VectorOps {
         &self,
         secret_path: SecretPath,
         derivation_path: DerivationPath,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError>;
 }
 

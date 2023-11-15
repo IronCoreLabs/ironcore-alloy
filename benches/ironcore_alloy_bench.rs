@@ -4,7 +4,7 @@ use ironcore_alloy::standalone::config::{
 };
 use ironcore_alloy::vector::{PlaintextVector, VectorOps};
 use ironcore_alloy::DerivationPath;
-use ironcore_alloy::{IronCoreMetadata, Secret, SecretPath, Standalone, TenantId};
+use ironcore_alloy::{AlloyMetadata, Secret, SecretPath, Standalone, TenantId};
 use itertools::Itertools;
 use rand::{Rng, RngCore};
 use rand_distr::Uniform;
@@ -57,7 +57,7 @@ fn benches(c: &mut Criterion) {
     let config =
         StandaloneConfiguration::new(standard_secrets, deterministic_secrets, vector_secrets);
     let sdk = Standalone::new(&config);
-    let metadata = IronCoreMetadata::new_simple(TenantId("tenant".to_string()));
+    let metadata = AlloyMetadata::new_simple(TenantId("tenant".to_string()));
 
     let range = Uniform::from(-1.0..1.0);
     c.bench_function(format!("encrypt d=1k").as_str(), |b| {

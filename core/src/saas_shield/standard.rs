@@ -6,7 +6,7 @@ use crate::standard::{
 use crate::tenant_security_client::errors::TenantSecurityError;
 use crate::tenant_security_client::{TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse};
 use crate::util::{get_rng, OurReseedingRng};
-use crate::IronCoreMetadata;
+use crate::AlloyMetadata;
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
@@ -46,7 +46,7 @@ impl SaasShieldStandardClient {
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,
         dek: Vec<u8>,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
         document: HashMap<String, Vec<u8>>,
     ) -> Result<EncryptedDocument, AlloyError> {
         let pb_edek: ironcore_documents::cmk_edek::EncryptedDek =
@@ -74,7 +74,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     async fn encrypt(
         &self,
         plaintext_document: PlaintextDocument,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
         let WrapKeyResponse {
@@ -95,7 +95,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     async fn decrypt(
         &self,
         encrypted_document: EncryptedDocument,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
         let (v4_document, edek) = get_document_header_and_edek(&encrypted_document)?;
@@ -148,7 +148,7 @@ fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, TenantSecuri
 fn generate_cmk_v4_doc_and_sign(
     mut edek: EncryptedDek,
     dek: EncryptionKey,
-    metadata: &IronCoreMetadata,
+    metadata: &AlloyMetadata,
 ) -> Result<V4DocumentHeader, AlloyError> {
     edek.tenantId = metadata.tenant_id.0.clone().into();
     let edek_wrapper = icl_header_v4::v4document_header::EdekWrapper {

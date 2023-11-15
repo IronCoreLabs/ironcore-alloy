@@ -1,4 +1,4 @@
-use crate::{errors::AlloyError, EncryptedBytes, FieldId, IronCoreMetadata, PlaintextBytes};
+use crate::{errors::AlloyError, AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes};
 use ironcore_documents::{aes::EncryptionKey, icl_header_v4, key_id_header::KeyIdHeader};
 use itertools::Itertools;
 use protobuf::Message;
@@ -38,7 +38,7 @@ pub trait StandardDocumentOps {
     async fn encrypt(
         &self,
         plaintext_document: PlaintextDocument,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError>;
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
     /// of the `StandardDocumentOps.encrypt` functions. The result contains a map from field identifiers to decrypted
@@ -46,7 +46,7 @@ pub trait StandardDocumentOps {
     async fn decrypt(
         &self,
         encrypted_document: EncryptedDocument,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError>;
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into

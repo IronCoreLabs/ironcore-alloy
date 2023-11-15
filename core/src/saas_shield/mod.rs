@@ -1,7 +1,7 @@
 use crate::tenant_security_client::{
     DerivationType, DerivedKey, KeyDeriveResponse, SecretType, TenantSecurityClient,
 };
-use crate::{errors::AlloyError, IronCoreMetadata, VectorEncryptionKey};
+use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
@@ -44,7 +44,7 @@ async fn derive_key_for_path<'a>(
 /// Then converts the results to encryption keys and key IDs.
 async fn derive_keys_many_paths(
     tenant_security_client: &TenantSecurityClient,
-    request_metadata: &IronCoreMetadata,
+    request_metadata: &AlloyMetadata,
     paths: Vec<(SecretPath, DerivationPath)>,
     secret_type: SecretType,
 ) -> Result<HashMap<SecretPath, HashMap<DerivationPath, Vec<DerivedKey>>>, AlloyError> {

@@ -4,7 +4,7 @@ use crate::deterministic::{
     EncryptedField, GenerateQueryResult, PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
-use crate::{DerivationPath, IronCoreMetadata, SecretPath, StandaloneConfiguration};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
     async fn encrypt(
         &self,
         plaintext_field: PlaintextField,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedField, AlloyError> {
         let secret = self
             .config
@@ -67,7 +67,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
         let (
             KeyIdHeader {
@@ -116,7 +116,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError> {
         fields_to_query
             .into_iter()
@@ -171,7 +171,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         &self,
         secret_path: SecretPath,
         _derivation_path: DerivationPath,
-        _metadata: &IronCoreMetadata,
+        _metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
         let secret = self.config.get(&secret_path).ok_or_else(|| {
             AlloyError::InvalidConfiguration(format!(

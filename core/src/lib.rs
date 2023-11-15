@@ -47,7 +47,7 @@ custom_newtype!(DerivationPath, String);
 /// Only the tenant ID will be used in Standalone SDKs, which can be created easily with `new_simple()`.
 #[derive(Debug, Clone, Serialize, uniffi::Object)]
 #[serde(rename_all(serialize = "camelCase"))]
-pub struct IronCoreMetadata {
+pub struct AlloyMetadata {
     tenant_id: TenantId,
     requesting_id: Option<String>,
     data_label: Option<String>,
@@ -59,8 +59,8 @@ pub struct IronCoreMetadata {
 }
 
 #[uniffi::export]
-impl IronCoreMetadata {
-    /// Constructor for IronCoreMetadata which contains the tenant's ID and other metadata to send to the
+impl AlloyMetadata {
+    /// Constructor for AlloyMetadata which contains the tenant's ID and other metadata to send to the
     /// Tenant Security Proxy.
     ///
     /// # Arguments
@@ -96,7 +96,7 @@ impl IronCoreMetadata {
         })
     }
 
-    /// Simplified constructor for IronCoreMetadata that only takes the tenant's ID and the
+    /// Simplified constructor for AlloyMetadata that only takes the tenant's ID and the
     /// ID of the user/service that is processing data.
     ///
     /// # Arguments
@@ -116,9 +116,9 @@ impl IronCoreMetadata {
     }
 }
 
-impl TryFrom<IronCoreMetadata> for RequestMetadata {
+impl TryFrom<AlloyMetadata> for RequestMetadata {
     type Error = AlloyError;
-    fn try_from(value: IronCoreMetadata) -> Result<Self, Self::Error> {
+    fn try_from(value: AlloyMetadata) -> Result<Self, Self::Error> {
         Ok(Self::new(
             value.tenant_id,
             RequestingId::new(
@@ -256,8 +256,8 @@ pub(crate) mod tests {
     use super::*;
     use itertools::Itertools;
 
-    pub fn get_metadata() -> Arc<IronCoreMetadata> {
-        IronCoreMetadata::new_simple(TenantId("foo".to_string()))
+    pub fn get_metadata() -> Arc<AlloyMetadata> {
+        AlloyMetadata::new_simple(TenantId("foo".to_string()))
     }
 
     // The expect value matches an array produced in the tsp test derive_keys_produces_known_result_sha_512.

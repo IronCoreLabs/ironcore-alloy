@@ -7,7 +7,7 @@ use crate::deterministic::{
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::{DerivationPath, IronCoreMetadata, SecretPath};
+use crate::{AlloyMetadata, DerivationPath, SecretPath};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
     async fn encrypt(
         &self,
         plaintext_field: PlaintextField,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedField, AlloyError> {
         let paths = [(
             plaintext_field.secret_path.clone(),
@@ -75,7 +75,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
         let (
             KeyIdHeader {
@@ -134,7 +134,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError> {
         let paths = fields_to_query
             .values()
@@ -179,7 +179,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         &self,
         secret_path: SecretPath,
         derivation_path: DerivationPath,
-        metadata: &IronCoreMetadata,
+        metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
         let paths = [(secret_path.clone(), [derivation_path.clone()].into())].into();
         let derived_keys = self
