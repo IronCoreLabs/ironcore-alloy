@@ -8,8 +8,8 @@ build:
   commands:
     # install rust
     - ./core/python/cloaked-ai/rust-toolchain-from-file.sh
-    - cargo b --release
-    - cargo run --bin uniffi-bindgen generate --library ../target/release/libcloaked_ai.so --language python  --out-dir python/cloaked-ai/cloaked_ai
+    - source "$HOME/.cargo/env" && cargo b --release
+    - source "$HOME/.cargo/env" && cargo run --bin uniffi-bindgen generate --library ./target/release/libcloaked_ai.so --language python  --out-dir core/python/cloaked-ai/cloaked_ai
     # actual doc building part
     - pip install -v "hatch==1.7.0"
     - cd core/python/cloaked-ai && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
