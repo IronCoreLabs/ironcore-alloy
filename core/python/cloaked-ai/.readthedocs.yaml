@@ -6,8 +6,7 @@ build:
   tools:
     python: "3.10"
   commands:
-    - cd core/python/cloaked-ai
     - pip install -v "hatch==1.7.0"
-    - hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
+    - cd core/python/cloaked-ai && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
 
    
