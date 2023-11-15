@@ -1,9 +1,12 @@
+#![allow(async_fn_in_trait)]
+
 use crate::errors::AlloyError;
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
 use saas_shield::standard::SaasShieldStandardClient;
 use saas_shield::vector::SaasShieldVectorClient;
 use serde::{Deserialize, Serialize};
+use standalone::config::StandaloneConfiguration;
 use standalone::deterministic::StandaloneDeterministicClient;
 use standalone::standard::StandaloneStandardClient;
 use standalone::vector::StandaloneVectorClient;
@@ -14,16 +17,14 @@ use tenant_security_client::{RequestMetadata, RequestingId};
 use uniffi::custom_newtype;
 use vector::VectorEncryptionKey;
 
-pub use standalone::config::StandaloneConfiguration;
-
-mod deterministic;
-mod errors;
-mod saas_shield;
-mod standalone;
-mod standard;
+pub mod deterministic;
+pub mod errors;
+pub mod saas_shield;
+pub mod standalone;
+pub mod standard;
 mod tenant_security_client;
 mod util;
-mod vector;
+pub mod vector;
 
 // add multi-lang scaffolding
 // proc macro defined
@@ -229,14 +230,6 @@ pub fn encode_prefix_z85(prefix_bytes: Vec<u8>) -> String {
     z85_string.pop();
     z85_string
 }
-
-#[derive(Debug, Serialize, Clone, Copy)]
-pub struct ScalingFactor(pub f32); // Based on page 135 having a size 2^30
-custom_newtype!(ScalingFactor, f32);
-
-#[derive(Debug, Serialize, Clone)]
-pub struct EncryptionKey(pub Vec<u8>);
-custom_newtype!(EncryptionKey, Vec<u8>);
 
 // Like an EncryptionKey but not used directly for encryption
 #[derive(Debug, Serialize, Clone, uniffi::Object)]

@@ -36,7 +36,7 @@ assertables = "7.0.1"
 base64 = "0.21.5"
 base85 = "2.0.0"
 camino = "1.1"
-criterion = { version = "0.5" }
+criterion = { version = "0.5", features = ["async_tokio"] }
 hex = "0.4.3"
 hex-literal = "0.4.1"
 lazy_static = "1.4"

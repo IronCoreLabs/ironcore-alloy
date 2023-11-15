@@ -2,7 +2,7 @@ use self::crypto::{shuffle, unshuffle, EncryptResult};
 use crate::{
     errors::AlloyError,
     util::{self, AuthHash},
-    DerivationPath, EncryptionKey, IronCoreMetadata, ScalingFactor, Secret, SecretPath, TenantId,
+    DerivationPath, IronCoreMetadata, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
 use ironcore_documents::{
@@ -13,6 +13,7 @@ use itertools::Itertools;
 use rand::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::collections::HashMap;
+use uniffi::custom_newtype;
 
 pub(crate) mod crypto;
 
@@ -36,14 +37,21 @@ pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
 pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
 
 /// Key used to for vector encryption.
-/// Can be created with the `generate_key`/`generateKey` function.
-#[derive(Debug, Serialize, Clone, uniffi::Record)]
+#[derive(Debug, Serialize, Clone)]
 pub struct VectorEncryptionKey {
     /// The amount to scale embedding values during encryption
     pub scaling_factor: ScalingFactor,
     /// The actual key used for encryption/decryption operations
     pub key: EncryptionKey,
 }
+
+#[derive(Debug, Serialize, Clone, Copy)]
+pub struct ScalingFactor(pub f32); // Based on page 135 having a size 2^30
+custom_newtype!(ScalingFactor, f32);
+
+#[derive(Debug, Serialize, Clone)]
+pub struct EncryptionKey(pub Vec<u8>);
+custom_newtype!(EncryptionKey, Vec<u8>);
 
 impl VectorEncryptionKey {
     /// A way to generate a key from the secret, tenant_id and derivation_path. This is done in the context of

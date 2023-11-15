@@ -98,7 +98,7 @@ pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::EncryptionKey;
+    use crate::{vector::EncryptionKey, vector::ScalingFactor};
     use base64::Engine;
     use bytes::Bytes;
     use itertools::Itertools;
@@ -128,7 +128,7 @@ pub(crate) mod tests {
                 scaling_factor as f32
             };
             let key = VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(f32_scaling_factor),
+                scaling_factor: ScalingFactor(f32_scaling_factor),
                 key: EncryptionKey(key.to_vec().into()),
             };
 

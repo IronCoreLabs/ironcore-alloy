@@ -1,9 +1,6 @@
-use super::VectorEncryptionKey;
-use crate::{util, EncryptionKey};
-use crate::{
-    util::{compute_auth_hash, create_rng, AuthHash},
-    ScalingFactor,
-};
+use super::{EncryptionKey, ScalingFactor, VectorEncryptionKey};
+use crate::util;
+use crate::util::{compute_auth_hash, create_rng, AuthHash};
 use itertools::Itertools;
 use ndarray::Array1;
 use ndarray_rand::RandomExt;
@@ -248,7 +245,7 @@ pub(crate) fn unshuffle<T: IntoIterator<Item = A>, A>(key: &EncryptionKey, input
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::EncryptionKey;
+    use crate::vector::ScalingFactor;
     use approx::assert_ulps_eq;
     use proptest::proptest;
     use rand::SeedableRng;
@@ -261,7 +258,7 @@ pub(crate) mod tests {
         let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         let result = encrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(1235.),
+                scaling_factor: ScalingFactor(1235.),
                 key: EncryptionKey(
                     vec![
                         69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150,
@@ -297,7 +294,7 @@ pub(crate) mod tests {
         let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         let result = encrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(1235.),
+                scaling_factor: ScalingFactor(1235.),
                 key: EncryptionKey(
                     vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -333,7 +330,7 @@ pub(crate) mod tests {
         let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         let result = encrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(1235.),
+                scaling_factor: ScalingFactor(1235.),
                 key: EncryptionKey(
                     vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -358,7 +355,7 @@ pub(crate) mod tests {
         let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         encrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(s),
+                scaling_factor: ScalingFactor(s),
                 key: EncryptionKey(
                     vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -391,7 +388,7 @@ pub(crate) mod tests {
     fn decrypt_fails_for_invalid_auth_hash() {
         let result = decrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(1235.),
+                scaling_factor: ScalingFactor(1235.),
                 key: EncryptionKey(
                     vec![
                         69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150,
@@ -422,7 +419,7 @@ pub(crate) mod tests {
         // This ciphertext and icl_metadata comes from `encrypt_produces_known_value()`
         let result = decrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(1235.),
+                scaling_factor: ScalingFactor(1235.),
                 key: EncryptionKey(
                     vec![
                         69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150,
@@ -448,7 +445,7 @@ pub(crate) mod tests {
     fn decrypt_with_scaling_factor(s: f32) -> Result<Array1<f32>, DecryptError> {
         decrypt(
             &VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(s),
+                scaling_factor: ScalingFactor(s),
                 key: EncryptionKey(
                     vec![
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -483,7 +480,7 @@ pub(crate) mod tests {
     #[test]
     fn roundtrip_small_value() {
         let key = VectorEncryptionKey {
-            scaling_factor: crate::ScalingFactor(1.),
+            scaling_factor: ScalingFactor(1.),
             key: EncryptionKey(
                 vec![
                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -510,7 +507,7 @@ pub(crate) mod tests {
         #[test]
         fn roundtrip(arb_msg: Vec<u16>, key: [u8; 32], scaling_factor in 1..16777215) {
             let key = VectorEncryptionKey {
-                scaling_factor: crate::ScalingFactor(scaling_factor as f32),
+                scaling_factor: ScalingFactor(scaling_factor as f32),
                 key: EncryptionKey(key.to_vec().into()),
             };
             let approximation_factor = 5.;
@@ -523,7 +520,7 @@ pub(crate) mod tests {
 
     fn get_key() -> VectorEncryptionKey {
         VectorEncryptionKey {
-            scaling_factor: crate::ScalingFactor(1235.),
+            scaling_factor: ScalingFactor(1235.),
             key: EncryptionKey(
                 vec![
                     69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
