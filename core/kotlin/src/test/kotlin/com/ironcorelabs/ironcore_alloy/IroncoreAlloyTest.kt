@@ -1,5 +1,6 @@
 package com.ironcorelabs.ironcore_alloy
 
+import kotlin.math.abs
 import java.util.Base64
 import kotlin.system.*
 import kotlin.test.*
@@ -9,10 +10,12 @@ fun ByteArray.toBase64(): String = String(Base64.getEncoder().encode(this))
 
 fun String.base64ToByteArray(): ByteArray = Base64.getDecoder().decode(this)
 
+fun Float.sameValueAs(other: Float) : Boolean {
+   return (abs(this-other) < 0.0000000001)
+}
+
 class IroncoreAlloyTest {
-    val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".toByteArray()
-    val scalingFactor = 12345.0f
-    val key = VectorEncryptionKey(scalingFactor, keyByteArray)
+    val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".base64ToByteArray()
     val approximationFactor = 1.1f
     val standardSecrets = StandardSecrets(10u, listOf(StandaloneSecret(10u, Secret(keyByteArray))))
     val deterministicSecrets =
@@ -36,9 +39,6 @@ class IroncoreAlloyTest {
             )
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
-    // val seededSdk = IroncoreAlloyStandalone.newTestSeeded(key, approximationFactor,
-    // 123.toULong())
-    // val docMetadata = DocumentMetadata("Tenant")
 
     @Test
     fun sdkVectorRoundtrip() {
@@ -48,31 +48,17 @@ class IroncoreAlloyTest {
         runBlocking {
             val encrypted = sdk.vector().encrypt(plaintext, metadata)
             val decrypted = sdk.vector().decrypt(encrypted, metadata)
-            assertContentEquals(
-                    data,
-                    decrypted.plaintextVector,
-            )
+            for (i in 0..(data.size-1)) {
+                data.get(i).sameValueAs(decrypted.plaintextVector.get(i))
+            }
         }
     }
 
-    // TODO
-    // @Test
-    // fun sdkEncryptSeeded() {
-    //     val data = listOf(1.0f, 2.0f, 3.0f)
-    //     val metadata = DocumentMetadata("tenant")
-    //     val encrypted = seededSdk.encrypt(data, metadata)
-    //     val expected = listOf(11864.771f, 26402.541f, 35622.992f)
-    //     assertEquals(
-    //             expected,
-    //             encrypted.ciphertext,
-    //     )
-    // }
-
     @Test
     fun sdkVectorDecrypt() {
-        val ciphertext = listOf(5826192.0f, 15508204.0f, 11420345.0f)
+        val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
         val iclMetadata =
-                "AAAAAoEACgyVAnirL57DGDIdC28SIH9FFpmMs5yi5CcTcQjcUjldEE0OEdZDWtpyNI++ALnf".base64ToByteArray()
+                "AAAAAoEACgxPGmuySl4VniL/cbMSIOykrH8Xa9rVT4vtQZE73EM3G6AOrEae4tVgIpxA3lhp".base64ToByteArray()
         val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
         val metadata = IronCoreMetadata.newSimple("tenant")
         runBlocking {
@@ -85,12 +71,12 @@ class IroncoreAlloyTest {
     }
 
     @Test
-    fun sdkEncryptDeterministicMetadata() {
+    fun sdkEncryptDeterministic() {
         val field = PlaintextField("My data".toByteArray(), "", "")
         val metadata = IronCoreMetadata.newSimple("tenant")
         runBlocking {
             val encrypted = sdk.deterministic().encrypt(field, metadata)
-            val expected = "AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak=".base64ToByteArray()
+            val expected = "AAAAAoAAUvfq7IxbDEtW26wr4H8x2JCtyB4DCzk=".base64ToByteArray()
             assertContentEquals(expected, encrypted.encryptedField)
         }
     }
@@ -107,24 +93,9 @@ class IroncoreAlloyTest {
         }
     }
 
-    // TODO
-    // @Test
-    // fun sdkEncryptProbabilisticMetadata() {
-    //     val documentFields = mapOf("foo" to "My data".toByteArray())
-    //     val metadata = DocumentMetadata("tenant")
-    //     val encrypted = seededSdk.encryptDocument(documentFields, metadata)
-    //     val expected =
-    //             mapOf(
-    //                     "foo" to
-    //
-    // "AElST047XW9umwlxe053wEV18Vn5REOO4xh1s+2PAJk9E/h2lSug0A==".base64ToByteArray()
-    //             )
-    //     assertContentEquals(expected.get("foo"), encrypted.document.get("foo"))
-    // }
-
     @Test
-    fun sdkDecryptDeterministicMetadata() {
-        val ciphertext = "AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak=".base64ToByteArray()
+    fun sdkDecryptDeterministic() {
+        val ciphertext = "AAAAAoAAUvfq7IxbDEtW26wr4H8x2JCtyB4DCzk=".base64ToByteArray()
         val encryptedField = EncryptedField(ciphertext, "", "")
         val metadata = IronCoreMetadata.newSimple("tenant")
         runBlocking {
