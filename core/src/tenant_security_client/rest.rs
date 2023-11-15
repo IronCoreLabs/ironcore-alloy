@@ -1,5 +1,5 @@
 use super::{errors::TenantSecurityError, DerivationPath, RequestMetadata, SecretPath};
-pub use base64_type::Base64;
+use base64_type::Base64;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -18,6 +18,7 @@ pub(crate) struct UnwrapKeyRequest<'a> {
 pub enum DerivationType {
     #[allow(dead_code)]
     Argon2,
+    #[allow(dead_code)]
     Sha256,
     Sha512,
 }

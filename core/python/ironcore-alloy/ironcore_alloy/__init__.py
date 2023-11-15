@@ -2,4 +2,4 @@
 #
 # SPDX-License-Identifier: AGPLv3+
 
-from .cloaked_ai import *
+from .ironcore_alloy import *

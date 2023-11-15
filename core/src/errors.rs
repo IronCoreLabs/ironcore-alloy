@@ -1,13 +1,13 @@
 use crate::tenant_security_client::errors::TenantSecurityError;
 use crate::vector::crypto::{DecryptError, EncryptError};
 
-/// Errors related to CloakedAiStandalone
+/// Errors related to IronCore Alloy SDK
 #[derive(Debug, uniffi::Error, PartialEq, Eq)]
 #[uniffi(flat_error)]
-pub enum CloakedAiError {
+pub enum AlloyError {
     /// Error while loading configuration.
     InvalidConfiguration(String),
-    /// Error with key used to initialize CloakedAiStandalone
+    /// Error with key used
     InvalidKey(String),
     /// Error with user input
     InvalidInput(String),
@@ -22,34 +22,34 @@ pub enum CloakedAiError {
     /// Error with IronCore Documents
     IronCoreDocumentsError(String),
 }
-impl std::fmt::Display for CloakedAiError {
+impl std::fmt::Display for AlloyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CloakedAiError::InvalidConfiguration(message) => {
+            AlloyError::InvalidConfiguration(message) => {
                 write!(f, "Invalid configuration: '{message}'")
             }
-            CloakedAiError::InvalidKey(message) => write!(f, "Invalid key: '{message}'"),
-            CloakedAiError::InvalidInput(message) => write!(f, "Invalid input: '{message}'"),
-            CloakedAiError::EncryptError(message) => write!(f, "Encrypt error: '{message}'"),
-            CloakedAiError::DecryptError(message) => write!(f, "Decrypt error: '{message}'"),
-            CloakedAiError::ProtobufError(message) => write!(f, "Protobuf error: '{message}'"),
-            CloakedAiError::TenantSecurityError(message) => {
+            AlloyError::InvalidKey(message) => write!(f, "Invalid key: '{message}'"),
+            AlloyError::InvalidInput(message) => write!(f, "Invalid input: '{message}'"),
+            AlloyError::EncryptError(message) => write!(f, "Encrypt error: '{message}'"),
+            AlloyError::DecryptError(message) => write!(f, "Decrypt error: '{message}'"),
+            AlloyError::ProtobufError(message) => write!(f, "Protobuf error: '{message}'"),
+            AlloyError::TenantSecurityError(message) => {
                 write!(f, "Tenant security client error: '{message}'")
             }
-            CloakedAiError::IronCoreDocumentsError(message) => {
+            AlloyError::IronCoreDocumentsError(message) => {
                 write!(f, "IronCore Documents error: '{message}'")
             }
         }
     }
 }
 
-impl From<TenantSecurityError> for CloakedAiError {
+impl From<TenantSecurityError> for AlloyError {
     fn from(value: TenantSecurityError) -> Self {
         Self::TenantSecurityError(value.to_string())
     }
 }
 
-impl From<EncryptError> for CloakedAiError {
+impl From<EncryptError> for AlloyError {
     fn from(value: EncryptError) -> Self {
         match value {
             EncryptError::InvalidKey(s) => Self::InvalidKey(s),
@@ -58,7 +58,7 @@ impl From<EncryptError> for CloakedAiError {
     }
 }
 
-impl From<DecryptError> for CloakedAiError {
+impl From<DecryptError> for AlloyError {
     fn from(value: DecryptError) -> Self {
         match value {
             DecryptError::InvalidKey(s) => Self::InvalidKey(s),
@@ -69,7 +69,7 @@ impl From<DecryptError> for CloakedAiError {
     }
 }
 
-impl From<ironcore_documents::Error> for CloakedAiError {
+impl From<ironcore_documents::Error> for AlloyError {
     fn from(value: ironcore_documents::Error) -> Self {
         match value {
             ironcore_documents::Error::EdocTooShort(_)
@@ -82,19 +82,19 @@ impl From<ironcore_documents::Error> for CloakedAiError {
             | ironcore_documents::Error::PayloadTypeError(_)
             | ironcore_documents::Error::KeyIdHeaderTooShort(_)
             | ironcore_documents::Error::KeyIdHeaderMalformed(_) => {
-                CloakedAiError::IronCoreDocumentsError(value.to_string())
+                AlloyError::IronCoreDocumentsError(value.to_string())
             }
-            ironcore_documents::Error::ProtoSerializationErr(m) => CloakedAiError::ProtobufError(m),
-            ironcore_documents::Error::EncryptError(m) => CloakedAiError::EncryptError(m),
-            ironcore_documents::Error::DecryptError(m) => CloakedAiError::DecryptError(m),
+            ironcore_documents::Error::ProtoSerializationErr(m) => AlloyError::ProtobufError(m),
+            ironcore_documents::Error::EncryptError(m) => AlloyError::EncryptError(m),
+            ironcore_documents::Error::DecryptError(m) => AlloyError::DecryptError(m),
         }
     }
 }
 
-impl From<protobuf::Error> for CloakedAiError {
+impl From<protobuf::Error> for AlloyError {
     fn from(value: protobuf::Error) -> Self {
-        CloakedAiError::ProtobufError(value.to_string())
+        AlloyError::ProtobufError(value.to_string())
     }
 }
 
-impl std::error::Error for CloakedAiError {}
+impl std::error::Error for AlloyError {}

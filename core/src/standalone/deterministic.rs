@@ -3,7 +3,7 @@ use crate::deterministic::{
     decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
     EncryptedField, GenerateQueryResult, PlaintextField, PlaintextFields,
 };
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::{DerivationPath, IronCoreMetadata, SecretPath, StandaloneConfiguration};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
@@ -36,18 +36,18 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         &self,
         plaintext_field: PlaintextField,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedField, CloakedAiError> {
+    ) -> Result<EncryptedField, AlloyError> {
         let secret = self
             .config
             .get(&plaintext_field.secret_path)
             .ok_or_else(|| {
-                CloakedAiError::InvalidConfiguration(format!(
+                AlloyError::InvalidConfiguration(format!(
                     "Provided secret path `{}` does not exist in the deterministic configuration.",
                     &plaintext_field.secret_path.0
                 ))
             })?;
         let current_secret = secret.current_secret.as_ref().ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(
+            AlloyError::InvalidConfiguration(
                 "No current secret exists in the deterministic configuration".to_string(),
             )
         })?;
@@ -68,7 +68,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         &self,
         encrypted_field: EncryptedField,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextField, CloakedAiError> {
+    ) -> Result<PlaintextField, AlloyError> {
         let (
             KeyIdHeader {
                 key_id,
@@ -79,19 +79,19 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
             encrypted_field.encrypted_field.into(),
         )
-        .map_err(|_| CloakedAiError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
+        .map_err(|_| AlloyError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
             let secret = self
                 .config
                 .get(&encrypted_field.secret_path)
                 .ok_or_else(|| {
-                    CloakedAiError::InvalidConfiguration(format!(
+                    AlloyError::InvalidConfiguration(format!(
                         "Provided secret path `{}` does not exist in the deterministic configuration.",
                         &encrypted_field.secret_path.0
                     ))
                 })?;
             let standalone_secret = secret.get_secret_with_id(&key_id).ok_or_else(|| {
-                CloakedAiError::InvalidConfiguration(format!(
+                AlloyError::InvalidConfiguration(format!(
                     "Secret with key ID `{}` does not exist in the deterministic configuration",
                     key_id.0
                 ))
@@ -108,7 +108,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 encrypted_field.derivation_path,
             )
         } else {
-            Err(CloakedAiError::InvalidInput(
+            Err(AlloyError::InvalidInput(
                 format!("The data indicated that this was not a Standalone Deterministic wrapped value. Found: {edek_type}, {payload_type}"),
             ))
         }
@@ -117,7 +117,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         &self,
         fields_to_query: PlaintextFields,
         metadata: &IronCoreMetadata,
-    ) -> Result<GenerateQueryResult, CloakedAiError> {
+    ) -> Result<GenerateQueryResult, AlloyError> {
         fields_to_query
             .into_iter()
             .map(|(field_id, plaintext_field)| {
@@ -125,7 +125,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     .config
                     .get(&plaintext_field.secret_path)
                     .ok_or_else(|| {
-                        CloakedAiError::InvalidConfiguration(format!(
+                        AlloyError::InvalidConfiguration(format!(
                             "Provided secret path `{}` does not exist in the deterministic configuration.",
                             &plaintext_field.secret_path.0
                         ))
@@ -135,7 +135,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     in_rotation_secret,
                 } = secret.as_ref();
                 if current_secret.is_none() && in_rotation_secret.is_none() {
-                    Err(CloakedAiError::InvalidConfiguration(format!(
+                    Err(AlloyError::InvalidConfiguration(format!(
                         "No secrets exist in the deterministic configuration for secret path `{}`.",
                         plaintext_field.secret_path.0
                     )))?;
@@ -172,15 +172,15 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         secret_path: SecretPath,
         _derivation_path: DerivationPath,
         _metadata: &IronCoreMetadata,
-    ) -> Result<Vec<u8>, CloakedAiError> {
+    ) -> Result<Vec<u8>, AlloyError> {
         let secret = self.config.get(&secret_path).ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(format!(
+            AlloyError::InvalidConfiguration(format!(
                 "Provided secret path `{}` does not exist in the deterministic configuration.",
                 &secret_path.0
             ))
         })?;
         let in_rotation_secret = secret.in_rotation_secret.as_ref().ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(format!(
+            AlloyError::InvalidConfiguration(format!(
                 "There is no in-rotation secret for path `{}` in the deterministic configuration.",
                 secret_path.0
             ))

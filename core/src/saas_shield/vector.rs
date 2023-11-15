@@ -2,11 +2,11 @@ use super::{
     derive_key_for_path, derive_keys_many_paths, derived_key_to_vector_encryption_key,
     get_in_rotation_prefix_internal, DeriveKeyChoice,
 };
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::{get_rng, OurReseedingRng};
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryBatchResult, PlaintextVector,
+    decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryResult, PlaintextVector,
     PlaintextVectors, VectorOps,
 };
 use crate::{DerivationPath, IronCoreMetadata, SecretPath, VectorEncryptionKey};
@@ -39,9 +39,9 @@ impl SaasShieldVectorClient {
         key: &VectorEncryptionKey,
         key_id: KeyId,
         plaintext_vector: PlaintextVector,
-    ) -> Result<EncryptedVector, CloakedAiError> {
+    ) -> Result<EncryptedVector, AlloyError> {
         let approximation_factor = self.approximation_factor.ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(
+            AlloyError::InvalidConfiguration(
                 "`approximation_factor` was not set in the vector configuration.".to_string(),
             )
         })?;
@@ -69,7 +69,7 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedVector, CloakedAiError> {
+    ) -> Result<EncryptedVector, AlloyError> {
         let paths = [(
             plaintext_vector.secret_path.clone(),
             [plaintext_vector.derivation_path.clone()].into(),
@@ -99,9 +99,9 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextVector, CloakedAiError> {
+    ) -> Result<PlaintextVector, AlloyError> {
         let approximation_factor = self.approximation_factor.ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(
+            AlloyError::InvalidConfiguration(
                 "`approximation_factor` was not set in the vector configuration.".to_string(),
             )
         })?;
@@ -116,7 +116,7 @@ impl VectorOps for SaasShieldVectorClient {
             encrypted_vector.paired_icl_info.clone().into(),
         )
         .map_err(|_| {
-            CloakedAiError::InvalidInput("Paired ICL info couldn't be decoded.".to_string())
+            AlloyError::InvalidInput("Paired ICL info couldn't be decoded.".to_string())
         })?;
 
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
@@ -143,7 +143,7 @@ impl VectorOps for SaasShieldVectorClient {
             .await?;
             let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
             if derived_key_id != key_id {
-                Err(CloakedAiError::InvalidKey(
+                Err(AlloyError::InvalidKey(
                     "The key ID in the paired ICL info and on the key derived for decryption did not match"
                         .to_string(),
                 ))
@@ -156,7 +156,7 @@ impl VectorOps for SaasShieldVectorClient {
                 )
             }
         } else {
-            Err(CloakedAiError::InvalidInput(
+            Err(AlloyError::InvalidInput(
                 format!("The data indicated that this was not a SaaS Shield Vector wrapped value. Found: {edek_type}, {payload_type}"),
             ))
         }
@@ -166,7 +166,7 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         vectors_to_query: PlaintextVectors,
         metadata: &IronCoreMetadata,
-    ) -> Result<GenerateQueryBatchResult, CloakedAiError> {
+    ) -> Result<GenerateQueryResult, AlloyError> {
         let paths = vectors_to_query
             .values()
             .map(|vector| (vector.secret_path.clone(), vector.derivation_path.clone()))
@@ -184,7 +184,7 @@ impl VectorOps for SaasShieldVectorClient {
                 let keys = all_keys
                     .get(&plaintext_vector.secret_path)
                     .and_then(|deriv| deriv.get(&plaintext_vector.derivation_path))
-                    .ok_or(CloakedAiError::TenantSecurityError(
+                    .ok_or(AlloyError::TenantSecurityError(
                         "Failed to derive keys for provided path using the TSP.".to_string(),
                     ))?;
                 keys.iter()
@@ -206,7 +206,7 @@ impl VectorOps for SaasShieldVectorClient {
         secret_path: SecretPath,
         derivation_path: DerivationPath,
         metadata: &IronCoreMetadata,
-    ) -> Result<Vec<u8>, CloakedAiError> {
+    ) -> Result<Vec<u8>, AlloyError> {
         let paths = [(secret_path.clone(), [derivation_path.clone()].into())].into();
         let derived_keys = self
             .tenant_security_client

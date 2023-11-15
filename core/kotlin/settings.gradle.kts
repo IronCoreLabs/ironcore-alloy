@@ -7,5 +7,5 @@
  * in the user manual at https://docs.gradle.org/8.0.1/userguide/multi_project_builds.html
  */
 
-rootProject.name = "cloaked-ai"
+rootProject.name = "ironcore-alloy"
 include("lib")

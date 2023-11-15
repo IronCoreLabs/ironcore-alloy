@@ -15,8 +15,8 @@ That will build the cdylib and generate the foreign code, placing them into the 
 
 ```console
 cargo b --release
-cargo run --release --bin uniffi-bindgen generate --library ../target/release/libcloaked_ai.so --language python --out-dir python/cloaked-ai/cloaked_ai/
-cp ../target/release/libcloaked_ai.so python/cloaked-ai/cloaked_ai/
+cargo run --release --bin uniffi-bindgen generate --library ../target/release/libironcore_alloy.so --language python --out-dir python/ironcore-alloy/ironcore_alloy/
+cp ../target/release/libironcore_alloy.so python/ironcore-alloy/ironcore_alloy/
 ```
 
 However the integration tests are guaranteed to always have the most current method of managing these files.
@@ -42,4 +42,4 @@ Workflow automation will do this, and instructions for triggering that automatio
 1. `hatch publish --repo test --user __token__ --auth "TEST_API_TOKEN"` to release all `.whl`s in `dist` to test pypi \*\*\*
 1. after confirming the results `hatch publish --repo main --user __token__ --auth "API_TOKEN"` to release all `.whl`s in `dist` to pypi
 
-> \* support for additional platforms can be added to `hatch_build.py` > \*\* steps 2 and 3 can be repeated for each platform we're going to support, and will result in a bunch of `.whl` files in `dist` > \*\*\* `python3 -m pip install --force --index-url https://test.pypi.org/simple/ cloaked-ai`, check installation and use
+> \* support for additional platforms can be added to `hatch_build.py` > \*\* steps 2 and 3 can be repeated for each platform we're going to support, and will result in a bunch of `.whl` files in `dist` > \*\*\* `python3 -m pip install --force --index-url https://test.pypi.org/simple/ ironcore-alloy`, check installation and use

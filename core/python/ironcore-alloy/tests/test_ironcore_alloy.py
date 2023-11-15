@@ -1,9 +1,9 @@
 import base64
-from cloaked_ai import *
+from ironcore_alloy import *
 import pytest
 
 
-class TestCloakedAi:
+class TestIroncoreAlloy:
     key_bytes = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".encode("utf-8")
     scaling_factor = 12345.0
     key = VectorEncryptionKey(scaling_factor, key_bytes)
@@ -62,7 +62,15 @@ class TestCloakedAi:
         expected = b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="
         assert base64.b64encode(encrypted.encrypted_field) == expected
 
-    @pytest.mark.skip(reason="not implemented yet")
+    @pytest.mark.asyncio
+    async def test_generate_query_field_values_deterministic(self):
+        field = PlaintextField(b"My data", "", "")
+        fields = {"foo": field}
+        metadata = IronCoreMetadata.new_simple("tenant")
+        queries = await self.sdk.deterministic().generate_query_field_values(fields, metadata)
+        expected = b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="
+        assert base64.b64encode(queries["foo"][0].encrypted_field) == expected
+
     @pytest.mark.asyncio
     async def test_roundtrip_standard(self):
         document = {"foo": b"My data"}
@@ -84,7 +92,7 @@ class TestCloakedAi:
 
     @pytest.mark.skip(reason="need seeded client")
     def test_encrypt_probabilistic_metadata(self):
-        seeded_sdk = CloakedAiStandalone.new_test_seeded(
+        seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
             self.key, self.approximation_factor, 123
         )
         document = {"foo": b"My data"}
@@ -96,8 +104,8 @@ class TestCloakedAi:
 
     @pytest.mark.skip(reason="not implemented yet")
     @pytest.mark.asyncio
-    async def consecutive_test_encrypt_standard_calls_different(self):
-        seeded_sdk = CloakedAiStandalone.new_test_seeded(
+    async def test_consecutive_test_encrypt_standard_calls_different(self):
+        seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
             self.key, self.approximation_factor, 123
         )
         document = {"foo": b"My data"}
@@ -109,7 +117,7 @@ class TestCloakedAi:
     @pytest.mark.skip(reason="not implemented yet")
     @pytest.mark.asyncio
     async def test_decrypt_standard(self):
-        seeded_sdk = CloakedAiStandalone.new_test_seeded(
+        seeded_sdk = IroncoreAlloyStandalone.new_test_seeded(
             self.key, self.approximation_factor, 123
         )
         ciphertext = {
@@ -130,7 +138,7 @@ class TestCloakedAi:
     @pytest.mark.skip(reason="not implemented yet")
     @pytest.mark.asyncio
     async def test_decrypt_wrong_type(self):
-        with pytest.raises(CloakedAiError.DocumentError):
+        with pytest.raises(AlloyError.DocumentError):
             ciphertext = {
                 "foo": base64.b64decode(b"AAAAAAAAMs7OVNXWuwUuW1DJVxlTbqoRTFdWKzM=")
             }
@@ -145,7 +153,7 @@ class TestCloakedAi:
 
     @pytest.mark.asyncio
     async def test_error_handling(self):
-        with pytest.raises(CloakedAiError.InvalidConfiguration) as secret_error:
+        with pytest.raises(AlloyError.InvalidConfiguration) as secret_error:
             standard_secrets = StandardSecrets(None, [])
             deterministic_secrets = {}
             vector_secrets = {
@@ -153,7 +161,7 @@ class TestCloakedAi:
                     self.approximation_factor,
                     RotatableSecret(
                         StandaloneSecret(2, Secret(b"deadbeef")),
-                        StandaloneSecret(1, Secret(key_bytes)),
+                        StandaloneSecret(1, Secret(b"key_bytes")),
                     ),
                 )
             }
@@ -167,9 +175,9 @@ class TestCloakedAi:
         assert "at least 32 cryptographically" in str(secret_error)
 
     def test_double_library_load(self):
-        import cloaked_ai
+        import ironcore_alloy
         import importlib
 
-        importlib.reload(cloaked_ai)
+        importlib.reload(ironcore_alloy)
         # if it can still create a Standalone object through the FFI we'll assume it's still good after the reload
         sdk = Standalone(self.config)

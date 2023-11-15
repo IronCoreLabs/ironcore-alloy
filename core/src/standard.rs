@@ -1,6 +1,4 @@
-use crate::{
-    errors::CloakedAiError, Edek, EncryptedBytes, FieldId, IronCoreMetadata, PlaintextBytes,
-};
+use crate::{errors::AlloyError, EncryptedBytes, FieldId, IronCoreMetadata, PlaintextBytes};
 use ironcore_documents::{aes::EncryptionKey, icl_header_v4, key_id_header::KeyIdHeader};
 use itertools::Itertools;
 use protobuf::Message;
@@ -22,12 +20,6 @@ pub struct EncryptedDocument {
     /// Map from field name to encrypted document bytes
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
-// returned from decryption or created when trying to re-use an edek
-#[derive(uniffi::Record)]
-pub struct PlaintextDocumentWithEdek {
-    edek: Edek,
-    document: PlaintextDocument,
-}
 
 /// API for encrypting and decrypting documents using our standard encryption. This class of encryption is the most
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
@@ -47,7 +39,7 @@ pub trait StandardDocumentOps {
         &self,
         plaintext_document: PlaintextDocument,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedDocument, CloakedAiError>;
+    ) -> Result<EncryptedDocument, AlloyError>;
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
     /// of the `StandardDocumentOps.encrypt` functions. The result contains a map from field identifiers to decrypted
     /// bytes.
@@ -55,7 +47,7 @@ pub trait StandardDocumentOps {
         &self,
         encrypted_document: EncryptedDocument,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextDocument, CloakedAiError>;
+    ) -> Result<PlaintextDocument, AlloyError>;
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
@@ -67,11 +59,11 @@ pub trait StandardDocumentOps {
 pub(crate) fn verify_sig(
     aes_dek: EncryptionKey,
     document: &icl_header_v4::V4DocumentHeader,
-) -> Result<(), CloakedAiError> {
+) -> Result<(), AlloyError> {
     if ironcore_documents::verify_signature(aes_dek.0, document) {
         Ok(())
     } else {
-        Err(CloakedAiError::DecryptError(
+        Err(AlloyError::DecryptError(
             "EDEK signature verification failed.".to_string(),
         ))
     }
@@ -83,7 +75,7 @@ pub(crate) fn encrypt_document_core<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
     aes_dek: EncryptionKey,
     key_id_header: KeyIdHeader,
     v4_doc: icl_header_v4::V4DocumentHeader,
-) -> Result<EncryptedDocument, CloakedAiError> {
+) -> Result<EncryptedDocument, AlloyError> {
     let encrypted_document = document
         .into_iter()
         .map(|(label, plaintext)| {
@@ -112,7 +104,7 @@ pub(crate) fn encrypt_document_core<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
 pub(crate) fn decrypt_document_core(
     document: HashMap<String, Vec<u8>>,
     dek: EncryptionKey,
-) -> Result<HashMap<String, Vec<u8>>, CloakedAiError> {
+) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
     Ok(document
         .into_iter()
         .map(|(label, ciphertext)| {

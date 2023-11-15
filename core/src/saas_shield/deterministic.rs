@@ -5,7 +5,7 @@ use crate::deterministic::{
     decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
     EncryptedField, GenerateQueryResult, PlaintextField, PlaintextFields,
 };
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::{DerivationPath, IronCoreMetadata, SecretPath};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
@@ -38,7 +38,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         &self,
         plaintext_field: PlaintextField,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedField, CloakedAiError> {
+    ) -> Result<EncryptedField, AlloyError> {
         let paths = [(
             plaintext_field.secret_path.clone(),
             [plaintext_field.derivation_path.clone()].into(),
@@ -76,7 +76,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         &self,
         encrypted_field: EncryptedField,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextField, CloakedAiError> {
+    ) -> Result<PlaintextField, AlloyError> {
         let (
             KeyIdHeader {
                 key_id,
@@ -87,7 +87,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
             encrypted_field.encrypted_field.into(),
         )
-        .map_err(|_| CloakedAiError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
+        .map_err(|_| AlloyError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
 
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
             let paths = [(
@@ -112,7 +112,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             )
             .await?;
             if derived_key.tenant_secret_id.0 != key_id.0 {
-                Err(CloakedAiError::InvalidKey(
+                Err(AlloyError::InvalidKey(
                     "The key ID in the document header and on the key derived for decryption did not match"
                         .to_string(),
                 ))
@@ -125,7 +125,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 )
             }
         } else {
-            Err(CloakedAiError::InvalidInput(
+            Err(AlloyError::InvalidInput(
                 format!("The data indicated that this was not a SaaS Shield Deterministic wrapped value. Found: {edek_type}, {payload_type}"),
             ))
         }
@@ -135,7 +135,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         &self,
         fields_to_query: PlaintextFields,
         metadata: &IronCoreMetadata,
-    ) -> Result<GenerateQueryResult, CloakedAiError> {
+    ) -> Result<GenerateQueryResult, AlloyError> {
         let paths = fields_to_query
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
@@ -153,7 +153,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 let keys = all_keys
                     .get(&plaintext_field.secret_path)
                     .and_then(|deriv| deriv.get(&plaintext_field.derivation_path))
-                    .ok_or(CloakedAiError::TenantSecurityError(
+                    .ok_or(AlloyError::TenantSecurityError(
                         "Failed to derive keys for provided path using the TSP.".to_string(),
                     ))?;
                 keys.iter()
@@ -180,7 +180,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         secret_path: SecretPath,
         derivation_path: DerivationPath,
         metadata: &IronCoreMetadata,
-    ) -> Result<Vec<u8>, CloakedAiError> {
+    ) -> Result<Vec<u8>, AlloyError> {
         let paths = [(secret_path.clone(), [derivation_path.clone()].into())].into();
         let derived_keys = self
             .tenant_security_client

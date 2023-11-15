@@ -1,4 +1,4 @@
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, verify_sig, EncryptedDocument, PlaintextDocument,
     StandardDocumentOps,
@@ -19,7 +19,7 @@ use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-#[derive(uniffi::Object, Clone)]
+#[derive(uniffi::Object)]
 pub struct SaasShieldStandardClient {
     tenant_security_client: Arc<TenantSecurityClient>,
     rng: Arc<Mutex<OurReseedingRng>>,
@@ -48,7 +48,7 @@ impl SaasShieldStandardClient {
         dek: Vec<u8>,
         metadata: &IronCoreMetadata,
         document: HashMap<String, Vec<u8>>,
-    ) -> Result<EncryptedDocument, CloakedAiError> {
+    ) -> Result<EncryptedDocument, AlloyError> {
         let pb_edek: ironcore_documents::cmk_edek::EncryptedDek =
             protobuf::Message::parse_from_bytes(&tsc_edek)?;
         let kms_config_id = pb_edek.kmsConfigId as u32;
@@ -75,7 +75,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         &self,
         plaintext_document: PlaintextDocument,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedDocument, CloakedAiError> {
+    ) -> Result<EncryptedDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
         let WrapKeyResponse {
             dek,
@@ -96,7 +96,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         &self,
         encrypted_document: EncryptedDocument,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextDocument, CloakedAiError> {
+    ) -> Result<PlaintextDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
         let (v4_document, edek) = get_document_header_and_edek(&encrypted_document)?;
         let UnwrapKeyResponse { dek } = self
@@ -120,21 +120,21 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     }
 }
 
-pub(crate) fn decrypt_document(
+fn decrypt_document(
     header: V4DocumentHeader,
     dek: Vec<u8>,
     encrypted_document: EncryptedDocument,
-) -> Result<HashMap<String, Vec<u8>>, CloakedAiError> {
+) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
     let enc_key = tsc_dek_to_encryption_key(dek)?;
     verify_sig(enc_key, &header)?;
     decrypt_document_core(encrypted_document.document, enc_key)
 }
 
-pub(crate) fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, CloakedAiError> {
+fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
     let maybe_edek_wrapper = edeks.iter().find(|edek| edek.has_cmk_edek());
     let cmk_edek = maybe_edek_wrapper
         .map(|edek| edek.cmk_edek())
-        .ok_or_else(|| CloakedAiError::DecryptError("No Saas Shield EDEK found.".to_string()))?;
+        .ok_or_else(|| AlloyError::DecryptError("No Saas Shield EDEK found.".to_string()))?;
     Ok(cmk_edek)
 }
 
@@ -149,7 +149,7 @@ fn generate_cmk_v4_doc_and_sign(
     mut edek: EncryptedDek,
     dek: EncryptionKey,
     metadata: &IronCoreMetadata,
-) -> Result<V4DocumentHeader, CloakedAiError> {
+) -> Result<V4DocumentHeader, AlloyError> {
     edek.tenantId = metadata.tenant_id.0.clone().into();
     let edek_wrapper = icl_header_v4::v4document_header::EdekWrapper {
         edek: Some(icl_header_v4::v4document_header::edek_wrapper::Edek::CmkEdek(edek)),
@@ -161,7 +161,7 @@ fn generate_cmk_v4_doc_and_sign(
 
 fn get_document_header_and_edek(
     document: &EncryptedDocument,
-) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), CloakedAiError> {
+) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), AlloyError> {
     let (_, v4_doc_bytes) =
         key_id_header::decode_version_prefixed_value(document.edek.0.clone().into())?;
     let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
@@ -182,7 +182,7 @@ mod test {
         };
         assert_eq!(
             get_document_header_and_edek(&encrypted_document).unwrap_err(),
-            CloakedAiError::IronCoreDocumentsError("KeyIdHeaderTooShort(1)".to_string())
+            AlloyError::IronCoreDocumentsError("KeyIdHeaderTooShort(1)".to_string())
         );
     }
 

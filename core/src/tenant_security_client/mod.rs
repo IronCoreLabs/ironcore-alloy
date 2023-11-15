@@ -1,6 +1,6 @@
 use crate::TenantId;
 use crate::{DerivationPath, SecretPath, TenantSecurityError::NonEmptyStringError};
-pub use base64_type::Base64;
+use base64_type::Base64;
 use errors::TenantSecurityError;
 use request::{TenantSecurityRequest, TspRequest};
 use reqwest::Client;
@@ -18,7 +18,6 @@ use std::{
 #[cfg(test)]
 pub use rest::TenantSecretAssignmentId;
 
-pub(crate) mod core;
 pub(crate) mod errors;
 mod request;
 mod rest;
@@ -146,6 +145,7 @@ impl RequestMetadata {
     /// # Arguments
     /// - `tenant_id`                     - Unique ID of tenant that is performing the operation.
     /// - `requesting_user_or_service_id` - Unique ID of user/service that is processing data. Must be non-empty.
+    #[allow(dead_code)]
     pub fn new_simple(
         tenant_id: TenantId,
         requesting_user_or_service_id: RequestingId,

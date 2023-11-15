@@ -17,8 +17,8 @@ mod test {
         build_dynamic_library()?;
         // copy the just compiled dynamic library to the python directory
         let dynamic_library_paths = get_dynamic_library_paths()?;
-        let python_dir = Path::new("python/cloaked-ai/");
-        let python_module_dir = python_dir.join(Path::new("cloaked_ai/"));
+        let python_dir = Path::new("python/ironcore-alloy/");
+        let python_module_dir = python_dir.join(Path::new("ironcore_alloy/"));
         for library_file in dynamic_library_paths.iter() {
             fs::copy(
                 library_file.clone(),

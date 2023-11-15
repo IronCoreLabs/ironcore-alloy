@@ -1,4 +1,4 @@
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::tenant_security_client::{ApiKey, TenantSecurityClient};
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ impl SaasShieldConfiguration {
         api_key: String,
         accept_invalid_certs: bool,
         approximation_factor: Option<f32>,
-    ) -> Result<Arc<Self>, CloakedAiError> {
+    ) -> Result<Arc<Self>, AlloyError> {
         let reqwest_client = reqwest::Client::builder()
             .danger_accept_invalid_certs(accept_invalid_certs)
             .build()
@@ -30,7 +30,7 @@ impl SaasShieldConfiguration {
             tenant_security_client: Arc::new(TenantSecurityClient::new(
                 tsp_uri,
                 ApiKey::try_from(api_key)
-                    .map_err(|e| CloakedAiError::InvalidConfiguration(format!("{}", e)))?,
+                    .map_err(|e| AlloyError::InvalidConfiguration(format!("{}", e)))?,
                 reqwest_client,
             )),
         }))

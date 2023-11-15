@@ -1,6 +1,6 @@
 use self::crypto::{shuffle, unshuffle, EncryptResult};
 use crate::{
-    errors::CloakedAiError,
+    errors::AlloyError,
     util::{self, AuthHash},
     DerivationPath, EncryptionKey, IronCoreMetadata, ScalingFactor, Secret, SecretPath, TenantId,
 };
@@ -33,9 +33,9 @@ pub struct PlaintextVector {
     pub derivation_path: DerivationPath,
 }
 pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
-pub type GenerateQueryBatchResult = HashMap<VectorId, Vec<EncryptedVector>>;
+pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
 
-/// Key used to initialize CloakedAiStandalone.
+/// Key used to for vector encryption.
 /// Can be created with the `generate_key`/`generateKey` function.
 #[derive(Debug, Serialize, Clone, uniffi::Record)]
 pub struct VectorEncryptionKey {
@@ -90,7 +90,7 @@ pub trait VectorOps {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedVector, CloakedAiError>;
+    ) -> Result<EncryptedVector, AlloyError>;
 
     /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
     /// be unshuffled to their original positions during decryption.
@@ -98,7 +98,7 @@ pub trait VectorOps {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextVector, CloakedAiError>;
+    ) -> Result<PlaintextVector, AlloyError>;
 
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
     /// The resulting encrypted vectors should be used in tandem when querying the vector database.
@@ -106,7 +106,7 @@ pub trait VectorOps {
         &self,
         vectors_to_query: PlaintextVectors,
         metadata: &IronCoreMetadata,
-    ) -> Result<GenerateQueryBatchResult, CloakedAiError>;
+    ) -> Result<GenerateQueryResult, AlloyError>;
 
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
@@ -118,20 +118,22 @@ pub trait VectorOps {
         secret_path: SecretPath,
         derivation_path: DerivationPath,
         metadata: &IronCoreMetadata,
-    ) -> Result<Vec<u8>, CloakedAiError>;
+    ) -> Result<Vec<u8>, AlloyError>;
 }
 
-pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), CloakedAiError> {
+pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), AlloyError> {
     let vector_proto: VectorEncryptionMetadata = protobuf::Message::parse_from_bytes(b)?;
     let iv = vector_proto.iv;
     let auth_hash = vector_proto.auth_hash;
     Ok((
         iv[..]
             .try_into()
-            .map_err(|_| CloakedAiError::DecryptError("Invalid IV".to_string()))?,
-        AuthHash(auth_hash[..].try_into().map_err(|_| {
-            CloakedAiError::DecryptError("Invalid authentication hash".to_string())
-        })?),
+            .map_err(|_| AlloyError::DecryptError("Invalid IV".to_string()))?,
+        AuthHash(
+            auth_hash[..]
+                .try_into()
+                .map_err(|_| AlloyError::DecryptError("Invalid authentication hash".to_string()))?,
+        ),
     ))
 }
 
@@ -142,7 +144,7 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
     edek_type: EdekType,
     plaintext_vector: PlaintextVector,
     rng: &mut R,
-) -> Result<EncryptedVector, CloakedAiError> {
+) -> Result<EncryptedVector, AlloyError> {
     let result = crypto::encrypt(
         key,
         approximation_factor,
@@ -173,7 +175,7 @@ pub(crate) fn decrypt_internal(
     key: &VectorEncryptionKey,
     encrypted_vector: EncryptedVector,
     icl_metadata_bytes: Bytes,
-) -> Result<PlaintextVector, CloakedAiError> {
+) -> Result<PlaintextVector, AlloyError> {
     let (iv, auth_hash) = get_iv_and_auth_hash(&icl_metadata_bytes)?;
     Ok(crypto::decrypt(
         key,

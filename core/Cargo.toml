@@ -1,6 +1,6 @@
 [package]
-name = "cloaked-ai"
-version = "0.4.4-pre.21"
+name = "ironcore-alloy"
+version = "0.9.0-pre.0"
 edition = "2021"
 
 [dependencies]
@@ -49,8 +49,8 @@ uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3a
 z85 = "3.0.5"
 
 [[bench]]
-name = "cloaked_ai_bench"
-path = "../benches/cloaked_ai_bench.rs"
+name = "ironcore_alloy_bench"
+path = "../benches/ironcore_alloy_bench.rs"
 harness = false
 
 # This is needed to allow extra options to be passed to criterion
@@ -58,7 +58,7 @@ harness = false
 [lib]
 bench = false
 crate-type = ["cdylib", "lib"]
-name = "cloaked_ai"
+name = "ironcore_alloy"
 
 [[bin]]
 # This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.

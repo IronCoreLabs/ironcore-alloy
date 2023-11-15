@@ -1,5 +1,5 @@
 use crate::{
-    errors::CloakedAiError, util, DerivationPath, EncryptedBytes, FieldId, IronCoreMetadata,
+    errors::AlloyError, util, DerivationPath, EncryptedBytes, FieldId, IronCoreMetadata,
     PlaintextBytes, Secret, SecretPath, TenantId,
 };
 use aes_gcm::KeyInit;
@@ -11,17 +11,16 @@ use uniffi::custom_newtype;
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct EncryptedField {
-    // TODO: do a pass of making uniffi'd types fully `pub`
-    pub(crate) encrypted_field: EncryptedBytes,
-    pub(crate) secret_path: SecretPath,
-    pub(crate) derivation_path: DerivationPath,
+    pub encrypted_field: EncryptedBytes,
+    pub secret_path: SecretPath,
+    pub derivation_path: DerivationPath,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct PlaintextField {
-    pub(crate) plaintext_field: PlaintextBytes,
-    pub(crate) secret_path: SecretPath,
-    pub(crate) derivation_path: DerivationPath,
+    pub plaintext_field: PlaintextBytes,
+    pub secret_path: SecretPath,
+    pub derivation_path: DerivationPath,
 }
 pub type PlaintextFields = HashMap<FieldId, PlaintextField>;
 pub type GenerateQueryResult = HashMap<FieldId, Vec<EncryptedField>>;
@@ -56,20 +55,20 @@ pub trait DeterministicFieldOps {
         &self,
         plaintext_field: PlaintextField,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedField, CloakedAiError>;
+    ) -> Result<EncryptedField, AlloyError>;
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextField, CloakedAiError>;
+    ) -> Result<PlaintextField, AlloyError>;
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
     /// The resulting encrypted fields should be used in tandem when querying the data store.
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
         metadata: &IronCoreMetadata,
-    ) -> Result<GenerateQueryResult, CloakedAiError>;
+    ) -> Result<GenerateQueryResult, AlloyError>;
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
@@ -80,18 +79,18 @@ pub trait DeterministicFieldOps {
         secret_path: SecretPath,
         derivation_path: DerivationPath,
         metadata: &IronCoreMetadata,
-    ) -> Result<Vec<u8>, CloakedAiError>;
+    ) -> Result<Vec<u8>, AlloyError>;
 }
 
 pub(crate) fn encrypt_internal(
     key: DeterministicEncryptionKey,
     key_id_header: KeyIdHeader,
     plaintext_field: PlaintextField,
-) -> Result<EncryptedField, CloakedAiError> {
+) -> Result<EncryptedField, AlloyError> {
     let current_derived_key_sized: [u8; 64] = key
         .0
         .try_into()
-        .map_err(|_| CloakedAiError::InvalidKey("The derived key was not 64 bytes.".to_string()))?;
+        .map_err(|_| AlloyError::InvalidKey("The derived key was not 64 bytes.".to_string()))?;
     let encrypted_bytes = deterministic_encrypt(
         current_derived_key_sized,
         plaintext_field.plaintext_field.as_slice(),
@@ -109,11 +108,11 @@ pub(crate) fn decrypt_internal(
     ciphertext: Bytes,
     secret_path: SecretPath,
     derivation_path: DerivationPath,
-) -> Result<PlaintextField, CloakedAiError> {
+) -> Result<PlaintextField, AlloyError> {
     let sized_key: [u8; 64] = key
         .0
         .try_into()
-        .map_err(|_| CloakedAiError::InvalidKey("The derived key was not 64 bytes.".to_string()))?;
+        .map_err(|_| AlloyError::InvalidKey("The derived key was not 64 bytes.".to_string()))?;
     deterministic_decrypt(sized_key, &ciphertext).map(|res| PlaintextField {
         plaintext_field: res,
         secret_path,
@@ -121,7 +120,7 @@ pub(crate) fn decrypt_internal(
     })
 }
 
-fn deterministic_encrypt(key: [u8; 64], plaintext: &[u8]) -> Result<Vec<u8>, CloakedAiError> {
+fn deterministic_encrypt(key: [u8; 64], plaintext: &[u8]) -> Result<Vec<u8>, AlloyError> {
     deterministic_encrypt_core(key, plaintext, &[])
 }
 
@@ -129,17 +128,14 @@ fn deterministic_encrypt_core(
     key: [u8; 64],
     plaintext: &[u8],
     associated_data: &[u8],
-) -> Result<Vec<u8>, CloakedAiError> {
+) -> Result<Vec<u8>, AlloyError> {
     let mut cipher = Aes256Siv::new(&key.into());
     cipher
         .encrypt([associated_data], plaintext)
-        .map_err(|e| CloakedAiError::EncryptError(e.to_string()))
+        .map_err(|e| AlloyError::EncryptError(e.to_string()))
 }
 
-pub(crate) fn deterministic_decrypt(
-    key: [u8; 64],
-    ciphertext: &[u8],
-) -> Result<Vec<u8>, CloakedAiError> {
+fn deterministic_decrypt(key: [u8; 64], ciphertext: &[u8]) -> Result<Vec<u8>, AlloyError> {
     deterministic_decrypt_core(key, ciphertext, &[])
 }
 
@@ -147,11 +143,11 @@ fn deterministic_decrypt_core(
     key: [u8; 64],
     ciphertext: &[u8],
     associated_data: &[u8],
-) -> Result<Vec<u8>, CloakedAiError> {
+) -> Result<Vec<u8>, AlloyError> {
     let mut cipher = Aes256Siv::new(&key.into());
     cipher
         .decrypt([associated_data], ciphertext)
-        .map_err(|e| CloakedAiError::DecryptError(e.to_string()))
+        .map_err(|e| AlloyError::DecryptError(e.to_string()))
 }
 
 #[cfg(test)]

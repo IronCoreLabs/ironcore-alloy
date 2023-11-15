@@ -8,16 +8,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cloaked-ai"
+name = "ironcore-alloy"
 authors = [{ name = "IronCore Labs", email = "info@ironcorelabs.com" }]
-description = "Python bindings to the IronCore Labs Cloaked AI SDK. Used for encrypting and decrypting embeddings and their related metadata."
+description = "Python bindings to the IronCore Labs Alloy SDK. Used for encrypting and decrypting embeddings and their related metadata."
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-  "Operating System :: MacOS",
-  "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
 ]
 dependencies = []
 dynamic = ["version"]
@@ -37,11 +37,11 @@ artifacts = ["*.so", "*.dylib"]
 [tool.hatch.build.targets.wheel.hooks.custom]
 
 [tool.hatch.envs.default]
-dependencies = ["pytest", "pytest-cov", "pytest-metadata"]
+dependencies = ["pytest", "pytest-cov", "pytest-metadata", "pytest-asyncio"]
 python = "3.10"
 
 [tool.hatch.envs.default.scripts]
-coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=cloaked_ai --cov=tests {args}"
+coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=ironcore_alloy --cov=tests {args}"
 test = "coverage --no-cov {args}"
 
 [[tool.hatch.envs.test.matrix]]
@@ -50,14 +50,14 @@ python = ["37", "38", "39", "310", "311"]
 [tool.coverage.run]
 branch = true
 parallel = true
-omit = ["cloaked_ai/__about__.py"]
+omit = ["ironcore_alloy/__about__.py"]
 
 [tool.coverage.report]
 exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-  "class _Uniffi",
-  "def _uniffi",
-  "_Uniffi",
+    "no cov",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class _Uniffi",
+    "def _uniffi",
+    "_Uniffi",
 ]

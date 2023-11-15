@@ -1,13 +1,9 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
 use saas_shield::standard::SaasShieldStandardClient;
 use saas_shield::vector::SaasShieldVectorClient;
 use serde::{Deserialize, Serialize};
-use standalone::config::StandaloneConfiguration;
 use standalone::deterministic::StandaloneDeterministicClient;
 use standalone::standard::StandaloneStandardClient;
 use standalone::vector::StandaloneVectorClient;
@@ -17,6 +13,8 @@ use tenant_security_client::errors::TenantSecurityError;
 use tenant_security_client::{RequestMetadata, RequestingId};
 use uniffi::custom_newtype;
 use vector::VectorEncryptionKey;
+
+pub use standalone::config::StandaloneConfiguration;
 
 mod deterministic;
 mod errors;
@@ -31,7 +29,6 @@ mod vector;
 // proc macro defined
 uniffi::setup_scaffolding!();
 
-type Edek = Vec<u8>;
 type FieldId = String;
 type EncryptedBytes = Vec<u8>;
 type PlaintextBytes = Vec<u8>;
@@ -102,7 +99,7 @@ impl IronCoreMetadata {
     /// ID of the user/service that is processing data.
     ///
     /// # Arguments
-    /// - `tenant_id`                     - Unique ID of tenant that is performing the operation.
+    /// - `tenant_id` - Unique ID of tenant that is performing the operation.
     #[uniffi::constructor]
     pub fn new_simple(tenant_id: TenantId) -> Arc<Self> {
         Arc::new(Self {
@@ -119,12 +116,16 @@ impl IronCoreMetadata {
 }
 
 impl TryFrom<IronCoreMetadata> for RequestMetadata {
-    type Error = CloakedAiError;
+    type Error = AlloyError;
     fn try_from(value: IronCoreMetadata) -> Result<Self, Self::Error> {
         Ok(Self::new(
             value.tenant_id,
-            RequestingId::new(value.requesting_id.unwrap_or("Cloaked AI".to_string()))
-                .map_err(|e| CloakedAiError::InvalidConfiguration(e.to_string()))?,
+            RequestingId::new(
+                value
+                    .requesting_id
+                    .unwrap_or("IronCore Labs Alloy SDK".to_string()),
+            )
+            .map_err(|e| AlloyError::InvalidConfiguration(e.to_string()))?,
             value.data_label,
             value.source_ip,
             value.object_id,
@@ -246,9 +247,9 @@ pub struct Secret {
 #[uniffi::export]
 impl Secret {
     #[uniffi::constructor]
-    pub fn new(secret: Vec<u8>) -> Result<Arc<Self>, CloakedAiError> {
+    pub fn new(secret: Vec<u8>) -> Result<Arc<Self>, AlloyError> {
         if secret.len() < 32 {
-            Err(CloakedAiError::InvalidConfiguration(
+            Err(AlloyError::InvalidConfiguration(
                 "Secrets must be at least 32 cryptographically random bytes.".to_string(),
             ))
         } else {

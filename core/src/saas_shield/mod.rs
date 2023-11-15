@@ -1,7 +1,7 @@
 use crate::tenant_security_client::{
     DerivationType, DerivedKey, KeyDeriveResponse, SecretType, TenantSecurityClient,
 };
-use crate::{errors::CloakedAiError, IronCoreMetadata, VectorEncryptionKey};
+use crate::{errors::AlloyError, IronCoreMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
@@ -12,7 +12,7 @@ pub mod deterministic;
 pub mod standard;
 pub mod vector;
 
-pub(crate) enum DeriveKeyChoice {
+enum DeriveKeyChoice {
     Current,
     Specific(KeyId),
     InRotation, // Non-current
@@ -25,7 +25,7 @@ async fn derive_key_for_path<'a>(
     secret_path: &'a SecretPath,
     deriv_path: &'a DerivationPath,
     derive_key_choice: DeriveKeyChoice,
-) -> Result<&'a DerivedKey, CloakedAiError> {
+) -> Result<&'a DerivedKey, AlloyError> {
     match derive_key_choice {
         DeriveKeyChoice::Current => derived_keys.get_current(secret_path, deriv_path),
         DeriveKeyChoice::Specific(key_id) => {
@@ -34,7 +34,7 @@ async fn derive_key_for_path<'a>(
         DeriveKeyChoice::InRotation => derived_keys.get_in_rotation(secret_path, deriv_path),
     }
     .ok_or_else(|| {
-        CloakedAiError::TenantSecurityError(
+        AlloyError::TenantSecurityError(
             "The secret path, derivation path combo didn't have the requested key.".to_string(),
         )
     })
@@ -47,7 +47,7 @@ async fn derive_keys_many_paths(
     request_metadata: &IronCoreMetadata,
     paths: Vec<(SecretPath, DerivationPath)>,
     secret_type: SecretType,
-) -> Result<HashMap<SecretPath, HashMap<DerivationPath, Vec<DerivedKey>>>, CloakedAiError> {
+) -> Result<HashMap<SecretPath, HashMap<DerivationPath, Vec<DerivedKey>>>, AlloyError> {
     let paths_map = paths
         .into_iter()
         .into_grouping_map_by(|x| x.0.clone())
@@ -70,9 +70,9 @@ async fn derive_keys_many_paths(
 /// Converts a DerivedKey to an encryption Key (with scaling factor) and key ID
 fn derived_key_to_vector_encryption_key(
     derived_key: &DerivedKey,
-) -> Result<(KeyId, VectorEncryptionKey), CloakedAiError> {
+) -> Result<(KeyId, VectorEncryptionKey), AlloyError> {
     let key = if derived_key.derived_key.len() < 35 {
-        Err(CloakedAiError::TenantSecurityError(
+        Err(AlloyError::TenantSecurityError(
             "Derivation didn't return enough bytes. HMAC-SHA512 should always return 64 bytes, so the TSP is misbehaving.".to_string(),
         ))
     } else {
@@ -88,7 +88,7 @@ async fn get_in_rotation_prefix_internal(
     derivation_path: DerivationPath,
     edek_type: EdekType,
     payload_type: PayloadType,
-) -> Result<Vec<u8>, CloakedAiError> {
+) -> Result<Vec<u8>, AlloyError> {
     let key_id = derive_key_for_path(
         derived_keys,
         &secret_path,

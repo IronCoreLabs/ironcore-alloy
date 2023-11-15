@@ -81,6 +81,7 @@ pub(crate) fn create_reseeding_rng() -> Arc<Mutex<OurReseedingRng>> {
 }
 
 /// Creates a seeded RNG that won't actually ever reseed to use in test functions from the FFI.
+#[cfg(test)]
 pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
     //Note that this will never actually reseed because the threshold is 0.
     Arc::new(Mutex::new(ReseedingRng::new(

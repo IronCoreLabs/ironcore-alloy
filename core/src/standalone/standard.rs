@@ -1,4 +1,4 @@
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, verify_sig, EncryptedDocument, PlaintextDocument,
     StandardDocumentOps,
@@ -49,7 +49,7 @@ impl StandaloneStandardClient {
         key_id: KeyId,
         rng: &mut R,
         tenant_id: &TenantId,
-    ) -> Result<EncryptedDocument, CloakedAiError> {
+    ) -> Result<EncryptedDocument, AlloyError> {
         let per_tenant_kek = derive_aes_encryption_key(&incoming_key, tenant_id);
         let (aes_dek, v4_doc) =
             generate_aes_edek_and_sign(rng, per_tenant_kek, format!("{}", key_id.0).as_str())?;
@@ -69,12 +69,12 @@ impl StandardDocumentOps for StandaloneStandardClient {
         &self,
         plaintext_document: PlaintextDocument,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedDocument, CloakedAiError> {
+    ) -> Result<EncryptedDocument, AlloyError> {
         let (secret_id, secret) = self
             .config
             .primary_secret_id
             .ok_or_else(|| {
-                CloakedAiError::InvalidConfiguration(
+                AlloyError::InvalidConfiguration(
                     "No primary secret exists in the standard configuration".to_string(),
                 )
             })
@@ -84,7 +84,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
                     .get(&id)
                     .map(|secret| (id, secret))
                     .ok_or_else(|| {
-                        CloakedAiError::InvalidConfiguration(
+                        AlloyError::InvalidConfiguration(
                             "Primary secret id not found in secrets map".to_string(),
                         )
                     })
@@ -104,7 +104,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
         &self,
         encrypted_document: EncryptedDocument,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextDocument, CloakedAiError> {
+    ) -> Result<PlaintextDocument, AlloyError> {
         let (
             KeyIdHeader {
                 key_id,
@@ -114,7 +114,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
             edek_bytes,
         ) = key_id_header::decode_version_prefixed_value(encrypted_document.edek.0.into())?;
         let secret = self.config.secrets.get(&key_id.0).ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(format!(
+            AlloyError::InvalidConfiguration(format!(
                 "Provided secret id `{}` does not exist in the standard configuration.",
                 &key_id.0
             ))
@@ -122,12 +122,12 @@ impl StandardDocumentOps for StandaloneStandardClient {
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
             let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
             let v4_document = Message::parse_from_bytes(&edek_bytes[..])
-                .map_err(|e| CloakedAiError::DecryptError(e.to_string()))?;
+                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
 
             let dek = decrypt_aes_edek(&per_tenant_kek, &v4_document)?;
             Ok(decrypt_document_core(encrypted_document.document, dek)?)
         } else {
-            Err(CloakedAiError::InvalidInput(
+            Err(AlloyError::InvalidInput(
                 format!("The data indicated that this was not a Standalone Standard wrapped value. Found: {edek_type}, {payload_type}"),
             ))
         }
@@ -148,7 +148,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
 fn decrypt_aes_edek(
     kek: &EncryptionKey,
     header: &icl_header_v4::V4DocumentHeader,
-) -> Result<EncryptionKey, CloakedAiError> {
+) -> Result<EncryptionKey, AlloyError> {
     let maybe_edek_wrapper = header
         .signed_payload
         .edeks
@@ -157,7 +157,7 @@ fn decrypt_aes_edek(
         .find(|edek| edek.has_aes_256_gcm_edek());
     let aes_edek = maybe_edek_wrapper
         .map(|edek| edek.aes_256_gcm_edek())
-        .ok_or_else(|| CloakedAiError::DecryptError("No AES EDEK found.".to_string()))?;
+        .ok_or_else(|| AlloyError::DecryptError("No AES EDEK found.".to_string()))?;
     let aes_dek = ironcore_documents::aes::decrypt_aes_edek(kek, aes_edek)?;
     verify_sig(aes_dek, header)?;
     Ok(aes_dek)
@@ -209,7 +209,7 @@ mod test {
         }
     }
     #[tokio::test]
-    async fn encrypt_decrypt_roundtrip() -> Result<(), CloakedAiError> {
+    async fn encrypt_decrypt_roundtrip() -> Result<(), AlloyError> {
         let client = default_client();
         let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
@@ -225,7 +225,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn decrypt_missing_key_from_config() -> Result<(), CloakedAiError> {
+    async fn decrypt_missing_key_from_config() -> Result<(), AlloyError> {
         let client = default_client();
         let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
@@ -236,7 +236,7 @@ mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            CloakedAiError::InvalidConfiguration(
+            AlloyError::InvalidConfiguration(
                 "Provided secret id `4` does not exist in the standard configuration.".to_string()
             )
         );
@@ -244,14 +244,14 @@ mod test {
     }
 
     #[tokio::test]
-    async fn encrypt_missing_primary() -> Result<(), CloakedAiError> {
+    async fn encrypt_missing_primary() -> Result<(), AlloyError> {
         let client = new_client(None);
         let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            CloakedAiError::InvalidConfiguration(
+            AlloyError::InvalidConfiguration(
                 "No primary secret exists in the standard configuration".to_string()
             )
         );
@@ -259,7 +259,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn encrypt_primary_not_found() -> Result<(), CloakedAiError> {
+    async fn encrypt_primary_not_found() -> Result<(), AlloyError> {
         // This id isn't in the config map.
         let client = new_client(Some(1000));
         let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
@@ -267,7 +267,7 @@ mod test {
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            CloakedAiError::InvalidConfiguration(
+            AlloyError::InvalidConfiguration(
                 "Primary secret id not found in secrets map".to_string()
             )
         );
@@ -275,7 +275,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn decrypt_id_not_primary() -> Result<(), CloakedAiError> {
+    async fn decrypt_id_not_primary() -> Result<(), AlloyError> {
         //The edek below is for key_id 1, setting primary to 2 in the sdk to 2.
         let client = new_client(Some(2));
         let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
@@ -306,7 +306,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn decrypt_edek_type_not_match() -> Result<(), CloakedAiError> {
+    async fn decrypt_edek_type_not_match() -> Result<(), AlloyError> {
         let client = default_client();
         let metadata = IronCoreMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
@@ -316,7 +316,7 @@ mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            CloakedAiError::InvalidInput(
+            AlloyError::InvalidInput(
                 "The data indicated that this was not a Standalone Standard wrapped value. Found: SaaS Shield, Deterministic Field"
                     .to_string()
             )

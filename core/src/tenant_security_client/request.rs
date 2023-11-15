@@ -1,11 +1,10 @@
-use crate::{DerivationPath, SecretPath};
-
 use super::errors::{TenantSecurityError, TenantSecurityProxyError};
 use super::rest::{
     DerivationType, KeyDeriveResponse, SecretType, TenantDeriveKeyRequest, TspErrorResponse,
     UnwrapKeyRequest, UnwrapKeyResponse, WrapKeyResponse,
 };
 use super::{ApiKey, RequestMetadata};
+use crate::{DerivationPath, SecretPath};
 use async_trait::async_trait;
 use base64_type::Base64;
 use reqwest::{

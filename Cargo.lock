@@ -467,46 +467,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
-name = "cloaked-ai"
-version = "0.4.4-pre.21"
-dependencies = [
- "aes-gcm",
- "aes-siv",
- "approx",
- "ascii85",
- "assertables",
- "async-trait",
- "base64",
- "base64_type",
- "base85",
- "bytes",
- "camino",
- "criterion",
- "hex",
- "hex-literal",
- "hmac",
- "ironcore-documents",
- "itertools 0.11.0",
- "lazy_static",
- "ndarray",
- "ndarray-rand",
- "proptest",
- "protobuf",
- "rand",
- "rand_chacha",
- "rand_distr",
- "reqwest",
- "ring",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "uniffi",
- "uniffi_bindgen",
- "z85",
-]
-
-[[package]]
 name = "cmac"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1020,6 +980,46 @@ name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
+
+[[package]]
+name = "ironcore-alloy"
+version = "0.9.0-pre.0"
+dependencies = [
+ "aes-gcm",
+ "aes-siv",
+ "approx",
+ "ascii85",
+ "assertables",
+ "async-trait",
+ "base64",
+ "base64_type",
+ "base85",
+ "bytes",
+ "camino",
+ "criterion",
+ "hex",
+ "hex-literal",
+ "hmac",
+ "ironcore-documents",
+ "itertools 0.11.0",
+ "lazy_static",
+ "ndarray",
+ "ndarray-rand",
+ "proptest",
+ "protobuf",
+ "rand",
+ "rand_chacha",
+ "rand_distr",
+ "reqwest",
+ "ring",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "uniffi",
+ "uniffi_bindgen",
+ "z85",
+]
 
 [[package]]
 name = "ironcore-documents"

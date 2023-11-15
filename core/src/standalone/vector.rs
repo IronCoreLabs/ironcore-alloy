@@ -1,9 +1,9 @@
 use super::config::VectorSecret;
-use crate::errors::CloakedAiError;
+use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
 use crate::util::get_rng;
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryBatchResult, PlaintextVector,
+    decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryResult, PlaintextVector,
     PlaintextVectors, VectorEncryptionKey, VectorOps,
 };
 use crate::{DerivationPath, IronCoreMetadata, SecretPath, StandaloneConfiguration};
@@ -44,12 +44,12 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &IronCoreMetadata,
-    ) -> Result<EncryptedVector, CloakedAiError> {
+    ) -> Result<EncryptedVector, AlloyError> {
         let vector_secret = self
             .config
             .get(&plaintext_vector.secret_path)
             .ok_or_else(|| {
-                CloakedAiError::InvalidConfiguration(format!(
+                AlloyError::InvalidConfiguration(format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
                     &plaintext_vector.secret_path.0
                 ))
@@ -59,7 +59,7 @@ impl VectorOps for StandaloneVectorClient {
             .current_secret
             .as_ref()
             .ok_or_else(|| {
-                CloakedAiError::InvalidConfiguration(
+                AlloyError::InvalidConfiguration(
                     "No current secret exists in the vector configuration".to_string(),
                 )
             })?;
@@ -82,7 +82,7 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &IronCoreMetadata,
-    ) -> Result<PlaintextVector, CloakedAiError> {
+    ) -> Result<PlaintextVector, AlloyError> {
         let (
             KeyIdHeader {
                 key_id,
@@ -93,13 +93,13 @@ impl VectorOps for StandaloneVectorClient {
         ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
             encrypted_vector.paired_icl_info.clone().into(),
         )
-        .map_err(|_| CloakedAiError::InvalidInput("Paired ICL info was invalid.".to_string()))?;
+        .map_err(|_| AlloyError::InvalidInput("Paired ICL info was invalid.".to_string()))?;
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
             let vector_secret =
                 self.config
                     .get(&encrypted_vector.secret_path)
                     .ok_or_else(|| {
-                        CloakedAiError::InvalidConfiguration(format!(
+                        AlloyError::InvalidConfiguration(format!(
                             "Provided secret path `{}` does not exist in the vector configuration.",
                             &encrypted_vector.secret_path.0
                         ))
@@ -108,7 +108,7 @@ impl VectorOps for StandaloneVectorClient {
                 .secret
                 .get_secret_with_id(&key_id)
                 .ok_or_else(|| {
-                    CloakedAiError::InvalidConfiguration(format!(
+                    AlloyError::InvalidConfiguration(format!(
                         "Secret with key ID `{}` does not exist in the vector configuration",
                         key_id.0
                     ))
@@ -125,7 +125,7 @@ impl VectorOps for StandaloneVectorClient {
                 icl_metadata_bytes,
             )
         } else {
-            Err(CloakedAiError::InvalidInput(
+            Err(AlloyError::InvalidInput(
                 format!("The data indicated that this was not a Standalone Vector wrapped value. Found: {edek_type}, {payload_type}"),
             ))
         }
@@ -135,7 +135,7 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         vectors_to_query: PlaintextVectors,
         metadata: &IronCoreMetadata,
-    ) -> Result<GenerateQueryBatchResult, CloakedAiError> {
+    ) -> Result<GenerateQueryResult, AlloyError> {
         vectors_to_query
             .into_iter()
             .map(|(vector_id, plaintext_vector)| {
@@ -143,7 +143,7 @@ impl VectorOps for StandaloneVectorClient {
                     self.config
                         .get(&plaintext_vector.secret_path)
                         .ok_or_else(|| {
-                            CloakedAiError::InvalidConfiguration(format!(
+                            AlloyError::InvalidConfiguration(format!(
                             "Provided secret path `{}` does not exist in the vector configuration.",
                             &plaintext_vector.secret_path.0
                         ))
@@ -153,7 +153,7 @@ impl VectorOps for StandaloneVectorClient {
                     in_rotation_secret,
                 } = vector_secret.secret.as_ref();
                 if current_secret.is_none() && in_rotation_secret.is_none() {
-                    Err(CloakedAiError::InvalidConfiguration(format!(
+                    Err(AlloyError::InvalidConfiguration(format!(
                         "No secrets exist in the vector configuration for secret path `{}`.",
                         plaintext_vector.secret_path.0
                     )))?;
@@ -192,9 +192,9 @@ impl VectorOps for StandaloneVectorClient {
         secret_path: SecretPath,
         _derivation_path: DerivationPath,
         _metadata: &IronCoreMetadata,
-    ) -> Result<Vec<u8>, CloakedAiError> {
+    ) -> Result<Vec<u8>, AlloyError> {
         let vector_secret = self.config.get(&secret_path).ok_or_else(|| {
-            CloakedAiError::InvalidConfiguration(format!(
+            AlloyError::InvalidConfiguration(format!(
                 "Provided secret path `{}` does not exist in the vector configuration.",
                 &secret_path.0
             ))
@@ -204,7 +204,7 @@ impl VectorOps for StandaloneVectorClient {
             .in_rotation_secret
             .as_ref()
             .ok_or_else(|| {
-                CloakedAiError::InvalidConfiguration(
+                AlloyError::InvalidConfiguration(
                     "There is no in-rotation secret in the vector configuration.".to_string(),
                 )
             })?;
@@ -264,13 +264,13 @@ mod test {
 
     #[tokio::test]
     async fn encrypt_produces_known_value() {
-        let cloaked_ai = get_default_client();
+        let ironcore_alloy = get_default_client();
         let plaintext = PlaintextVector {
             plaintext_vector: vec![1., 2., 3., 4., 5.],
             secret_path: SecretPath("secret_path".to_string()),
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
-        let result = cloaked_ai
+        let result = ironcore_alloy
             .encrypt(plaintext, &get_metadata())
             .await
             .unwrap();
@@ -290,17 +290,17 @@ mod test {
 
     #[tokio::test]
     async fn encrypt_decrypt_roundtrip() {
-        let cloaked_ai = get_default_client();
+        let ironcore_alloy = get_default_client();
         let plaintext = PlaintextVector {
             plaintext_vector: vec![1., 2., 3., 4., 5.],
             secret_path: SecretPath("secret_path".to_string()),
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
-        let encrypt_result = cloaked_ai
+        let encrypt_result = ironcore_alloy
             .encrypt(plaintext.clone(), &get_metadata())
             .await
             .unwrap();
-        let result = cloaked_ai
+        let result = ironcore_alloy
             .decrypt(encrypt_result, &get_metadata())
             .await
             .unwrap();

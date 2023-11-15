@@ -43,7 +43,7 @@ pub(crate) fn get_dynamic_library_paths() -> Result<Vec<PathBuf>, Box<dyn Error>
                     .file_name()
                     .unwrap()
                     .to_string_lossy()
-                    .starts_with("libcloaked_ai")
+                    .starts_with("libironcore_alloy")
         }) {
             Some(path)
         } else {

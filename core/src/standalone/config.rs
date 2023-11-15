@@ -1,12 +1,12 @@
-use crate::{errors::CloakedAiError, Secret, SecretPath};
+use crate::{errors::AlloyError, Secret, SecretPath};
 use ironcore_documents::key_id_header::KeyId;
 use std::{collections::HashMap, sync::Arc};
 
 /// A secret used by standalone mode to derive encryption keys.
 #[derive(Debug, uniffi::Object)]
 pub struct StandaloneSecret {
-    pub id: u32,
-    pub secret: Arc<Secret>,
+    pub(crate) id: u32,
+    pub(crate) secret: Arc<Secret>,
 }
 #[uniffi::export]
 impl StandaloneSecret {
@@ -22,8 +22,8 @@ impl StandaloneSecret {
 /// The rest of the secrets will only be used to decrypt existing documents when encountered.
 #[derive(Debug, uniffi::Object)]
 pub struct StandardSecrets {
-    pub primary_secret_id: Option<u32>,
-    pub secrets: HashMap<u32, Secret>,
+    pub(crate) primary_secret_id: Option<u32>,
+    pub(crate) secrets: HashMap<u32, Secret>,
 }
 #[uniffi::export]
 impl StandardSecrets {
@@ -33,7 +33,7 @@ impl StandardSecrets {
     pub fn new(
         primary_secret_id: Option<u32>,
         secrets: Vec<Arc<StandaloneSecret>>,
-    ) -> Result<Arc<Self>, CloakedAiError> {
+    ) -> Result<Arc<Self>, AlloyError> {
         let mut internal_secrets = HashMap::new();
         for standalone_secret in secrets.into_iter() {
             if internal_secrets
@@ -43,7 +43,7 @@ impl StandardSecrets {
                 )
                 .is_some()
             {
-                return Err(CloakedAiError::InvalidKey(format!(
+                return Err(AlloyError::InvalidKey(format!(
                     "Duplicate secret id encountered while initializing Standalone mode: {}",
                     standalone_secret.id
                 )));
@@ -53,7 +53,7 @@ impl StandardSecrets {
         // check that the provided primary does in fact exist
         if let Some(id) = primary_secret_id {
             if internal_secrets.get(&id).is_none() {
-                return Err(CloakedAiError::InvalidKey(format!(
+                return Err(AlloyError::InvalidKey(format!(
                     "Primary secret id not found in provided secrets: {id}"
                 )));
             }
@@ -82,9 +82,9 @@ impl RotatableSecret {
     pub fn new(
         current_secret: Option<Arc<StandaloneSecret>>,
         in_rotation_secret: Option<Arc<StandaloneSecret>>,
-    ) -> Result<Arc<Self>, CloakedAiError> {
+    ) -> Result<Arc<Self>, AlloyError> {
         if current_secret.is_none() && in_rotation_secret.is_none() {
-            Err(CloakedAiError::InvalidKey(
+            Err(AlloyError::InvalidKey(
                 "Cannot create a RotatingSecret with no secrets.".to_string(),
             ))
         } else {

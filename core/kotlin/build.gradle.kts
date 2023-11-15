@@ -58,10 +58,10 @@ publishing {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
             groupId = "com.ironcorelabs"
-            artifactId = "cloaked-ai"
+            artifactId = "ironcore-alloy"
             pom {
-                name.set("Cloaked AI")
-                description.set("Cloaked AI bindings for Kotlin.")
+                name.set("IronCore Labs Alloy SDK")
+                description.set("IronCore Alloy bindings for Kotlin.")
                 url.set("https://ironcorelabs.com")
                 licenses {
                     license {
@@ -77,7 +77,7 @@ publishing {
                     }
                 }
                 scm {
-                    connection.set("scm:git@github.com:IronCoreLabs/cloaked-ai.git")
+                    connection.set("scm:git@github.com:IronCoreLabs/ironcore-alloy.git")
                     url.set("https://github.com/IronCoreLabs")
                 }
             }

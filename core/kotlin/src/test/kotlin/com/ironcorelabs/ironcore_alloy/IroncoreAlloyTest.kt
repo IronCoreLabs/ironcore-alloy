@@ -1,4 +1,4 @@
-package com.ironcorelabs.cloaked_ai
+package com.ironcorelabs.ironcore_alloy
 
 import java.util.Base64
 import kotlin.system.*
@@ -9,7 +9,7 @@ fun ByteArray.toBase64(): String = String(Base64.getEncoder().encode(this))
 
 fun String.base64ToByteArray(): ByteArray = Base64.getDecoder().decode(this)
 
-class CloakedAiTest {
+class IroncoreAlloyTest {
     val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".toByteArray()
     val scalingFactor = 12345.0f
     val key = VectorEncryptionKey(scalingFactor, keyByteArray)
@@ -36,7 +36,8 @@ class CloakedAiTest {
             )
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
-    // val seededSdk = CloakedAiStandalone.newTestSeeded(key, approximationFactor, 123.toULong())
+    // val seededSdk = IroncoreAlloyStandalone.newTestSeeded(key, approximationFactor,
+    // 123.toULong())
     // val docMetadata = DocumentMetadata("Tenant")
 
     @Test
@@ -136,7 +137,7 @@ class CloakedAiTest {
     @Test
     fun sdkStandardDecryptWrongType() {
         val err =
-                assertFailsWith<CloakedAiException.InvalidInput>("foo") {
+                assertFailsWith<AlloyException.InvalidInput>("foo") {
                     val documentFields =
                             mapOf(
                                     "foo" to
