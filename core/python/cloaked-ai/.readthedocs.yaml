@@ -8,7 +8,7 @@ build:
   commands:
     # these rust sections are mostly cribbed from our github action https://github.com/IronCoreLabs/rust-toolchain/blob/main/action.yml
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
-    - ./rust-toolchain-from-file.sh
+    - ./core/python/cloaked-ai/rust-toolchain-from-file.sh
     # actual doc building part
     - pip install -v "hatch==1.7.0"
     - cd core/python/cloaked-ai && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
