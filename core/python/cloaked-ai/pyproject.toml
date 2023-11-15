@@ -37,10 +37,24 @@ artifacts = ["*.so", "*.dylib"]
 [tool.hatch.build.targets.wheel.hooks.custom]
 
 [tool.hatch.envs.default]
-dependencies = ["pytest", "pytest-cov", "pytest-metadata"]
 python = "3.10"
 
-[tool.hatch.envs.default.scripts]
+[tool.hatch.envs.docs]
+dependencies = ["mkdocs.material==9.4.8", "mkdocstrings-python==1.7.4"]
+
+[tool.hatch.envs.docs.scripts]
+build = "mkdocs build --clean --strict {args}"
+serve = "mkdocs serve --dev-addr localhost:8000 {args}"
+
+[tool.hatch.envs.test]
+dependencies = [
+  "pytest==7.4.2",
+  "pytest-cov==4.1.0",
+  "pytest-metadata==3.0.0",
+  "pytest-asyncio==0.21.1",
+]
+
+[tool.hatch.envs.test.scripts]
 coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=cloaked_ai --cov=tests {args}"
 test = "coverage --no-cov {args}"
 
