@@ -6,7 +6,7 @@ Ironcore Alloy SDK is designed to be a single SDK for all the different IronCore
 
 - [Java](http://todo.com)
 - [Kotlin](http://todo.com)
-- [Python](http://todo.com)
+- [Python](https://pypi.org/project/ironcore-alloy)
 - [Rust](http://todo.com)
 
 This SDK was written in Rust and is using [uniffi](https://github.com/mozilla/uniffi-rs) to generate the foreign language bindings. If your language is not listed above, feel free to open an issue and we can take a look!
