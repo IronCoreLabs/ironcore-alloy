@@ -63,7 +63,7 @@ impl SaasShieldVectorClient {
     }
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl VectorOps for SaasShieldVectorClient {
     async fn encrypt(
         &self,

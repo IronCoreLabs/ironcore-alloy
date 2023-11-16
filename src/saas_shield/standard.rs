@@ -69,7 +69,7 @@ impl SaasShieldStandardClient {
     }
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl StandardDocumentOps for SaasShieldStandardClient {
     async fn encrypt(
         &self,
