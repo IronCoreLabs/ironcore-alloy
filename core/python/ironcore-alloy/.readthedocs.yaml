@@ -10,7 +10,7 @@ build:
     # only would need to install hatch here. Doc builds would then be a few seconds instead of a few minutes.
     - ./core/python/ironcore-alloy/rust-toolchain-from-file.sh
     - ~/.cargo/bin/cargo b --release
-    - ~/.cargo/bin/cargo run --bin uniffi-bindgen generate --library ./target/release/libcloaked_ai.so --language python  --out-dir core/python/cloaked-ai/cloaked_ai
+    - ~/.cargo/bin/cargo run --bin uniffi-bindgen generate --library ./target/release/libironcore_alloy.so --language python  --out-dir core/python/ironcore-alloy/ironcore_alloy
     # actual doc building part
     - pip install -v "hatch==1.7.0"
     - cd core/python/ironcore-alloy && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html

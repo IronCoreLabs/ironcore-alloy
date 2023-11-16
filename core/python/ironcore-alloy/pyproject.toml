@@ -55,7 +55,7 @@ dependencies = [
 ]
 
 [tool.hatch.envs.test.scripts]
-coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=cloaked_ai --cov=tests {args}"
+coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=ironcore_alloy --cov=tests {args}"
 test = "coverage --no-cov {args}"
 
 [[tool.hatch.envs.test.matrix]]
