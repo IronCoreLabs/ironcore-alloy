@@ -22,4 +22,4 @@
 **/.coverage
 
 # python generated foreign module
-**/cloaked_ai.py
+**/ironcore_alloy.py

@@ -1,5 +1,0 @@
-[bindings]
-doc_comments = true
-
-[bindings.kotlin]
-package_name = "com.ironcorelabs.cloaked_ai"
