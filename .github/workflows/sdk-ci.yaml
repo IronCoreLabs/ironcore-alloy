@@ -32,7 +32,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: ${{ join(matrix.runs-on) }}-
-          path: ${{ github.workspace }}/core/kotlin/src/main/resources/
+          path: ${{ github.workspace }}/kotlin/src/main/resources/
       - if: startsWith(matrix.runs-on, 'buildjet')
         uses: Swatinem/rust-cache@v2
         with:
@@ -43,10 +43,10 @@ jobs:
           cache-provider: github
       - name: Generate Kotlin files
         run: cargo run --bin uniffi-bindgen generate --library resources/libironcore_alloy.* --language kotlin --out-dir kotlin
-        working-directory: core/kotlin/src/main
+        working-directory: kotlin/src/main
       - name: Run Kotlin tests
         run: ./gradlew test
-        working-directory: core/kotlin
+        working-directory: kotlin
 
   python-test:
     needs: generate-cdylibs
@@ -61,7 +61,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: ${{ join(matrix.runs-on) }}-
-          path: ${{ github.workspace }}/core/python/ironcore-alloy/ironcore_alloy
+          path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy
       - if: startsWith(matrix.runs-on, 'buildjet')
         uses: Swatinem/rust-cache@v2
         with:
@@ -72,7 +72,7 @@ jobs:
           cache-provider: github
       - name: Generate Python files
         run: cargo run --bin uniffi-bindgen generate --library libironcore_alloy.* --language python --out-dir .
-        working-directory: core/python/ironcore-alloy/ironcore_alloy
+        working-directory: python/ironcore-alloy/ironcore_alloy
       - name: Install hatch
         if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm'
         # The buildjet arm machine has a permissions error if we don't use sudo
@@ -101,4 +101,4 @@ jobs:
             3.11
       - name: Run Python tests
         run: hatch run test:test
-        working-directory: core/python/ironcore-alloy/ironcore_alloy
+        working-directory: python/ironcore-alloy/ironcore_alloy

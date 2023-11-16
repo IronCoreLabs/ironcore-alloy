@@ -26,7 +26,7 @@ dynamic = ["version"]
 Homepage = "https://ironcorelabs.com"
 
 [tool.hatch.version]
-# version is locked to the Rust SDK version in core/Cargo.toml
+# version is locked to the Rust SDK version in Cargo.toml
 path = "../../Cargo.toml"
 pattern = "^version = \"(?P<version>[^\"]+)\"$"
 
