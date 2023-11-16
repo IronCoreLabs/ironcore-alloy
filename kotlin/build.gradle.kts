@@ -1,7 +1,7 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
-version = "0.4.4-SNAPSHOT"
+version = "0.9.0-SNAPSHOT"
 group = "com.ironcorelabs"
 
 plugins {
