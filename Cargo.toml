@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.9.1-SNAPSHOT-pre.1"
+version = "0.9.2-pre"
 edition = "2021"
 
 [dependencies]
@@ -19,13 +19,17 @@ protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_distr = "0.4.3"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }
 ring = "0.16.20"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
 thiserror = "1.0.50"
 uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
     "cli",
+    "tokio",
 ], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
 z85 = "3.0.5"
 
