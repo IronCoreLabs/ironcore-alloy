@@ -3,7 +3,7 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/ironcore-alloy.svg)](https://pypi.org/project/ironcore-alloy)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ironcore-alloy.svg)](https://pypi.org/project/ironcore-alloy)
 
-Python bindings to the IronCore Labs Alloy SDK. Generated library API documentation hopefully incoming.
+Python bindings to the IronCore Labs Alloy SDK. Python API documentation is available [here](https://ironcore-alloy.readthedocs.io). General documentation of the various products and broader information about how to use the SDK is available [here](https://docs.ironcorelabs.com).
 
 - [Installation](#installation)
 - [License](#license)
