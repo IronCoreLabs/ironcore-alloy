@@ -18,13 +18,13 @@ fun Float.sameValueAs(other: Float): Boolean {
 class IroncoreAlloyTest {
     val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".base64ToByteArray()
     val approximationFactor = 1.1f
-    val standardSecrets = StandardSecrets(10u, listOf(StandaloneSecret(10u, Secret(keyByteArray))))
+    val standardSecrets = StandardSecrets(10, listOf(StandaloneSecret(10, Secret(keyByteArray))))
     val deterministicSecrets =
             mapOf(
                     "" to
                             RotatableSecret(
-                                    StandaloneSecret(2u, Secret(keyByteArray)),
-                                    StandaloneSecret(1u, Secret(keyByteArray))
+                                    StandaloneSecret(2, Secret(keyByteArray)),
+                                    StandaloneSecret(1, Secret(keyByteArray))
                             )
             )
     val vectorSecrets =
@@ -33,8 +33,8 @@ class IroncoreAlloyTest {
                             VectorSecret(
                                     approximationFactor,
                                     RotatableSecret(
-                                            StandaloneSecret(2u, Secret(keyByteArray)),
-                                            StandaloneSecret(1u, Secret(keyByteArray))
+                                            StandaloneSecret(2, Secret(keyByteArray)),
+                                            StandaloneSecret(1, Secret(keyByteArray))
                                     )
                             )
             )

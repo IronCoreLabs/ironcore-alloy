@@ -53,7 +53,7 @@ pub trait StandardDocumentOps {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: u32) -> Vec<u8>;
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
 }
 
 pub(crate) fn verify_sig(

@@ -12,14 +12,11 @@ pub struct StandaloneSecret {
 impl StandaloneSecret {
     /// Create a standalone secret. The secret needs to be cryptographically random bytes.
     #[uniffi::constructor]
-    pub(crate) fn new(id: i32, secret: Arc<Secret>) -> Arc<Self> {
-        Self::new_u32(id as u32, secret)
-    }
-}
-
-impl StandaloneSecret {
-    pub fn new_u32(id: u32, secret: Arc<Secret>) -> Arc<Self> {
-        Arc::new(Self { id, secret })
+    pub fn new(id: i32, secret: Arc<Secret>) -> Arc<Self> {
+        Arc::new(StandaloneSecret {
+            id: id as u32,
+            secret,
+        })
     }
 }
 /// A collection of secrets for standalone standard mode used to derive encryption keys.
@@ -36,7 +33,7 @@ impl StandardSecrets {
     /// This will error if secret ids aren't unique or the primary secret id isn't in the secrets list.
     #[uniffi::constructor]
     pub fn new(
-        primary_secret_id: Option<u32>,
+        primary_secret_id: Option<i32>,
         secrets: Vec<Arc<StandaloneSecret>>,
     ) -> Result<Arc<Self>, AlloyError> {
         let mut internal_secrets = HashMap::new();
@@ -57,7 +54,7 @@ impl StandardSecrets {
 
         // check that the provided primary does in fact exist
         if let Some(id) = primary_secret_id {
-            if internal_secrets.get(&id).is_none() {
+            if internal_secrets.get(&(id as u32)).is_none() {
                 return Err(AlloyError::InvalidKey(format!(
                     "Primary secret id not found in provided secrets: {id}"
                 )));
@@ -65,7 +62,7 @@ impl StandardSecrets {
         }
 
         Ok(Arc::new(Self {
-            primary_secret_id,
+            primary_secret_id: primary_secret_id.map(|i| i as u32),
             secrets: internal_secrets,
         }))
     }

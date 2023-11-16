@@ -110,11 +110,11 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             .await?;
         decrypt_document(v4_document, dek.0, encrypted_document)
     }
-    fn get_searchable_edek_prefix(&self, id: u32) -> Vec<u8> {
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         get_prefix_bytes_for_search(ironcore_documents::key_id_header::KeyIdHeader::new(
             Self::get_edek_type(),
             Self::get_payload_type(),
-            KeyId(id),
+            KeyId(id as u32),
         ))
         .into()
     }
