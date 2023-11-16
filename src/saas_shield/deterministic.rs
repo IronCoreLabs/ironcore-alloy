@@ -32,7 +32,7 @@ impl SaasShieldDeterministicClient {
     }
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl DeterministicFieldOps for SaasShieldDeterministicClient {
     async fn encrypt(
         &self,
