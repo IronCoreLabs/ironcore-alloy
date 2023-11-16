@@ -40,11 +40,12 @@ impl SaasShieldVectorClient {
         key_id: KeyId,
         plaintext_vector: PlaintextVector,
     ) -> Result<EncryptedVector, AlloyError> {
-        let approximation_factor = self.approximation_factor.ok_or_else(|| {
-            AlloyError::InvalidConfiguration(
-                "`approximation_factor` was not set in the vector configuration.".to_string(),
-            )
-        })?;
+        let approximation_factor =
+            self.approximation_factor
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    message: "`approximation_factor` was not set in the vector configuration."
+                        .to_string(),
+                })?;
         encrypt_internal(
             approximation_factor,
             key,
@@ -100,11 +101,12 @@ impl VectorOps for SaasShieldVectorClient {
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
-        let approximation_factor = self.approximation_factor.ok_or_else(|| {
-            AlloyError::InvalidConfiguration(
-                "`approximation_factor` was not set in the vector configuration.".to_string(),
-            )
-        })?;
+        let approximation_factor =
+            self.approximation_factor
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    message: "`approximation_factor` was not set in the vector configuration."
+                        .to_string(),
+                })?;
         let (
             KeyIdHeader {
                 key_id,
@@ -115,8 +117,8 @@ impl VectorOps for SaasShieldVectorClient {
         ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
             encrypted_vector.paired_icl_info.clone().into(),
         )
-        .map_err(|_| {
-            AlloyError::InvalidInput("Paired ICL info couldn't be decoded.".to_string())
+        .map_err(|_| AlloyError::InvalidInput {
+            message: "Paired ICL info couldn't be decoded.".to_string(),
         })?;
 
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
@@ -143,10 +145,10 @@ impl VectorOps for SaasShieldVectorClient {
             .await?;
             let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
             if derived_key_id != key_id {
-                Err(AlloyError::InvalidKey(
+                Err(AlloyError::InvalidKey{message:
                     "The key ID in the paired ICL info and on the key derived for decryption did not match"
                         .to_string(),
-                ))
+                })
             } else {
                 decrypt_internal(
                     approximation_factor,
@@ -156,9 +158,9 @@ impl VectorOps for SaasShieldVectorClient {
                 )
             }
         } else {
-            Err(AlloyError::InvalidInput(
+            Err(AlloyError::InvalidInput{message:
                 format!("The data indicated that this was not a SaaS Shield Vector wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
+            })
         }
     }
 
@@ -184,9 +186,10 @@ impl VectorOps for SaasShieldVectorClient {
                 let keys = all_keys
                     .get(&plaintext_vector.secret_path)
                     .and_then(|deriv| deriv.get(&plaintext_vector.derivation_path))
-                    .ok_or(AlloyError::TenantSecurityError(
-                        "Failed to derive keys for provided path using the TSP.".to_string(),
-                    ))?;
+                    .ok_or(AlloyError::TenantSecurityError {
+                        message: "Failed to derive keys for provided path using the TSP."
+                            .to_string(),
+                    })?;
                 keys.iter()
                     .map(|derived_key| {
                         let (key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;

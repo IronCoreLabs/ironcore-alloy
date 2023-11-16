@@ -63,9 +63,9 @@ pub(crate) fn verify_sig(
     if ironcore_documents::verify_signature(aes_dek.0, document) {
         Ok(())
     } else {
-        Err(AlloyError::DecryptError(
-            "EDEK signature verification failed.".to_string(),
-        ))
+        Err(AlloyError::DecryptError {
+            message: "EDEK signature verification failed.".to_string(),
+        })
     }
 }
 

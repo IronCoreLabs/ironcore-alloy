@@ -134,7 +134,9 @@ fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
     let maybe_edek_wrapper = edeks.iter().find(|edek| edek.has_cmk_edek());
     let cmk_edek = maybe_edek_wrapper
         .map(|edek| edek.cmk_edek())
-        .ok_or_else(|| AlloyError::DecryptError("No Saas Shield EDEK found.".to_string()))?;
+        .ok_or_else(|| AlloyError::DecryptError {
+            message: "No Saas Shield EDEK found.".to_string(),
+        })?;
     Ok(cmk_edek)
 }
 
@@ -182,7 +184,9 @@ mod test {
         };
         assert_eq!(
             get_document_header_and_edek(&encrypted_document).unwrap_err(),
-            AlloyError::IronCoreDocumentsError("KeyIdHeaderTooShort(1)".to_string())
+            AlloyError::IronCoreDocumentsError {
+                message: "KeyIdHeaderTooShort(1)".to_string()
+            }
         );
     }
 

@@ -87,7 +87,9 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
             encrypted_field.encrypted_field.into(),
         )
-        .map_err(|_| AlloyError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
+        .map_err(|_| AlloyError::InvalidInput {
+            message: "Ciphertext header was invalid.".to_string(),
+        })?;
 
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
             let paths = [(
@@ -112,10 +114,10 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             )
             .await?;
             if derived_key.tenant_secret_id.0 != key_id.0 {
-                Err(AlloyError::InvalidKey(
+                Err(AlloyError::InvalidKey{ message:
                     "The key ID in the document header and on the key derived for decryption did not match"
                         .to_string(),
-                ))
+                })
             } else {
                 decrypt_internal(
                     DeterministicEncryptionKey(derived_key.derived_key.0.clone()),
@@ -125,9 +127,9 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 )
             }
         } else {
-            Err(AlloyError::InvalidInput(
+            Err(AlloyError::InvalidInput{ message:
                 format!("The data indicated that this was not a SaaS Shield Deterministic wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
+            })
         }
     }
 
@@ -153,9 +155,10 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 let keys = all_keys
                     .get(&plaintext_field.secret_path)
                     .and_then(|deriv| deriv.get(&plaintext_field.derivation_path))
-                    .ok_or(AlloyError::TenantSecurityError(
-                        "Failed to derive keys for provided path using the TSP.".to_string(),
-                    ))?;
+                    .ok_or(AlloyError::TenantSecurityError {
+                        message: "Failed to derive keys for provided path using the TSP."
+                            .to_string(),
+                    })?;
                 keys.iter()
                     .map(|derived_key| {
                         let key_id_header = KeyIdHeader {

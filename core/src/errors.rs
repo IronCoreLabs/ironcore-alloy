@@ -3,24 +3,57 @@ use crate::vector::crypto::{DecryptError, EncryptError};
 
 /// Errors related to IronCore Alloy SDK
 #[derive(Debug, uniffi::Error, PartialEq, Eq)]
-#[uniffi(flat_error)]
 pub enum AlloyError {
-    /// Error while loading configuration.
-    InvalidConfiguration(String),
-    /// Error with key used
-    InvalidKey(String),
-    /// Error with user input
-    InvalidInput(String),
-    /// Errors while encrypting
-    EncryptError(String),
+    AnotherSubvariant {
+        subvariant: Subvariant,
+    },
     /// Errors while decrypting
-    DecryptError(String),
-    /// Error when parsing encryption headers/metadata
-    ProtobufError(String),
-    /// Error with requests to TSC
-    TenantSecurityError(String),
+    DecryptError {
+        message: String,
+    },
+    /// Errors while encrypting
+    EncryptError {
+        message: String,
+    },
+    /// Error while loading configuration.
+    InvalidConfiguration {
+        message: String,
+    },
+    /// Error with user input
+    InvalidInput {
+        message: String,
+    },
+    /// Error with key used
+    InvalidKey {
+        message: String,
+    },
     /// Error with IronCore Documents
-    IronCoreDocumentsError(String),
+    IronCoreDocumentsError {
+        message: String,
+    },
+    /// Error when parsing encryption headers/metadata
+    ProtobufError {
+        messsage: String,
+    },
+    /// Error with requests to TSC
+    TenantSecurityError {
+        message: String,
+    },
+}
+#[derive(Debug, uniffi::Error, PartialEq, Eq)]
+#[uniffi(flat_error)]
+pub enum Subvariant {
+    One(String),
+    Two(String),
+}
+impl std::error::Error for Subvariant {}
+impl std::fmt::Display for Subvariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Subvariant::One(message) => write!(f, "One bad: {message}"),
+            Subvariant::Two(message) => write!(f, "Two bad: {message}"),
+        }
+    }
 }
 impl std::fmt::Display for AlloyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -39,6 +72,7 @@ impl std::fmt::Display for AlloyError {
             AlloyError::IronCoreDocumentsError(message) => {
                 write!(f, "IronCore Documents error: '{message}'")
             }
+            AlloyError::AnotherSubvariant(s) => write!(f, "Bad time: {s}"),
         }
     }
 }

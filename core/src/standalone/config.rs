@@ -45,19 +45,21 @@ impl StandardSecrets {
                 )
                 .is_some()
             {
-                return Err(AlloyError::InvalidKey(format!(
-                    "Duplicate secret id encountered while initializing Standalone mode: {}",
-                    standalone_secret.id
-                )));
+                return Err(AlloyError::InvalidKey {
+                    message: format!(
+                        "Duplicate secret id encountered while initializing Standalone mode: {}",
+                        standalone_secret.id
+                    ),
+                });
             }
         }
 
         // check that the provided primary does in fact exist
         if let Some(id) = primary_secret_id {
             if internal_secrets.get(&(id as u32)).is_none() {
-                return Err(AlloyError::InvalidKey(format!(
-                    "Primary secret id not found in provided secrets: {id}"
-                )));
+                return Err(AlloyError::InvalidKey {
+                    message: format!("Primary secret id not found in provided secrets: {id}"),
+                });
             }
         }
 
@@ -86,9 +88,9 @@ impl RotatableSecret {
         in_rotation_secret: Option<Arc<StandaloneSecret>>,
     ) -> Result<Arc<Self>, AlloyError> {
         if current_secret.is_none() && in_rotation_secret.is_none() {
-            Err(AlloyError::InvalidKey(
-                "Cannot create a RotatingSecret with no secrets.".to_string(),
-            ))
+            Err(AlloyError::InvalidKey {
+                message: "Cannot create a RotatingSecret with no secrets.".to_string(),
+            })
         } else {
             Ok(Arc::new(Self {
                 current_secret,

@@ -134,13 +134,15 @@ pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), All
     let iv = vector_proto.iv;
     let auth_hash = vector_proto.auth_hash;
     Ok((
-        iv[..]
-            .try_into()
-            .map_err(|_| AlloyError::DecryptError("Invalid IV".to_string()))?,
+        iv[..].try_into().map_err(|_| AlloyError::DecryptError {
+            message: "Invalid IV".to_string(),
+        })?,
         AuthHash(
             auth_hash[..]
                 .try_into()
-                .map_err(|_| AlloyError::DecryptError("Invalid authentication hash".to_string()))?,
+                .map_err(|_| AlloyError::DecryptError {
+                    message: "Invalid authentication hash".to_string(),
+                })?,
         ),
     ))
 }

@@ -126,7 +126,9 @@ impl TryFrom<AlloyMetadata> for RequestMetadata {
                     .requesting_id
                     .unwrap_or("IronCore Labs Alloy SDK".to_string()),
             )
-            .map_err(|e| AlloyError::InvalidConfiguration(e.to_string()))?,
+            .map_err(|e| AlloyError::InvalidConfiguration {
+                message: e.to_string(),
+            })?,
             value.data_label,
             value.source_ip,
             value.object_id,
@@ -242,9 +244,9 @@ impl Secret {
     #[uniffi::constructor]
     pub fn new(secret: Vec<u8>) -> Result<Arc<Self>, AlloyError> {
         if secret.len() < 32 {
-            Err(AlloyError::InvalidConfiguration(
-                "Secrets must be at least 32 cryptographically random bytes.".to_string(),
-            ))
+            Err(AlloyError::InvalidConfiguration {
+                message: "Secrets must be at least 32 cryptographically random bytes.".to_string(),
+            })
         } else {
             Ok(Arc::new(Self { secret }))
         }

@@ -33,10 +33,9 @@ async fn derive_key_for_path<'a>(
         }
         DeriveKeyChoice::InRotation => derived_keys.get_in_rotation(secret_path, deriv_path),
     }
-    .ok_or_else(|| {
-        AlloyError::TenantSecurityError(
-            "The secret path, derivation path combo didn't have the requested key.".to_string(),
-        )
+    .ok_or_else(|| AlloyError::TenantSecurityError {
+        message: "The secret path, derivation path combo didn't have the requested key."
+            .to_string(),
     })
 }
 

@@ -73,20 +73,16 @@ impl StandardDocumentOps for StandaloneStandardClient {
         let (secret_id, secret) = self
             .config
             .primary_secret_id
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(
-                    "No primary secret exists in the standard configuration".to_string(),
-                )
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                message: "No primary secret exists in the standard configuration".to_string(),
             })
             .and_then(|id| {
                 self.config
                     .secrets
                     .get(&id)
                     .map(|secret| (id, secret))
-                    .ok_or_else(|| {
-                        AlloyError::InvalidConfiguration(
-                            "Primary secret id not found in secrets map".to_string(),
-                        )
+                    .ok_or_else(|| AlloyError::InvalidConfiguration {
+                        message: "Primary secret id not found in secrets map".to_string(),
                     })
             })?;
 
@@ -113,23 +109,30 @@ impl StandardDocumentOps for StandaloneStandardClient {
             },
             edek_bytes,
         ) = key_id_header::decode_version_prefixed_value(encrypted_document.edek.0.into())?;
-        let secret = self.config.secrets.get(&key_id.0).ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
-                "Provided secret id `{}` does not exist in the standard configuration.",
-                &key_id.0
-            ))
-        })?;
+        let secret =
+            self.config
+                .secrets
+                .get(&key_id.0)
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    message: format!(
+                        "Provided secret id `{}` does not exist in the standard configuration.",
+                        &key_id.0
+                    ),
+                })?;
         if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
             let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
-            let v4_document = Message::parse_from_bytes(&edek_bytes[..])
-                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
+            let v4_document = Message::parse_from_bytes(&edek_bytes[..]).map_err(|e| {
+                AlloyError::DecryptError {
+                    message: e.to_string(),
+                }
+            })?;
 
             let dek = decrypt_aes_edek(&per_tenant_kek, &v4_document)?;
             Ok(decrypt_document_core(encrypted_document.document, dek)?)
         } else {
-            Err(AlloyError::InvalidInput(
+            Err(AlloyError::InvalidInput{message:
                 format!("The data indicated that this was not a Standalone Standard wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
+            })
         }
     }
 
@@ -157,7 +160,9 @@ fn decrypt_aes_edek(
         .find(|edek| edek.has_aes_256_gcm_edek());
     let aes_edek = maybe_edek_wrapper
         .map(|edek| edek.aes_256_gcm_edek())
-        .ok_or_else(|| AlloyError::DecryptError("No AES EDEK found.".to_string()))?;
+        .ok_or_else(|| AlloyError::DecryptError {
+            message: "No AES EDEK found.".to_string(),
+        })?;
     let aes_dek = ironcore_documents::aes::decrypt_aes_edek(kek, aes_edek)?;
     verify_sig(aes_dek, header)?;
     Ok(aes_dek)
@@ -236,9 +241,10 @@ mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidConfiguration(
-                "Provided secret id `4` does not exist in the standard configuration.".to_string()
-            )
+            AlloyError::InvalidConfiguration {
+                message: "Provided secret id `4` does not exist in the standard configuration."
+                    .to_string()
+            }
         );
         Ok(())
     }
@@ -251,9 +257,9 @@ mod test {
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidConfiguration(
-                "No primary secret exists in the standard configuration".to_string()
-            )
+            AlloyError::InvalidConfiguration {
+                message: "No primary secret exists in the standard configuration".to_string()
+            }
         );
         Ok(())
     }
@@ -267,9 +273,9 @@ mod test {
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidConfiguration(
-                "Primary secret id not found in secrets map".to_string()
-            )
+            AlloyError::InvalidConfiguration {
+                message: "Primary secret id not found in secrets map".to_string()
+            }
         );
         Ok(())
     }
@@ -316,10 +322,10 @@ mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidInput(
+            AlloyError::InvalidInput{message:
                 "The data indicated that this was not a Standalone Standard wrapped value. Found: SaaS Shield, Deterministic Field"
                     .to_string()
-            )
+            }
         );
         Ok(())
     }
