@@ -1,6 +1,45 @@
 use crate::tenant_security_client::errors::TenantSecurityError;
 use crate::vector::crypto::{DecryptError, EncryptError};
 
+#[derive(Debug, uniffi::Error, PartialEq, Eq)]
+pub enum AlternateError {
+    Alloy { message: String },
+    TenantSecurity { cause: InternalTenantSecurityError },
+}
+
+#[derive(Debug, uniffi::Error, PartialEq, Eq)]
+pub enum InternalTenantSecurityError {
+    Retryable { message: String },
+    Terminal { message: String },
+}
+
+impl std::fmt::Display for InternalTenantSecurityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InternalTenantSecurityError::Retryable { message } => {
+                write!(f, "Retryable TSP failure encountered: {message}")
+            }
+            InternalTenantSecurityError::Terminal { message } => {
+                write!(f, "TSP failure encountered: {message}")
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for AlternateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Alloy { message } => write!(f, "Call failed inside the SDK: {message}"),
+            Self::TenantSecurity { cause } => {
+                write!(f, "Tenant security proxy call failed: {cause}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AlternateError {}
+impl std::error::Error for InternalTenantSecurityError {}
+
 /// Errors related to IronCore Alloy SDK
 #[derive(Debug, uniffi::Error, PartialEq, Eq)]
 #[uniffi(flat_error)]
