@@ -131,7 +131,8 @@ impl VectorSecret {
 
 /// Configuration for the standalone SDKs. Sets secrets and secret paths for the different SDK operations.
 /// If usage of only one set of SDK operations is desired the others can be left as empty objects, and will error if
-/// called in that state.
+/// called in that state. If you want to share a secret between multiple SDK modes, you'll need to create secrets in each
+/// mode that share the same secret bytes.
 #[derive(Debug, uniffi::Object, Clone)]
 pub struct StandaloneConfiguration {
     pub(crate) standard: Arc<StandardSecrets>,
