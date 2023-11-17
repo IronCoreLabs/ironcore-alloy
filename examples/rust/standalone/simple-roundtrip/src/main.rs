@@ -2,7 +2,7 @@ use std::{collections::HashMap, env};
 
 use ironcore_alloy::{
     standalone::config::{StandaloneConfiguration, StandaloneSecret, StandardSecrets},
-    standard::StandardDocumentOps,
+    standard::{EdekWithKeyIdHeader, EncryptedDocument, StandardDocumentOps},
     AlloyMetadata, Secret, Standalone, TenantId,
 };
 use serde::{Deserialize, Serialize};
@@ -68,4 +68,45 @@ async fn main() {
     println!("Decrypted SSN: {}", parsed_jim.ssn);
     println!("Decrypted address: {}", parsed_jim.adddress);
     println!("Decrypted name: {}", parsed_jim.name);
+
+    let success_string = "success".to_string();
+    let image_bytes = std::fs::read("success.jpg").expect("Couldn't read success.jpg bytes");
+    let encrypted_image = standalone
+        .standard()
+        .encrypt([(success_string.clone(), image_bytes)].into(), &metadata)
+        .await
+        .unwrap();
+
+    // Write the enrcypted data and edek.
+    std::fs::write("success.jpg.edek", encrypted_image.edek.0).expect("");
+    std::fs::write(
+        "success.jpg.enc",
+        encrypted_image
+            .document
+            .get(success_string.as_str())
+            .expect("String is present in map"),
+    )
+    .expect("Writing encrypted data to file failed.");
+
+    // Now read back in the edek and encrypted image.
+    let edek_read = std::fs::read("success.jpg.edek").unwrap();
+    let encrypted_data = std::fs::read("success.jpg.enc").unwrap();
+
+    let decrypted_data = standalone
+        .standard()
+        .decrypt(
+            EncryptedDocument {
+                edek: EdekWithKeyIdHeader(edek_read),
+                document: [(success_string.clone(), encrypted_data)].into(),
+            },
+            &metadata,
+        )
+        .await
+        .unwrap();
+
+    std::fs::write(
+        "decrypted.jpg",
+        decrypted_data.get(success_string.as_str()).unwrap(),
+    )
+    .unwrap()
 }
