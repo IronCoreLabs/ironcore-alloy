@@ -1,13 +1,20 @@
 # IronCore Labs Alloy SDK
 
-Ironcore Alloy SDK is designed to be a single SDK for all the different IronCore products. This includes AES, deterministic, and vector encryption. It also has support for multiple types of key management including integration with [Saas Shield](https://ironcorelabs.com/products/saas-shield/). The goal is for this SDK to be all you need to easily encrypt all your data for your application regardless of your key management strategy.
+The Alloy SDK brings together a set of tools that you can use for your different Application Layer Encryption needs. It
+unifies functionality that was provided in our SaaS Shield Tenant Security Client (TSC) SDKs and our new Cloaked AI tools
+in a single library that you can include in your application. This library provides tools to encrypt data using
+_standard_, _deterministic_, and _vector_ encryption algorithms.
+
+Whether you are handling structured or unstructured documents, fields that are stored in a relational database or key value
+store, vectors that are stored in a vector database, or some combination of these, the Alloy SDK provides the tools you need
+to protect the private or sensitive data your apps process.
 
 ## Language Support
 
-- [Java](http://todo.com)
-- [Kotlin](http://todo.com)
+- [Java](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy)
+- [Kotlin](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy)
 - [Python](https://pypi.org/project/ironcore-alloy)
-- [Rust](http://todo.com)
+- Rust - Depend on this repo using a git dependency.
 
 This SDK was written in Rust and is using [uniffi](https://github.com/mozilla/uniffi-rs) to generate the foreign language bindings. If your language is not listed above, feel free to open an issue and we can take a look!
 
