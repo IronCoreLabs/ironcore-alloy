@@ -2,6 +2,7 @@ import ironcore_alloy as alloy
 import os
 import asyncio
 
+
 async def main():
     tenant_id = os.environ.get('TENANT_ID', 'tenant-gcp')
     # Note: in practice this must be 32 cryptographically-secure bytes
@@ -9,10 +10,10 @@ async def main():
     approximation_factor = 7.2
     vector_secrets = {
         "contacts":
-        alloy.VectorSecret(
-            approximation_factor,
-            alloy.RotatableSecret(alloy.StandaloneSecret(1, alloy.Secret(key_bytes)), None),
-        )
+            alloy.VectorSecret(
+                approximation_factor,
+                alloy.RotatableSecret(alloy.StandaloneSecret(1, alloy.Secret(key_bytes)), None),
+            )
     }
     standard_secrets = alloy.StandardSecrets(None, [])
     deterministic_secrets = {}
@@ -31,6 +32,7 @@ async def main():
     print("Decrypted vector: ", decrypted.plaintext_vector)
     print("Note that the encryption/decryption is lossy due to floating point math.")
 
-if __name__ ==  '__main__':
+
+if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())

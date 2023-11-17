@@ -2,6 +2,7 @@ import ironcore_alloy as alloy
 import os
 import asyncio
 
+
 async def main():
     tenant_id = os.environ.get('TENANT_ID', 'tenant-gcp')
     api_key = os.environ.get('API_KEY', '0WUaXesNgbTAuLwn')
@@ -27,6 +28,7 @@ async def main():
     print("Note that the query vectors are a nested list. If this tenant had an in-rotation key, two vectors")
     print("would be in the result. In that case, both vectors must be used in conjunction when querying.")
 
-if __name__ ==  '__main__':
+
+if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())

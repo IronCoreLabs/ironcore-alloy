@@ -2,6 +2,7 @@ import ironcore_alloy as alloy
 import os
 import asyncio
 
+
 async def main():
     tenant_id = os.environ.get('TENANT_ID', 'tenant-gcp')
     api_key = os.environ.get('API_KEY', '0WUaXesNgbTAuLwn')
@@ -22,6 +23,7 @@ async def main():
     print("Decrypted vector: ", decrypted.plaintext_vector)
     print("Note that the encryption/decryption is lossy due to floating point math.")
 
-if __name__ ==  '__main__':
+
+if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
