@@ -37,3 +37,12 @@ query vectors that can be used for nearest-neighbor searches on the original pla
 ```
 python vector-search.py
 ```
+
+### Standard roundtrip
+
+This example shows creating a plaintext document containing personal information associated with a tenant, encrypting
+the document, then decrypting it. 
+
+```
+python standard-roundtrip.py
+```
