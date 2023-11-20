@@ -1006,7 +1006,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "ironcore-alloy"
-version = "0.9.2-pre.2"
+version = "0.9.2-rc.2"
 dependencies = [
  "aes-gcm",
  "aes-siv",
