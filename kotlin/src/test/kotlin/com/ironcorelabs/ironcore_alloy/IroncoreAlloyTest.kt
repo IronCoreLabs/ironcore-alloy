@@ -5,6 +5,7 @@ import java.util.Base64
 import kotlin.math.abs
 import kotlin.system.*
 import kotlin.test.*
+import kotlin.time.*
 import kotlinx.coroutines.*
 
 fun ByteArray.toBase64(): String = String(Base64.getEncoder().encode(this))
