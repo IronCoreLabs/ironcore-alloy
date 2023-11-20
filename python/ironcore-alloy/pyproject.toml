@@ -61,6 +61,14 @@ test = "coverage --no-cov {args}"
 [[tool.hatch.envs.test.matrix]]
 python = ["37", "38", "39", "310", "311"]
 
+[tool.hatch.envs.bench]
+dependencies = [
+    "pyperf==2.6.2"
+]
+
+[tool.hatch.envs.bench.scripts]
+standard_roundtrip = "python bench.py {args}"
+
 [tool.coverage.run]
 branch = true
 parallel = true
