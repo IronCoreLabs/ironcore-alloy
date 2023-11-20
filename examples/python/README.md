@@ -2,14 +2,14 @@
 
 ## Setup
 
-To run the examples, you must first activate the virtual environment; we use Pipenv to manage this. 
-If you don't have Pipenv installed, directions for installing it can be found 
-[here](https://pipenv.pypa.io/en/latest/installation.html).
+To run the examples, you must first activate the virtual environment; we use `hatch` to manage this. 
+If you don't have `hatch` installed, directions for installing it can be found 
+[here](https://hatch.pypa.io/latest/install/).
 
 From the `examples/python` folder, run 
 
 ```bash
-pipenv shell
+hatch shell
 ```
 
 Once the environment is activated, decide if you would like to run the Standalone or SaaS Shield examples and navigate
