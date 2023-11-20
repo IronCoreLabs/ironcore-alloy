@@ -3,11 +3,12 @@ use super::{
 };
 use crate::deterministic::{
     decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
-    EncryptedField, GenerateQueryResult, PlaintextField, PlaintextFields,
+    EncryptedField, EncryptedFields, GenerateQueryResult, PlaintextField, PlaintextFields,
+    RotateBatchResult,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::{AlloyMetadata, DerivationPath, SecretPath};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::sync::Arc;
@@ -58,8 +59,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             &plaintext_field.secret_path,
             &plaintext_field.derivation_path,
             DeriveKeyChoice::Current,
-        )
-        .await?;
+        )?;
         let key_id_header = KeyIdHeader::new(
             Self::get_edek_type(),
             Self::get_payload_type(),
@@ -109,8 +109,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 &encrypted_field.secret_path,
                 &encrypted_field.derivation_path,
                 DeriveKeyChoice::Specific(key_id),
-            )
-            .await?;
+            )?;
             if derived_key.tenant_secret_id.0 != key_id.0 {
                 Err(AlloyError::InvalidKey(
                     "The key ID in the document header and on the key derived for decryption did not match"
@@ -175,6 +174,15 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             .collect()
     }
 
+    async fn rotate_fields(
+        &self,
+        _encrypted_fields: EncryptedFields,
+        _metadata: &AlloyMetadata,
+        _new_tenant_id: TenantId,
+    ) -> Result<RotateBatchResult, AlloyError> {
+        todo!()
+    }
+
     async fn get_in_rotation_prefix(
         &self,
         secret_path: SecretPath,
@@ -198,7 +206,6 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             Self::get_edek_type(),
             Self::get_payload_type(),
         )
-        .await
     }
 }
 
@@ -237,7 +244,6 @@ mod test {
             &derivation_path,
             DeriveKeyChoice::Current,
         )
-        .await
         .unwrap();
         let field = PlaintextField {
             plaintext_field: vec![1, 2, 3],
@@ -292,7 +298,6 @@ mod test {
             &derivation_path,
             DeriveKeyChoice::Specific(KeyId(1)),
         )
-        .await
         .unwrap();
         let field = EncryptedField {
             derivation_path: derivation_path.clone(),

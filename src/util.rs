@@ -1,11 +1,15 @@
-use crate::VectorEncryptionKey;
+use crate::{errors::AlloyError, FieldId, VectorEncryptionKey};
+use itertools::Itertools;
 use rand::{
     rngs::{adapter::ReseedingRng, OsRng},
     CryptoRng, RngCore, SeedableRng,
 };
 use rand_chacha::{ChaCha20Core, ChaCha20Rng};
 use ring::hmac::{Key as HMACKey, HMAC_SHA256, HMAC_SHA512};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 /// number of bytes that can be read from before it rngs are reseeded. 1 MiB
 const BYTES_BEFORE_RESEEDING: u64 = 1024 * 1024;
@@ -93,6 +97,31 @@ pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
 
 pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T) -> ChaCha20Rng {
     ChaCha20Rng::from_seed(hash256(key, hash_payload))
+}
+
+pub(crate) struct BatchResult<U> {
+    pub successes: HashMap<FieldId, U>,
+    pub failures: HashMap<FieldId, String>,
+}
+
+pub(crate) fn hash_map_to_batch_result<T, U, F>(
+    hash_map: HashMap<FieldId, T>,
+    func: F,
+) -> BatchResult<U>
+where
+    F: Fn(T) -> Result<U, AlloyError>,
+{
+    let (successes, failures) = hash_map
+        .into_iter()
+        .map(|(key, value)| match func(value) {
+            Ok(x) => Ok((key, x)),
+            Err(x) => Err((key, x.to_string())), // TODO: remove to_string when returning AlloyError works
+        })
+        .partition_result();
+    BatchResult {
+        successes,
+        failures,
+    }
 }
 
 #[cfg(test)]

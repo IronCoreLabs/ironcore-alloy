@@ -1,10 +1,11 @@
 use super::config::RotatableSecret;
 use crate::deterministic::{
-    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
-    EncryptedField, GenerateQueryResult, PlaintextField, PlaintextFields,
+    check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
+    DeterministicFieldOps, EncryptedField, EncryptedFields, GenerateQueryResult, PlaintextField,
+    PlaintextFields, RotateBatchResult,
 };
 use crate::errors::AlloyError;
-use crate::{AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -28,14 +29,12 @@ impl StandaloneDeterministicClient {
     fn get_payload_type() -> PayloadType {
         PayloadType::DeterministicField
     }
-}
 
-#[uniffi::export]
-impl DeterministicFieldOps for StandaloneDeterministicClient {
-    async fn encrypt(
+    /// Synchronous version of `encrypt` that takes TenantId instead of full AlloyMetadata
+    fn encrypt_sync(
         &self,
         plaintext_field: PlaintextField,
-        metadata: &AlloyMetadata,
+        tenant_id: &TenantId,
     ) -> Result<EncryptedField, AlloyError> {
         let secret = self
             .config
@@ -53,7 +52,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         })?;
         let key = DeterministicEncryptionKey::derive_from_secret(
             &current_secret.secret,
-            &metadata.tenant_id,
+            tenant_id,
             &plaintext_field.derivation_path,
         );
         let key_id_header = KeyIdHeader::new(
@@ -64,10 +63,11 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         encrypt_internal(key, key_id_header, plaintext_field)
     }
 
-    async fn decrypt(
+    /// Synchronous version of `decrypt` that takes TenantId instead of full AlloyMetadata
+    fn decrypt_sync(
         &self,
         encrypted_field: EncryptedField,
-        metadata: &AlloyMetadata,
+        tenant_id: &TenantId,
     ) -> Result<PlaintextField, AlloyError> {
         let (
             KeyIdHeader {
@@ -98,7 +98,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             })?;
             let key = DeterministicEncryptionKey::derive_from_secret(
                 &standalone_secret.secret,
-                &metadata.tenant_id,
+                tenant_id,
                 &encrypted_field.derivation_path,
             );
             decrypt_internal(
@@ -113,6 +113,26 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             ))
         }
     }
+}
+
+#[uniffi::export]
+impl DeterministicFieldOps for StandaloneDeterministicClient {
+    async fn encrypt(
+        &self,
+        plaintext_field: PlaintextField,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedField, AlloyError> {
+        self.encrypt_sync(plaintext_field, &metadata.tenant_id)
+    }
+
+    async fn decrypt(
+        &self,
+        encrypted_field: EncryptedField,
+        metadata: &AlloyMetadata,
+    ) -> Result<PlaintextField, AlloyError> {
+        self.decrypt_sync(encrypted_field, &metadata.tenant_id)
+    }
+
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
@@ -165,6 +185,60 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     .map(|enc| (field_id, enc))
             })
             .try_collect()
+    }
+
+    async fn rotate_fields(
+        &self,
+        encrypted_fields: EncryptedFields,
+        metadata: &AlloyMetadata,
+        new_tenant_id: TenantId,
+    ) -> Result<RotateBatchResult, AlloyError> {
+        let reencrypt_field = |encrypted_field: EncryptedField| {
+            let (
+                KeyIdHeader {
+                    key_id,
+                    edek_type,
+                    payload_type,
+                },
+                _,
+            ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
+                encrypted_field.encrypted_field.clone().into(),
+            )
+            .map_err(|_| AlloyError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
+            let rotatable_secret = self
+                .config
+                .get(&encrypted_field.secret_path)
+                .ok_or_else(|| {
+                    AlloyError::InvalidConfiguration(format!(
+                        "Provided secret path `{}` does not exist in the deterministic configuration.",
+                        &encrypted_field.secret_path.0
+                    ))
+                })?;
+            if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
+                if check_rotation_no_op(
+                    key_id,
+                    &rotatable_secret.current_secret,
+                    &new_tenant_id,
+                    metadata,
+                ) {
+                    Ok(encrypted_field)
+                } else {
+                    self.decrypt_sync(encrypted_field, &metadata.tenant_id)
+                        .and_then(|decrypted_field| {
+                            self.encrypt_sync(decrypted_field, &new_tenant_id)
+                        })
+                }
+            } else {
+                Err(AlloyError::InvalidInput(
+                    format!("The data indicated that this was not a Standalone Deterministic wrapped value. Found: {edek_type}, {payload_type}"),
+                ))
+            }
+        };
+        let batch_result = crate::util::hash_map_to_batch_result(encrypted_fields, reencrypt_field);
+        Ok(RotateBatchResult {
+            successes: batch_result.successes,
+            failures: batch_result.failures,
+        })
     }
 
     async fn get_in_rotation_prefix(

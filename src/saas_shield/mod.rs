@@ -20,7 +20,7 @@ enum DeriveKeyChoice {
 
 /// Calls the TSP to derive keys for a single secret_path/derivation_path.
 /// Then converts the result to an encryption key and key ID.
-async fn derive_key_for_path<'a>(
+fn derive_key_for_path<'a>(
     derived_keys: &'a KeyDeriveResponse,
     secret_path: &'a SecretPath,
     deriv_path: &'a DerivationPath,
@@ -82,7 +82,7 @@ fn derived_key_to_vector_encryption_key(
     Ok((KeyId(derived_key.tenant_secret_id.0), key))
 }
 
-async fn get_in_rotation_prefix_internal(
+fn get_in_rotation_prefix_internal(
     derived_keys: &KeyDeriveResponse,
     secret_path: SecretPath,
     derivation_path: DerivationPath,
@@ -94,8 +94,7 @@ async fn get_in_rotation_prefix_internal(
         &secret_path,
         &derivation_path,
         DeriveKeyChoice::InRotation,
-    )
-    .await?
+    )?
     .tenant_secret_id
     .0;
     let key_id_header = KeyIdHeader {
@@ -157,7 +156,6 @@ mod test {
             EdekType::SaasShield,
             PayloadType::StandardEdek,
         )
-        .await
         .unwrap();
 
         assert_eq!(

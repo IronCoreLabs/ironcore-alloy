@@ -198,7 +198,7 @@ impl SaasShield {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct TenantId(pub String);
 custom_newtype!(TenantId, String);
 

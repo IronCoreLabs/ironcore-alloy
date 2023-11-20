@@ -89,8 +89,7 @@ impl VectorOps for SaasShieldVectorClient {
             &plaintext_vector.secret_path,
             &plaintext_vector.derivation_path,
             DeriveKeyChoice::Current,
-        )
-        .await?;
+        )?;
         let (key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
         self.encrypt_core(&key, key_id, plaintext_vector)
     }
@@ -139,8 +138,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &encrypted_vector.secret_path,
                 &encrypted_vector.derivation_path,
                 DeriveKeyChoice::Specific(key_id),
-            )
-            .await?;
+            )?;
             let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
             if derived_key_id != key_id {
                 Err(AlloyError::InvalidKey(
@@ -224,6 +222,5 @@ impl VectorOps for SaasShieldVectorClient {
             Self::get_edek_type(),
             Self::get_payload_type(),
         )
-        .await
     }
 }
