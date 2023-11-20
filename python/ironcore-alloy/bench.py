@@ -2,9 +2,8 @@ import ironcore_alloy
 import time, random, string, asyncio, statistics
 import pyperf
 
-# This benchmark tests a single standard roundtrip call to get an idea of how much time is being added by the FFI.
-# Run this benchmark with `hatch run bench:standard_roundtrip -o batch.json`
-# Review stats with `hatch run bench:pyperf stats bench.json`
+# Run this benchmark with `hatch run bench:bench`
+# Review stats with `hatch run bench:stats`
 
 
 def create_sdk_shared_key(key_bytes: bytearray) -> ironcore_alloy.Standalone:
@@ -27,6 +26,7 @@ def random_word(length: int):
     return "".join(random.choice(string.ascii_lowercase) for i in range(length))
 
 
+# This benchmark tests a single standard roundtrip call to get an idea of how much time is being added by the FFI.
 async def standard_roundtrip(
     sdk: ironcore_alloy.Standalone,
     word: bytearray,
@@ -43,7 +43,7 @@ key_bytes = "awholelotoftotallyrandomdatathatcanbeusedasasecurecryptokey".encode
 )
 sdk = create_sdk_shared_key(key_bytes)
 runner = pyperf.Runner()
-runner.metadata["description"] = "Run the IronCore Alloy Standard Roundtrip benchmark."
+runner.metadata["description"] = "Run the IronCore Alloy benchmarks."
 runner.bench_async_func(
     "standard_roundtrip",
     standard_roundtrip,

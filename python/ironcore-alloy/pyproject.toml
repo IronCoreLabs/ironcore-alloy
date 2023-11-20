@@ -67,7 +67,8 @@ dependencies = [
 ]
 
 [tool.hatch.envs.bench.scripts]
-standard_roundtrip = "python bench.py {args}"
+bench = "rm bench.json; python bench.py -o bench.json"
+stats = "pyperf stats bench.json"
 
 [tool.coverage.run]
 branch = true
