@@ -2,7 +2,7 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.allopen.gradle.*
 import org.jetbrains.kotlin.gradle.tasks.*
-import org.jetbrains.kotlinx.benchmark.gradle.*
+import kotlinx.benchmark.gradle.*
 
 version = "0.9.2-SNAPSHOT"
 
@@ -110,19 +110,19 @@ signing {
     sign(publishing.publications["mavenJava"])
 }
 
-sourceSets.all {
-    java.setSrcDirs(listOf("$name/src"))
-    resources.setSrcDirs(listOf("$name/resources"))
-}
+// sourceSets.all {
+//     java.setSrcDirs(listOf("$name/src"))
+//     resources.setSrcDirs(listOf("$name/resources"))
+// }
 
 configure<AllOpenExtension> { annotation("org.openjdk.jmh.annotations.State") }
 
-tasks.withType<JavaCompile> {
-    sourceCompatibility = "1.8"
-    targetCompatibility = "1.8"
-}
+// tasks.withType<JavaCompile> {
+//     sourceCompatibility = "1.8"
+//     targetCompatibility = "1.8"
+// }
 
-tasks.withType<KotlinCompile> { kotlinOptions { jvmTarget = "1.8" } }
+// tasks.withType<KotlinCompile> { kotlinOptions { jvmTarget = "1.8" } }
 
 benchmark {
     targets {
