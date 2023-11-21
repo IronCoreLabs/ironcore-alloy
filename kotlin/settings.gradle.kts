@@ -8,10 +8,3 @@
  */
 
 rootProject.name = "ironcore-alloy"
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-

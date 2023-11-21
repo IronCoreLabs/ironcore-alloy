@@ -37,6 +37,19 @@ tasks.register<Jar>("dokkaJavadocJar") {
     archiveClassifier.set("javadoc")
 }
 
+val benchmarks = "benchmarks"
+sourceSets {
+    create(benchmarks)
+}
+
+sourceSets.all {
+    java.setSrcDirs(listOf("$name/src"))
+
+    resources.setSrcDirs(listOf("$name/../src/main/resources"))
+}
+
+val benchmarksImplementation by configurations
+
 dependencies {
     // Use the Kotlin JUnit 5 integration.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -45,8 +58,8 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.13.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
-    // TODO(murph): might need to move this so we don't ship it
-    implementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.9")
+    benchmarksImplementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.9")
+    benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
 }
 
 java {
@@ -110,29 +123,11 @@ signing {
     sign(publishing.publications["mavenJava"])
 }
 
-// sourceSets.all {
-//     java.setSrcDirs(listOf("$name/src"))
-//     resources.setSrcDirs(listOf("$name/resources"))
-// }
-
 configure<AllOpenExtension> { annotation("org.openjdk.jmh.annotations.State") }
-
-// tasks.withType<JavaCompile> {
-//     sourceCompatibility = "1.8"
-//     targetCompatibility = "1.8"
-// }
-
-// tasks.withType<KotlinCompile> { kotlinOptions { jvmTarget = "1.8" } }
 
 benchmark {
     targets {
-        configurations {
-            named("main") {
-                iterationTime = 5
-                iterationTimeUnit = "sec"
-            }
-        }
-        register("main") {
+        register(benchmarks) {
             this as JvmBenchmarkTarget
             jmhVersion = "1.21"
         }
