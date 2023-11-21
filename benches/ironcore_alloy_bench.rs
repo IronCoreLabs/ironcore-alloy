@@ -1,13 +1,17 @@
+use std::time::Duration;
+
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ironcore_alloy::standalone::config::{
     RotatableSecret, StandaloneConfiguration, StandaloneSecret, StandardSecrets, VectorSecret,
 };
+use ironcore_alloy::standard::StandardDocumentOps;
 use ironcore_alloy::vector::{PlaintextVector, VectorOps};
 use ironcore_alloy::DerivationPath;
 use ironcore_alloy::{AlloyMetadata, Secret, SecretPath, Standalone, TenantId};
 use itertools::Itertools;
+use rand::rngs::ThreadRng;
 use rand::{Rng, RngCore};
-use rand_distr::Uniform;
+use rand_distr::{Alphanumeric, Uniform};
 use tokio::runtime::Runtime;
 // // Test the function F with inputs of dimensionality 1,000 and 1,000,000
 // async fn test_function<F, Fut>(c: &mut Criterion, rng: &mut ThreadRng, name: &str, mut f: F)
@@ -75,12 +79,42 @@ fn benches(c: &mut Criterion) {
         )
     });
 
-    // test_function(c, &mut rng, "encrypt/decrypt roundtrip", |values| {
-    //     sdk.encrypt(values, &doc_metadata)
-    //         .and_then(|encrypted| sdk.decrypt(encrypted, &doc_metadata))
-    //         .unwrap();
-    // });
-
+    fn random_word(rng: ThreadRng, length: usize) -> Vec<u8> {
+        rng.sample_iter(&Alphanumeric)
+            .take(length)
+            .map(char::from)
+            .collect::<String>()
+            .into_bytes()
+    }
+    let roundtrip = |value: Vec<u8>| async {
+        let encrypted = sdk
+            .standard()
+            .encrypt([("foo".to_string(), value)].into(), &metadata)
+            .await
+            .unwrap();
+        sdk.standard().decrypt(encrypted, &metadata).await.unwrap();
+    };
+    c.bench_function(format!("encrypt/decrypt roundtrip small").as_str(), |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || random_word(rng.clone(), 10),
+            roundtrip,
+            BatchSize::SmallInput,
+        )
+    });
+    c.bench_function(format!("encrypt/decrypt roundtrip medium").as_str(), |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || random_word(rng.clone(), 10 * 1000),
+            roundtrip,
+            BatchSize::SmallInput,
+        )
+    });
+    c.bench_function(format!("encrypt/decrypt roundtrip large").as_str(), |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || random_word(rng.clone(), 10 * 10000),
+            roundtrip,
+            BatchSize::SmallInput,
+        )
+    });
     // This test requires `computer_auth_hash` to be `pub`, so only
     // briefly un-comment and test, then re-comment.
     // {
@@ -93,5 +127,9 @@ fn benches(c: &mut Criterion) {
     // }
 }
 
-criterion_group!(benchmarks, benches);
+criterion_group! {
+    name = benchmarks;
+    config = Criterion::default().measurement_time(Duration::from_secs(10));
+    targets = benches
+}
 criterion_main!(benchmarks);

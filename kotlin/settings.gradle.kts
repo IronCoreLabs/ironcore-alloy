@@ -8,4 +8,3 @@
  */
 
 rootProject.name = "ironcore-alloy"
-include("lib")

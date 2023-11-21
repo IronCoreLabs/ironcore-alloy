@@ -1,12 +1,16 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
+import org.jetbrains.kotlin.allopen.gradle.*
+import org.jetbrains.kotlin.gradle.tasks.*
+import kotlinx.benchmark.gradle.*
 
 version = "0.9.2-SNAPSHOT"
+
 group = "com.ironcorelabs"
 
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
-    id("org.jetbrains.kotlin.jvm") version "1.8.10"
+    kotlin("jvm") version "1.8.10"
     id("org.jetbrains.dokka") version "1.9.0"
 
     // Apply the java-library plugin for API and implementation separation.
@@ -16,6 +20,11 @@ plugins {
     signing
     id("io.github.gradle-nexus.publish-plugin") version "2.0.0-rc-1"
     id("com.dorongold.task-tree") version "2.1.1"
+
+    // benchmark deps
+    java
+    id("org.jetbrains.kotlinx.benchmark") version "0.4.9"
+    kotlin("plugin.allopen") version "1.9.20"
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -28,6 +37,19 @@ tasks.register<Jar>("dokkaJavadocJar") {
     archiveClassifier.set("javadoc")
 }
 
+val benchmarks = "benchmarks"
+sourceSets {
+    create(benchmarks)
+}
+
+sourceSets.all {
+    java.setSrcDirs(listOf("$name/src"))
+
+    resources.setSrcDirs(listOf("$name/../src/main/resources"))
+}
+
+val benchmarksImplementation by configurations
+
 dependencies {
     // Use the Kotlin JUnit 5 integration.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -36,6 +58,8 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.13.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
+    benchmarksImplementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.9")
+    benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
 }
 
 java {
@@ -75,7 +99,6 @@ publishing {
                 }
             }
             artifact(tasks["dokkaJavadocJar"])
-
         }
     }
 }
@@ -98,4 +121,15 @@ tasks.named<Test>("test") {
 signing {
     useGpgCmd()
     sign(publishing.publications["mavenJava"])
+}
+
+configure<AllOpenExtension> { annotation("org.openjdk.jmh.annotations.State") }
+
+benchmark {
+    targets {
+        register(benchmarks) {
+            this as JvmBenchmarkTarget
+            jmhVersion = "1.21"
+        }
+    }
 }
