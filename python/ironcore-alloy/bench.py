@@ -36,7 +36,6 @@ async def standard_roundtrip(
     await sdk.standard().decrypt(encrypted, metadata)
 
 
-random_word = random_word(10).encode("utf-8")
 metadata = ironcore_alloy.AlloyMetadata.new_simple("tenant")
 key_bytes = "awholelotoftotallyrandomdatathatcanbeusedasasecurecryptokey".encode(
     "utf-8"
@@ -44,10 +43,19 @@ key_bytes = "awholelotoftotallyrandomdatathatcanbeusedasasecurecryptokey".encode
 sdk = create_sdk_shared_key(key_bytes)
 runner = pyperf.Runner()
 runner.metadata["description"] = "Run the IronCore Alloy benchmarks."
+random_small_word = random_word(10).encode("utf-8")
 runner.bench_async_func(
-    "standard_roundtrip",
+    "standard_roundtrip_small",
     standard_roundtrip,
     sdk,
-    random_word,
+    random_small_word,
     metadata,
+)
+random_medium_word = random_word(10 * 1000).encode("utf-8")
+runner.bench_async_func(
+    "standard_roundtrip_medium", standard_roundtrip, sdk, random_medium_word, metadata
+)
+random_large_word = random_word(10 * 10000).encode("utf-8")
+runner.bench_async_func(
+    "standard_roundtrip_large", standard_roundtrip, sdk, random_large_word, metadata
 )
