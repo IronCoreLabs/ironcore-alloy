@@ -8,6 +8,10 @@ Ensure the library and source have been created, typically done by running `carg
 
 `./gradlew test`
 
+## Benchmarking
+
+You can run the benchmarks `./gradlew bench`.
+
 ## Publishing
 
 You can test publishing `./gradlew publishToMavenLocal`.
