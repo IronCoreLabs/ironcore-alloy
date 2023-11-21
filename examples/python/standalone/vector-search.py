@@ -38,10 +38,7 @@ async def main():
     query_vectors_embeddings = map(lambda vector: vector.encrypted_vector, query_vectors)
     print("Query vectors:    ", list(query_vectors_embeddings))
     print(
-        "Note that the query vectors are a nested list. Because this tenant has both a current key and an in-rotation key,"
-    )
-    print(
-        "there are two vectors resulting query vectors. In this case, both vectors must be used in conjunction when querying."
+        "Note that the query vectors are a nested list. Because this tenant has both a current key and an in-rotation key, there are two vectors resulting query vectors. In this case, both vectors must be used in conjunction when querying."
     )
 
 
