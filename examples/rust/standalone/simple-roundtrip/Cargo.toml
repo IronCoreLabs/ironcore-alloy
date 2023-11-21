@@ -1,0 +1,15 @@
+[package]
+name = "ironcore-alloy-simple-roundtrip"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ironcore-alloy = { git = "https://github.com/IronCoreLabs/ironcore-alloy.git", tag = "0.9.1" }
+serde = "1"
+serde_json = "1.0.108"
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "time",
+  "sync",
+  "macros",
+] }
