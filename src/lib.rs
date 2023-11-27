@@ -201,12 +201,17 @@ impl SaasShield {
 }
 
 trait AlloyClient {
+    /// Returns the only EdekType this Alloy client deals with.
     fn get_edek_type() -> EdekType;
 
+    /// Returns the only PayloadType this Alloy client deals with.
     fn get_payload_type() -> PayloadType;
 
+    /// Decodes the header from the encrypted bytes, returning an error if the
+    /// decoded EdekType or PayloadType is incorrect for this AlloyClient.
+    /// Returns the decoded key ID and remaining non-header bytes.
     fn decompose_encrypted_field_header(
-        encrypted_field: Vec<u8>,
+        encrypted_bytes: Vec<u8>,
     ) -> Result<(KeyId, Bytes), AlloyError> {
         let (
             KeyIdHeader {
@@ -216,7 +221,7 @@ trait AlloyClient {
             },
             remaining_bytes,
         ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
-            encrypted_field.into(),
+            encrypted_bytes.into(),
         )
         .map_err(|_| AlloyError::InvalidInput("Encrypted header was invalid.".to_string()))?;
         let expected_edek_type = Self::get_edek_type();

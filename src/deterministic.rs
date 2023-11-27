@@ -78,7 +78,9 @@ pub trait DeterministicFieldOps {
         fields_to_query: PlaintextFields,
         metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError>;
-    /// TODO: docs
+    /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
+    /// must contain the tenant ID that the fields were originally encrypted to. If the same tenant ID is passed in
+    /// `metadata` and `new_tenant_id`, the fields will simply be encrypted with the same tenant's current secret.
     async fn rotate_fields(
         &self,
         encrypted_fields: EncryptedFields,
@@ -166,6 +168,7 @@ fn deterministic_decrypt_core(
         .map_err(|e| AlloyError::DecryptError(e.to_string()))
 }
 
+/// Returns `true` if the key IDs and tenant IDs are identical, otherwise `false`.
 pub(crate) fn check_rotation_no_op(
     encrypted_key_id: KeyId,
     maybe_current_key: &Option<u32>,

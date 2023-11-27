@@ -104,6 +104,9 @@ pub(crate) struct BatchResult<U> {
     pub failures: HashMap<FieldId, String>,
 }
 
+/// Applies the function `func` to all the values of `hash_map`, then partitions them into
+/// success and failure hashmaps. Note that the value type for failures is currently `String`
+/// because of an issue with uniffi exporting errors.
 pub(crate) fn hash_map_to_batch_result<T, U, F>(
     hash_map: HashMap<FieldId, T>,
     func: F,
