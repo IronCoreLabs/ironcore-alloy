@@ -1,6 +1,6 @@
 use crate::errors::AlloyError;
 use crate::standard::{
-    decrypt_document_core, encrypt_document_core, verify_sig, EdekWithKeyIdHeader,
+    decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
     EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, StandardDocumentOps,
 };
 use crate::util::{get_rng, hash256, OurReseedingRng};
@@ -144,7 +144,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
     ) -> Result<PlaintextDocument, AlloyError> {
         let dek =
             Self::decrypt_document_dek(encrypted_document.edek, &self.config.secrets, metadata)?;
-        Ok(decrypt_document_core(encrypted_document.document, dek)?)
+        decrypt_document_core(encrypted_document.document, dek)
     }
 
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
@@ -167,18 +167,8 @@ impl StandardDocumentOps for StandaloneStandardClient {
             metadata,
         )?;
 
-        let encrypted_document: HashMap<_, _> = plaintext_document
-            .document
-            .into_iter()
-            .map(|(label, plaintext)| {
-                ironcore_documents::aes::encrypt_detached_document(
-                    &mut *get_rng(&self.rng),
-                    dek,
-                    ironcore_documents::aes::PlaintextDocument(plaintext),
-                )
-                .map(|c| (label, c.0.to_vec()))
-            })
-            .try_collect()?;
+        let encrypted_document: HashMap<_, _> =
+            encrypt_map(plaintext_document.document, self.rng.clone(), dek)?;
 
         Ok(EncryptedDocument {
             edek: plaintext_document.edek,

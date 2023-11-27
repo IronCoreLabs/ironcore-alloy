@@ -104,7 +104,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             .unwrap_key(
                 &edek
                     .write_to_bytes()
-                    .expect("Writing edek to bytes failed.")[..], // There shouldn't be any reason this could fail.
+                    .expect("Writing EDEK to bytes failed. Contact IronCore Labs support.")[..], // There shouldn't be any reason this could fail.
                 &request_metadata,
             )
             .await?;

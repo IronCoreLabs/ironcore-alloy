@@ -76,7 +76,10 @@ pub trait StandardDocumentOps {
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
-
+    /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
+    /// bytes, and the same metadata must be provided when decrypting the document.
+    /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
+    /// of the document.
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,
