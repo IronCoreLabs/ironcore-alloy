@@ -103,9 +103,9 @@ class IroncoreAlloyTest {
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
             val encrypted = sdk.standard().encrypt(plaintextDocument, metadata)
-            assertContains(encrypted.document, "foo")
             val encrypted2 = sdk.standard().encryptWithExistingEdek(PlaintextDocumentWithEdek(encrypted.edek,plaintextDocument2), metadata)
             val decrypted = sdk.standard().decrypt(encrypted2, metadata)
+            assertContentEquals(encrypted.edek, encrypted2.edek)
             assertContentEquals(decrypted.get("foo"), plaintextDocument2.get("foo"))
         }
     }

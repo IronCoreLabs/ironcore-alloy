@@ -92,6 +92,7 @@ class TestIroncoreAlloy:
             PlaintextDocumentWithEdek(encrypted.edek, document2), metadata
         )
         assert encrypted.document["foo"] != encrypted2.document["foo"]
+        assert encrypted.edek == encrypted2.edek
         decrypted = await self.sdk.standard().decrypt(encrypted2, metadata)
         assert decrypted == document2
 
