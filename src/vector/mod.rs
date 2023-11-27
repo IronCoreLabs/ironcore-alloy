@@ -5,11 +5,12 @@ use crate::{
     AlloyMetadata, DerivationPath, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
+use futures::future::{join_all, FutureExt};
 use ironcore_documents::{
     key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType},
     vector_encryption_metadata::VectorEncryptionMetadata,
 };
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use rand::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -19,7 +20,7 @@ pub(crate) mod crypto;
 
 pub type VectorId = String;
 
-#[derive(uniffi::Record)]
+#[derive(Debug, uniffi::Record)]
 pub struct EncryptedVector {
     pub encrypted_vector: Vec<f32>,
     pub secret_path: SecretPath,
@@ -34,7 +35,14 @@ pub struct PlaintextVector {
     pub derivation_path: DerivationPath,
 }
 pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
+pub type EncryptedVectors = HashMap<VectorId, EncryptedVector>;
 pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
+#[derive(Debug, uniffi::Record)]
+pub struct RotateResult {
+    pub successes: EncryptedVectors,
+    // TODO(murph): we can't pass AlloyError across here? Only in `Result`? Using string for now
+    pub failures: HashMap<VectorId, String>,
+}
 
 /// Key used to for vector encryption.
 #[derive(Debug, Serialize, Clone)]
@@ -127,6 +135,63 @@ pub trait VectorOps {
         derivation_path: DerivationPath,
         metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError>;
+
+    /// Rotates vectors from the in-rotation secret for their secret path to the current secret.
+    /// This can also be used to rotate data from one tenant ID to a new one, which most useful when a tenant is
+    /// internally migrated.
+    ///
+    /// WARNINGS:
+    ///     * this involves decrypting then encrypting vectors. Since the vectors are full of floating point numbers,
+    ///       this process is lossy, which will cause some drift over time. If you need perfectly preserved accuracy
+    ///       store the source vector encrypted with `standard` next to the encrypted vector. `standard` decrypt
+    ///       that, `vector` encrypt it again, and replace the encrypted vector with the result.
+    ///     * only one metadata and new tenant ID argument means each call to this needs to have one tenant's vectors.
+    async fn rotate_vectors(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> RotateResult {
+        let decrypt_attempts: Vec<_> = join_all(encrypted_vectors.into_iter().map(
+            |(vector_id, encrypted_vector)| {
+                self.decrypt(encrypted_vector, metadata)
+                    .map(|r| (vector_id, r))
+            },
+        ))
+        .await;
+
+        let (decrypt_successes, mut decrypt_failures): (Vec<_>, Vec<_>) =
+            decrypt_attempts.into_iter().partition_map(|r| match r {
+                (vector_id, Ok(decrypted_vector)) => Either::Left((vector_id, decrypted_vector)),
+                (vector_id, Err(e)) => Either::Right((vector_id, e.to_string())),
+            });
+
+        let encrypt_attempts = join_all(decrypt_successes.into_iter().map(
+            |(vector_id, decrypted_vector)| {
+                // use the new tenant id if it's there
+                let new_metadata = match new_tenant_id {
+                    None => metadata,
+                    Some(tenant_id) => &AlloyMetadata { tenant_id, .. },
+                };
+                self.encrypt(decrypted_vector, new_metadata)
+                    .map(|r| (vector_id, r))
+            },
+        ))
+        .await;
+
+        let (encrypt_successes, mut encrypt_failures): (Vec<_>, Vec<_>) =
+            encrypt_attempts.into_iter().partition_map(|r| match r {
+                (vector_id, Ok(encrypted_vector)) => Either::Left((vector_id, encrypted_vector)),
+                (vector_id, Err(e)) => Either::Right((vector_id, e.to_string())),
+            });
+
+        encrypt_failures.append(&mut decrypt_failures);
+
+        RotateResult {
+            successes: encrypt_successes.into_iter().collect(),
+            failures: encrypt_failures.into_iter().collect(),
+        }
+    }
 }
 
 pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), AlloyError> {

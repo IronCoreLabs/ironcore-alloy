@@ -42,7 +42,6 @@ impl std::fmt::Display for AlloyError {
         }
     }
 }
-
 impl From<TenantSecurityError> for AlloyError {
     fn from(value: TenantSecurityError) -> Self {
         Self::TenantSecurityError(value.to_string())
