@@ -96,6 +96,21 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun sdkStandardEncryptWithExistingEdek() {
+        val plaintextDocument = mapOf("foo" to "My data".toByteArray())
+        val plaintextDocument2 = mapOf("foo" to "My data2".toByteArray())
+
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = sdk.standard().encrypt(plaintextDocument, metadata)
+            assertContains(encrypted.document, "foo")
+            val encrypted2 = sdk.standard().encryptWithExistingEdek(PlaintextDocumentWithEdek(encrypted.edek,plaintextDocument2), metadata)
+            val decrypted = sdk.standard().decrypt(encrypted2, metadata)
+            assertContentEquals(decrypted.get("foo"), plaintextDocument2.get("foo"))
+        }
+    }
+
+    @Test
     fun sdkDecryptDeterministic() {
         val ciphertext = "AAAAAoAAUvfq7IxbDEtW26wr4H8x2JCtyB4DCzk=".base64ToByteArray()
         val encryptedField = EncryptedField(ciphertext, "", "")

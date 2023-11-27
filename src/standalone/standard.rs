@@ -1,10 +1,10 @@
 use crate::errors::AlloyError;
 use crate::standard::{
-    decrypt_document_core, encrypt_document_core, verify_sig, EncryptedDocument, PlaintextDocument,
-    StandardDocumentOps,
+    decrypt_document_core, encrypt_document_core, verify_sig, EdekWithKeyIdHeader,
+    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, StandardDocumentOps,
 };
 use crate::util::{get_rng, hash256, OurReseedingRng};
-use crate::{AlloyMetadata, TenantId};
+use crate::{AlloyMetadata, Secret, TenantId};
 use ironcore_documents::aes::{generate_aes_edek_and_sign, EncryptionKey};
 use ironcore_documents::icl_header_v4;
 use ironcore_documents::key_id_header::{
@@ -47,12 +47,15 @@ impl StandaloneStandardClient {
         incoming_key: &[u8],
         document: HashMap<String, U>,
         key_id: KeyId,
-        rng: &mut R,
+        rng: Arc<Mutex<R>>,
         tenant_id: &TenantId,
     ) -> Result<EncryptedDocument, AlloyError> {
         let per_tenant_kek = derive_aes_encryption_key(&incoming_key, tenant_id);
-        let (aes_dek, v4_doc) =
-            generate_aes_edek_and_sign(rng, per_tenant_kek, format!("{}", key_id.0).as_str())?;
+        let (aes_dek, v4_doc) = generate_aes_edek_and_sign(
+            &mut *get_rng(&rng),
+            per_tenant_kek,
+            format!("{}", key_id.0).as_str(),
+        )?;
         encrypt_document_core(
             document,
             rng,
@@ -60,6 +63,40 @@ impl StandaloneStandardClient {
             KeyIdHeader::new(Self::get_edek_type(), Self::get_payload_type(), key_id),
             v4_doc,
         )
+    }
+
+    /// Given the edek, the secrets and the metadata, try to decrypt the per tenant_kek using the secret.
+    /// Then decrypt the per document EncryptionKey using that per tenant kek.
+    fn decrypt_document_dek(
+        edek: EdekWithKeyIdHeader,
+        config_secrets: &HashMap<u32, Secret>,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptionKey, AlloyError> {
+        let (
+            KeyIdHeader {
+                key_id,
+                edek_type,
+                payload_type,
+            },
+            edek_bytes,
+        ) = key_id_header::decode_version_prefixed_value(edek.0.into())?;
+        let secret = config_secrets.get(&key_id.0).ok_or_else(|| {
+            AlloyError::InvalidConfiguration(format!(
+                "Provided secret id `{}` does not exist in the standard configuration.",
+                &key_id.0
+            ))
+        })?;
+        if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
+            let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
+            let v4_document = Message::parse_from_bytes(&edek_bytes[..])
+                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
+
+            Ok(decrypt_aes_edek(&per_tenant_kek, &v4_document)?)
+        } else {
+            Err(AlloyError::InvalidInput(
+            format!("The data indicated that this was not a Standalone Standard wrapped value. Found: {edek_type}, {payload_type}"),
+        ))
+        }
     }
 }
 
@@ -94,7 +131,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
             &secret.secret,
             plaintext_document,
             KeyId(secret_id),
-            &mut *get_rng(&self.rng),
+            self.rng.clone(),
             &metadata.tenant_id,
         )?;
 
@@ -105,32 +142,9 @@ impl StandardDocumentOps for StandaloneStandardClient {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
-        let (
-            KeyIdHeader {
-                key_id,
-                edek_type,
-                payload_type,
-            },
-            edek_bytes,
-        ) = key_id_header::decode_version_prefixed_value(encrypted_document.edek.0.into())?;
-        let secret = self.config.secrets.get(&key_id.0).ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
-                "Provided secret id `{}` does not exist in the standard configuration.",
-                &key_id.0
-            ))
-        })?;
-        if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
-            let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
-            let v4_document = Message::parse_from_bytes(&edek_bytes[..])
-                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
-
-            let dek = decrypt_aes_edek(&per_tenant_kek, &v4_document)?;
-            Ok(decrypt_document_core(encrypted_document.document, dek)?)
-        } else {
-            Err(AlloyError::InvalidInput(
-                format!("The data indicated that this was not a Standalone Standard wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
-        }
+        let dek =
+            Self::decrypt_document_dek(encrypted_document.edek, &self.config.secrets, metadata)?;
+        Ok(decrypt_document_core(encrypted_document.document, dek)?)
     }
 
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
@@ -140,6 +154,36 @@ impl StandardDocumentOps for StandaloneStandardClient {
             KeyId(id as u32),
         ))
         .into()
+    }
+
+    async fn encrypt_with_existing_edek(
+        &self,
+        plaintext_document: PlaintextDocumentWithEdek,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedDocument, AlloyError> {
+        let dek = Self::decrypt_document_dek(
+            plaintext_document.edek.clone(),
+            &self.config.secrets,
+            metadata,
+        )?;
+
+        let encrypted_document: HashMap<_, _> = plaintext_document
+            .document
+            .into_iter()
+            .map(|(label, plaintext)| {
+                ironcore_documents::aes::encrypt_detached_document(
+                    &mut *get_rng(&self.rng),
+                    dek,
+                    ironcore_documents::aes::PlaintextDocument(plaintext),
+                )
+                .map(|c| (label, c.0.to_vec()))
+            })
+            .try_collect()?;
+
+        Ok(EncryptedDocument {
+            edek: plaintext_document.edek,
+            document: encrypted_document,
+        })
     }
 }
 
