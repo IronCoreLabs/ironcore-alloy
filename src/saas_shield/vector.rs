@@ -171,11 +171,12 @@ impl VectorOps for SaasShieldVectorClient {
             .collect_vec();
         let all_keys = derive_keys_many_paths(
             &self.tenant_security_client,
-            &metadata.clone(),
+            metadata,
             paths,
             SecretType::Vector,
         )
-        .await?;
+        .await?
+        .derived_keys;
         vectors_to_query
             .into_iter()
             .map(|(vector_id, plaintext_vector)| {

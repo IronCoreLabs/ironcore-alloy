@@ -1,6 +1,5 @@
 use crate::{
     errors::AlloyError,
-    standalone::config::StandaloneSecret,
     util::{self},
     AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath,
     TenantId,
@@ -9,7 +8,7 @@ use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
 use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 use uniffi::custom_newtype;
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -169,12 +168,11 @@ fn deterministic_decrypt_core(
 
 pub(crate) fn check_rotation_no_op(
     encrypted_key_id: KeyId,
-    maybe_current_key: &Option<Arc<StandaloneSecret>>,
+    maybe_current_key: &Option<u32>,
     new_tenant_id: &TenantId,
     metadata: &AlloyMetadata,
 ) -> bool {
-    maybe_current_key.as_ref().map(|k| k.id) == Some(encrypted_key_id.0)
-        && new_tenant_id.0 == metadata.tenant_id.0
+    maybe_current_key == &Some(encrypted_key_id.0) && new_tenant_id.0 == metadata.tenant_id.0
 }
 
 #[cfg(test)]

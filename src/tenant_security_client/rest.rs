@@ -73,7 +73,7 @@ pub struct UnwrapKeyResponse {
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct TenantSecretAssignmentId(pub u32);
 
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivedKey {
     pub derived_key: Base64,
@@ -83,7 +83,7 @@ pub struct DerivedKey {
 
 pub type DerivedKeys = HashMap<DerivationPath, Vec<DerivedKey>>;
 
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyDeriveResponse {
     pub has_primary_config: bool,

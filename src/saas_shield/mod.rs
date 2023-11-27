@@ -5,7 +5,7 @@ use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 pub mod config;
 pub mod deterministic;
@@ -47,7 +47,7 @@ async fn derive_keys_many_paths(
     request_metadata: &AlloyMetadata,
     paths: Vec<(SecretPath, DerivationPath)>,
     secret_type: SecretType,
-) -> Result<HashMap<SecretPath, HashMap<DerivationPath, Vec<DerivedKey>>>, AlloyError> {
+) -> Result<KeyDeriveResponse, AlloyError> {
     let paths_map = paths
         .into_iter()
         .into_grouping_map_by(|x| x.0.clone())
@@ -64,7 +64,7 @@ async fn derive_keys_many_paths(
             secret_type,
         )
         .await?;
-    Ok(derived_keys.derived_keys)
+    Ok(derived_keys)
 }
 
 /// Converts a DerivedKey to an encryption Key (with scaling factor) and key ID
@@ -110,6 +110,7 @@ mod test {
     use super::*;
     use crate::tenant_security_client::TenantSecretAssignmentId;
     use base64_type::Base64;
+    use std::collections::HashMap;
 
     // helper function to create the nested hashmaps. Groups by the secret path string and the derivation path string creating the
     // derivation keys inside as it goes.
