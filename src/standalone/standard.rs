@@ -259,6 +259,29 @@ mod test {
     }
 
     #[tokio::test]
+    async fn encrypt_with_existing_edek_roundtrip() -> Result<(), AlloyError> {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
+        let document2: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 4])].into();
+        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let encrypted_2 = client
+            .encrypt_with_existing_edek(
+                PlaintextDocumentWithEdek::new(encrypted.edek.clone(), document2.clone()),
+                &metadata,
+            )
+            .await
+            .unwrap();
+        let decrypted = client
+            .decrypt(encrypted_2.clone(), &metadata)
+            .await
+            .unwrap();
+        assert_eq!(encrypted.edek, encrypted_2.edek);
+        assert_eq!(decrypted, document2);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn decrypt_missing_key_from_config() -> Result<(), AlloyError> {
         let client = default_client();
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
