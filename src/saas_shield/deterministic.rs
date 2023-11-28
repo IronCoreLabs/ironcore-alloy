@@ -154,8 +154,9 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         &self,
         encrypted_fields: EncryptedFields,
         metadata: &AlloyMetadata,
-        new_tenant_id: TenantId,
+        new_tenant_id: Option<TenantId>,
     ) -> Result<RotateBatchResult, AlloyError> {
+        let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let paths = encrypted_fields
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
@@ -167,7 +168,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             SecretType::Deterministic,
         )
         .await?;
-        let new_tenant_keys = if new_tenant_id != metadata.tenant_id {
+        let new_tenant_keys = if parsed_new_tenant_id != &metadata.tenant_id {
             derive_keys_many_paths(
                 &self.tenant_security_client,
                 metadata,
@@ -190,7 +191,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             if check_rotation_no_op(
                 original_key_id,
                 &maybe_current_key_id,
-                &new_tenant_id,
+                parsed_new_tenant_id,
                 metadata,
             ) {
                 Ok(encrypted_field)

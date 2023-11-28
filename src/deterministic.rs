@@ -79,13 +79,13 @@ pub trait DeterministicFieldOps {
         metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError>;
     /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
-    /// must contain the tenant ID that the fields were originally encrypted to. If the same tenant ID is passed in
-    /// `metadata` and `new_tenant_id`, the fields will simply be encrypted with the same tenant's current secret.
+    /// must contain the tenant ID that the fields were originally encrypted to. If `new_tenant_id` is empty,
+    /// the fields will simply be encrypted with the same tenant's current secret.
     async fn rotate_fields(
         &self,
         encrypted_fields: EncryptedFields,
         metadata: &AlloyMetadata,
-        new_tenant_id: TenantId,
+        new_tenant_id: Option<TenantId>,
     ) -> Result<RotateBatchResult, AlloyError>;
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into

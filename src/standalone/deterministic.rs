@@ -171,8 +171,9 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         &self,
         encrypted_fields: EncryptedFields,
         metadata: &AlloyMetadata,
-        new_tenant_id: TenantId,
+        new_tenant_id: Option<TenantId>,
     ) -> Result<RotateBatchResult, AlloyError> {
+        let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (key_id, _) =
                 Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
@@ -188,13 +189,15 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             if check_rotation_no_op(
                 key_id,
                 &maybe_new_secret.as_ref().map(|k| k.id),
-                &new_tenant_id,
+                parsed_new_tenant_id,
                 metadata,
             ) {
                 Ok(encrypted_field)
             } else {
                 self.decrypt_sync(encrypted_field, &metadata.tenant_id)
-                    .and_then(|decrypted_field| self.encrypt_sync(decrypted_field, &new_tenant_id))
+                    .and_then(|decrypted_field| {
+                        self.encrypt_sync(decrypted_field, parsed_new_tenant_id)
+                    })
             }
         };
         let batch_result = crate::util::hash_map_to_batch_result(encrypted_fields, reencrypt_field);
