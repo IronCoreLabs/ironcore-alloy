@@ -78,11 +78,24 @@ class TestIroncoreAlloy:
         document = {"foo": b"My data"}
         metadata = AlloyMetadata.new_simple("tenant")
         encrypted = await self.sdk.standard().encrypt(document, metadata)
-        print(base64.b64encode(encrypted.edek))
         assert len(encrypted.document["foo"]) == 40
         assert encrypted.document["foo"] != document["foo"]
         decrypted = await self.sdk.standard().decrypt(encrypted, metadata)
         assert decrypted == document
+
+    @pytest.mark.asyncio
+    async def test_encrypt_with_existing_edek(self):
+        document = {"foo": b"My data"}
+        document2 = {"foo": b"My data2"}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.standard().encrypt(document, metadata)
+        encrypted2 = await self.sdk.standard().encrypt_with_existing_edek(
+            PlaintextDocumentWithEdek(encrypted.edek, document2), metadata
+        )
+        assert encrypted.document["foo"] != encrypted2.document["foo"]
+        assert encrypted.edek == encrypted2.edek
+        decrypted = await self.sdk.standard().decrypt(encrypted2, metadata)
+        assert decrypted == document2
 
     @pytest.mark.asyncio
     async def test_decrypt_deterministic_metadata(self):

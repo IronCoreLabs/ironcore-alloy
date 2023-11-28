@@ -1,11 +1,11 @@
 use crate::errors::AlloyError;
 use crate::standard::{
-    decrypt_document_core, encrypt_document_core, verify_sig, EncryptedDocument, PlaintextDocument,
-    StandardDocumentOps,
+    decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
+    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, StandardDocumentOps,
 };
 use crate::tenant_security_client::errors::TenantSecurityError;
 use crate::tenant_security_client::{TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse};
-use crate::util::{get_rng, OurReseedingRng};
+use crate::util::OurReseedingRng;
 use crate::AlloyMetadata;
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
@@ -57,7 +57,7 @@ impl SaasShieldStandardClient {
 
         encrypt_document_core(
             document,
-            &mut *get_rng(&rng),
+            rng,
             enc_key,
             KeyIdHeader::new(
                 Self::get_edek_type(),
@@ -98,13 +98,13 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
-        let (v4_document, edek) = get_document_header_and_edek(&encrypted_document)?;
+        let (v4_document, edek) = get_document_header_and_edek(&encrypted_document.edek)?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
             .unwrap_key(
                 &edek
                     .write_to_bytes()
-                    .expect("Writing edek to bytes failed.")[..], // There shouldn't be any reason this could fail.
+                    .expect("Writing EDEK to bytes failed. Contact IronCore Labs support.")[..], // There shouldn't be any reason this could fail.
                 &request_metadata,
             )
             .await?;
@@ -117,6 +117,32 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             KeyId(id as u32),
         ))
         .into()
+    }
+    async fn encrypt_with_existing_edek(
+        &self,
+        plaintext_document: PlaintextDocumentWithEdek,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedDocument, AlloyError> {
+        let request_metadata = metadata.clone().try_into()?;
+        let (_, edek) = get_document_header_and_edek(&plaintext_document.edek)?;
+        let UnwrapKeyResponse { dek } = self
+            .tenant_security_client
+            .unwrap_key(
+                &edek
+                    .write_to_bytes()
+                    .expect("Writing edek to bytes failed.")[..], // There shouldn't be any reason this could fail.
+                &request_metadata,
+            )
+            .await?;
+
+        Ok(EncryptedDocument {
+            document: encrypt_map(
+                plaintext_document.document,
+                self.rng.clone(),
+                tsc_dek_to_encryption_key(dek.0)?,
+            )?,
+            edek: plaintext_document.edek,
+        })
     }
 }
 
@@ -160,10 +186,9 @@ fn generate_cmk_v4_doc_and_sign(
 }
 
 fn get_document_header_and_edek(
-    document: &EncryptedDocument,
+    edek: &EdekWithKeyIdHeader,
 ) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), AlloyError> {
-    let (_, v4_doc_bytes) =
-        key_id_header::decode_version_prefixed_value(document.edek.0.clone().into())?;
+    let (_, v4_doc_bytes) = key_id_header::decode_version_prefixed_value(edek.0.clone().into())?;
     let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
     let edek = find_cmk_edek(&v4_document.signed_payload.edeks)?.clone();
     Ok((v4_document, edek))
@@ -181,7 +206,7 @@ mod test {
             document: Default::default(),
         };
         assert_eq!(
-            get_document_header_and_edek(&encrypted_document).unwrap_err(),
+            get_document_header_and_edek(&encrypted_document.edek).unwrap_err(),
             AlloyError::IronCoreDocumentsError("KeyIdHeaderTooShort(1)".to_string())
         );
     }
@@ -195,6 +220,6 @@ mod test {
             document: Default::default(),
         };
 
-        get_document_header_and_edek(&encrypted_doc).unwrap();
+        get_document_header_and_edek(&encrypted_doc.edek).unwrap();
     }
 }
