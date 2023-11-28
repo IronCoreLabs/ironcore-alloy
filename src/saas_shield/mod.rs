@@ -1,44 +1,17 @@
 use crate::tenant_security_client::{
-    DerivationType, DerivedKey, KeyDeriveResponse, SecretType, TenantSecurityClient,
+    DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse, SecretType,
+    TenantSecurityClient,
 };
 use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 pub mod config;
 pub mod deterministic;
 pub mod standard;
 pub mod vector;
-
-enum DeriveKeyChoice {
-    Current,
-    Specific(KeyId),
-    InRotation, // Non-current
-}
-
-/// Calls the TSP to derive keys for a single secret_path/derivation_path.
-/// Then converts the result to an encryption key and key ID.
-async fn derive_key_for_path<'a>(
-    derived_keys: &'a KeyDeriveResponse,
-    secret_path: &'a SecretPath,
-    deriv_path: &'a DerivationPath,
-    derive_key_choice: DeriveKeyChoice,
-) -> Result<&'a DerivedKey, AlloyError> {
-    match derive_key_choice {
-        DeriveKeyChoice::Current => derived_keys.get_current(secret_path, deriv_path),
-        DeriveKeyChoice::Specific(key_id) => {
-            derived_keys.get_by_id(secret_path, deriv_path, key_id.0)
-        }
-        DeriveKeyChoice::InRotation => derived_keys.get_in_rotation(secret_path, deriv_path),
-    }
-    .ok_or_else(|| {
-        AlloyError::TenantSecurityError(
-            "The secret path, derivation path combo didn't have the requested key.".to_string(),
-        )
-    })
-}
 
 /// Calls the TSP to derive keys for many secret_path/derivation_path combinations.
 /// Then converts the results to encryption keys and key IDs.
@@ -47,7 +20,7 @@ async fn derive_keys_many_paths(
     request_metadata: &AlloyMetadata,
     paths: Vec<(SecretPath, DerivationPath)>,
     secret_type: SecretType,
-) -> Result<HashMap<SecretPath, HashMap<DerivationPath, Vec<DerivedKey>>>, AlloyError> {
+) -> Result<KeyDeriveResponse, AlloyError> {
     let paths_map = paths
         .into_iter()
         .into_grouping_map_by(|x| x.0.clone())
@@ -64,7 +37,7 @@ async fn derive_keys_many_paths(
             secret_type,
         )
         .await?;
-    Ok(derived_keys.derived_keys)
+    Ok(derived_keys)
 }
 
 /// Converts a DerivedKey to an encryption Key (with scaling factor) and key ID
@@ -82,22 +55,17 @@ fn derived_key_to_vector_encryption_key(
     Ok((KeyId(derived_key.tenant_secret_id.0), key))
 }
 
-async fn get_in_rotation_prefix_internal(
+fn get_in_rotation_prefix_internal(
     derived_keys: &KeyDeriveResponse,
     secret_path: SecretPath,
     derivation_path: DerivationPath,
     edek_type: EdekType,
     payload_type: PayloadType,
 ) -> Result<Vec<u8>, AlloyError> {
-    let key_id = derive_key_for_path(
-        derived_keys,
-        &secret_path,
-        &derivation_path,
-        DeriveKeyChoice::InRotation,
-    )
-    .await?
-    .tenant_secret_id
-    .0;
+    let key_id = derived_keys
+        .get_key_for_path(&secret_path, &derivation_path, DeriveKeyChoice::InRotation)?
+        .tenant_secret_id
+        .0;
     let key_id_header = KeyIdHeader {
         key_id: KeyId(key_id),
         edek_type,
@@ -111,6 +79,7 @@ mod test {
     use super::*;
     use crate::tenant_security_client::TenantSecretAssignmentId;
     use base64_type::Base64;
+    use std::collections::HashMap;
 
     // helper function to create the nested hashmaps. Groups by the secret path string and the derivation path string creating the
     // derivation keys inside as it goes.
@@ -157,7 +126,6 @@ mod test {
             EdekType::SaasShield,
             PayloadType::StandardEdek,
         )
-        .await
         .unwrap();
 
         assert_eq!(

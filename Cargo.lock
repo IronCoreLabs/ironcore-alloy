@@ -1056,7 +1056,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "ironcore-alloy"
-version = "0.9.2-pre.5"
+version = "0.9.2-pre.7"
 dependencies = [
  "aes-gcm",
  "aes-siv",
@@ -1097,8 +1097,8 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.1.0-pre.1"
-source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?branch=add-vector-header#010d867e26cd6cb04db8c60687faa21377d4b81d"
+version = "0.1.0-pre.2"
+source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?rev=28f4fe607a6a2671cbe77e28d404bab658fbb668#28f4fe607a6a2671cbe77e28d404bab658fbb668"
 dependencies = [
  "aes-gcm",
  "bytes",

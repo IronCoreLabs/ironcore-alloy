@@ -5,13 +5,14 @@ import pytest
 
 class TestIroncoreAlloy:
     key_bytes = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".encode("utf-8")
+    key_bytes2 = "iJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yB=".encode("utf-8")
     scaling_factor = 12345.0
     approximation_factor = 1.1
     standard_secrets = StandardSecrets(10, [StandaloneSecret(10, Secret(key_bytes))])
     deterministic_secrets = {
         "": RotatableSecret(
             StandaloneSecret(2, Secret(key_bytes)),
-            StandaloneSecret(1, Secret(key_bytes)),
+            StandaloneSecret(1, Secret(key_bytes2)),
         )
     }
     vector_secrets = {
@@ -77,11 +78,24 @@ class TestIroncoreAlloy:
         document = {"foo": b"My data"}
         metadata = AlloyMetadata.new_simple("tenant")
         encrypted = await self.sdk.standard().encrypt(document, metadata)
-        print(base64.b64encode(encrypted.edek))
         assert len(encrypted.document["foo"]) == 40
         assert encrypted.document["foo"] != document["foo"]
         decrypted = await self.sdk.standard().decrypt(encrypted, metadata)
         assert decrypted == document
+
+    @pytest.mark.asyncio
+    async def test_encrypt_with_existing_edek(self):
+        document = {"foo": b"My data"}
+        document2 = {"foo": b"My data2"}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.standard().encrypt(document, metadata)
+        encrypted2 = await self.sdk.standard().encrypt_with_existing_edek(
+            PlaintextDocumentWithEdek(encrypted.edek, document2), metadata
+        )
+        assert encrypted.document["foo"] != encrypted2.document["foo"]
+        assert encrypted.edek == encrypted2.edek
+        decrypted = await self.sdk.standard().decrypt(encrypted2, metadata)
+        assert decrypted == document2
 
     @pytest.mark.asyncio
     async def test_decrypt_deterministic_metadata(self):
@@ -90,6 +104,49 @@ class TestIroncoreAlloy:
         )
         metadata = AlloyMetadata.new_simple("tenant")
         decrypted = await self.sdk.deterministic().decrypt(field, metadata)
+        expected = b"My data"
+        assert decrypted.plaintext_field == expected
+
+    @pytest.mark.asyncio
+    async def test_rotate_deterministic_different_tenant(self):
+        field = EncryptedField(
+            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "", ""
+        )
+        fields = {"doc": field}
+        metadata = AlloyMetadata.new_simple("tenant")
+        rotated = await self.sdk.deterministic().rotate_fields(fields, metadata, "tenant2")
+        assert len(rotated.successes) == 1
+        assert len(rotated.failures) == 0
+        new_metadata = AlloyMetadata.new_simple("tenant2")
+        decrypted = await self.sdk.deterministic().decrypt(rotated.successes["doc"], new_metadata)
+        expected = b"My data"
+        assert decrypted.plaintext_field == expected
+
+    @pytest.mark.asyncio
+    async def test_rotate_deterministic_different_key(self):
+        deterministic_secrets2 = {
+        "": RotatableSecret(
+            # Switched current and in-rotation versus original sdk
+            StandaloneSecret(1, Secret(self.key_bytes2)),
+            StandaloneSecret(2, Secret(self.key_bytes)),
+        )}
+        sdk2 = Standalone(StandaloneConfiguration(self.standard_secrets, deterministic_secrets2, self.vector_secrets))
+        field = EncryptedField(
+            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "", ""
+        )
+        fields = {"doc": field}
+        metadata = AlloyMetadata.new_simple("tenant")
+        rotated = await sdk2.deterministic().rotate_fields(fields, metadata, "tenant") # unchanged tenant
+        assert len(rotated.successes) == 1
+        assert len(rotated.failures) == 0
+        # Now that it's rotated, sometime in the future we have an SDK with only the new current
+        deterministic_secrets3 = {
+        "": RotatableSecret(
+            StandaloneSecret(1, Secret(self.key_bytes2)),
+            None,
+        )}
+        sdk3 = Standalone(StandaloneConfiguration(self.standard_secrets, deterministic_secrets3, self.vector_secrets))
+        decrypted = await sdk3.deterministic().decrypt(rotated.successes["doc"], metadata)
         expected = b"My data"
         assert decrypted.plaintext_field == expected
 
@@ -168,7 +225,7 @@ class TestIroncoreAlloy:
             bad_sdk = Standalone(config)
 
             metadata = AlloyMetadata.new_simple("tenant")
-            bad_sdk.vector().encrypt([1, 2, 4], metadata)
+            await bad_sdk.vector().encrypt(PlaintextVector([1, 2, 4], "", ""), metadata)
         assert "at least 32 cryptographically" in str(secret_error)
 
     def test_double_library_load(self):
