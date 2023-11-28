@@ -49,7 +49,7 @@ impl StandaloneDeterministicClient {
             tenant_id,
             &plaintext_field.derivation_path,
         );
-        let key_id_header = Self::get_key_id_header(current_secret.id);
+        let key_id_header = Self::create_key_id_header(current_secret.id);
         encrypt_internal(key, key_id_header, plaintext_field)
     }
 
@@ -154,7 +154,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                             &metadata.tenant_id,
                             &plaintext_field.derivation_path,
                         );
-                        let key_id_header = Self::get_key_id_header(standalone_secret.id);
+                        let key_id_header = Self::create_key_id_header(standalone_secret.id);
                         encrypt_internal(
                             key,
                             key_id_header,
@@ -222,7 +222,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 secret_path.0
             ))
         })?;
-        let key_id_header = Self::get_key_id_header(in_rotation_secret.id);
+        let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
         Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
     }
 }
