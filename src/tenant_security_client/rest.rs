@@ -1,5 +1,6 @@
 use super::{errors::TenantSecurityError, DerivationPath, RequestMetadata, SecretPath};
 use base64_type::Base64;
+use ironcore_documents::key_id_header::KeyId;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -73,7 +74,7 @@ pub struct UnwrapKeyResponse {
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct TenantSecretAssignmentId(pub u32);
 
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivedKey {
     pub derived_key: Base64,
@@ -83,7 +84,13 @@ pub struct DerivedKey {
 
 pub type DerivedKeys = HashMap<DerivationPath, Vec<DerivedKey>>;
 
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+pub enum DeriveKeyChoice {
+    Current,
+    Specific(KeyId),
+    InRotation, // Non-current
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyDeriveResponse {
     pub has_primary_config: bool,
@@ -91,6 +98,26 @@ pub struct KeyDeriveResponse {
 }
 
 impl KeyDeriveResponse {
+    /// Get a key of specified type from the TSP response. Can return the
+    /// current key, in-rotation key, or a key with a specific ID.
+    pub fn get_key_for_path(
+        &self,
+        secret_path: &SecretPath,
+        deriv_path: &DerivationPath,
+        derive_key_choice: DeriveKeyChoice,
+    ) -> Result<&DerivedKey, TenantSecurityError> {
+        match derive_key_choice {
+            DeriveKeyChoice::Current => self.get_current(secret_path, deriv_path),
+            DeriveKeyChoice::Specific(key_id) => self.get_by_id(secret_path, deriv_path, key_id.0),
+            DeriveKeyChoice::InRotation => self.get_in_rotation(secret_path, deriv_path),
+        }
+        .ok_or_else(|| {
+            TenantSecurityError::RequestError(
+                "The secret path, derivation path combo didn't have the requested key.".to_string(),
+            )
+        })
+    }
+
     /// Look for a certain salt in derived_keys and return its current key (if present)
     pub fn get_current(
         &self,

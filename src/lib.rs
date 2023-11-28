@@ -1,6 +1,8 @@
 #![allow(async_fn_in_trait)]
 
 use crate::errors::AlloyError;
+use bytes::Bytes;
+use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
 use saas_shield::standard::SaasShieldStandardClient;
@@ -198,7 +200,51 @@ impl SaasShield {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+trait AlloyClient {
+    /// Returns the only EdekType this Alloy client deals with.
+    fn get_edek_type() -> EdekType;
+
+    /// Returns the only PayloadType this Alloy client deals with.
+    fn get_payload_type() -> PayloadType;
+
+    fn create_key_id_header(key_id: u32) -> KeyIdHeader {
+        KeyIdHeader {
+            key_id: KeyId(key_id),
+            edek_type: Self::get_edek_type(),
+            payload_type: Self::get_payload_type(),
+        }
+    }
+
+    /// Decodes the header from the encrypted bytes, returning an error if the
+    /// decoded EdekType or PayloadType is incorrect for this AlloyClient.
+    /// Returns the decoded key ID and remaining non-header bytes.
+    fn decompose_encrypted_field_header(
+        encrypted_bytes: Vec<u8>,
+    ) -> Result<(KeyId, Bytes), AlloyError> {
+        let (
+            KeyIdHeader {
+                key_id,
+                edek_type,
+                payload_type,
+            },
+            remaining_bytes,
+        ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
+            encrypted_bytes.into(),
+        )
+        .map_err(|_| AlloyError::InvalidInput("Encrypted header was invalid.".to_string()))?;
+        let expected_edek_type = Self::get_edek_type();
+        let expected_payload_type = Self::get_payload_type();
+        if edek_type == expected_edek_type && payload_type == expected_payload_type {
+            Ok((key_id, remaining_bytes))
+        } else {
+            Err(AlloyError::InvalidInput(
+                format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
+            ))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct TenantId(pub String);
 custom_newtype!(TenantId, String);
 

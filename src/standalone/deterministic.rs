@@ -1,11 +1,14 @@
 use super::config::RotatableSecret;
 use crate::deterministic::{
-    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
-    EncryptedField, GenerateQueryResult, PlaintextField, PlaintextFields,
+    check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
+    DeterministicFieldOps, EncryptedField, EncryptedFields, GenerateQueryResult, PlaintextField,
+    PlaintextFields, RotateBatchResult,
 };
 use crate::errors::AlloyError;
-use crate::{AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use crate::{
+    AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+};
+use ironcore_documents::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -21,21 +24,11 @@ impl StandaloneDeterministicClient {
         }
     }
 
-    fn get_edek_type() -> EdekType {
-        EdekType::Standalone
-    }
-
-    fn get_payload_type() -> PayloadType {
-        PayloadType::DeterministicField
-    }
-}
-
-#[uniffi::export]
-impl DeterministicFieldOps for StandaloneDeterministicClient {
-    async fn encrypt(
+    /// Synchronous version of `encrypt` that takes TenantId instead of full AlloyMetadata
+    fn encrypt_sync(
         &self,
         plaintext_field: PlaintextField,
-        metadata: &AlloyMetadata,
+        tenant_id: &TenantId,
     ) -> Result<EncryptedField, AlloyError> {
         let secret = self
             .config
@@ -53,15 +46,68 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         })?;
         let key = DeterministicEncryptionKey::derive_from_secret(
             &current_secret.secret,
-            &metadata.tenant_id,
+            tenant_id,
             &plaintext_field.derivation_path,
         );
-        let key_id_header = KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
-            KeyId(current_secret.id),
-        );
+        let key_id_header = Self::create_key_id_header(current_secret.id);
         encrypt_internal(key, key_id_header, plaintext_field)
+    }
+
+    /// Synchronous version of `decrypt` that takes TenantId instead of full AlloyMetadata
+    fn decrypt_sync(
+        &self,
+        encrypted_field: EncryptedField,
+        tenant_id: &TenantId,
+    ) -> Result<PlaintextField, AlloyError> {
+        let (key_id, ciphertext) =
+            Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+        let secret = self
+            .config
+            .get(&encrypted_field.secret_path)
+            .ok_or_else(|| {
+                AlloyError::InvalidConfiguration(format!(
+                    "Provided secret path `{}` does not exist in the deterministic configuration.",
+                    &encrypted_field.secret_path.0
+                ))
+            })?;
+        let standalone_secret = secret.get_secret_with_id(&key_id).ok_or_else(|| {
+            AlloyError::InvalidConfiguration(format!(
+                "Secret with key ID `{}` does not exist in the deterministic configuration",
+                key_id.0
+            ))
+        })?;
+        let key = DeterministicEncryptionKey::derive_from_secret(
+            &standalone_secret.secret,
+            tenant_id,
+            &encrypted_field.derivation_path,
+        );
+        decrypt_internal(
+            key,
+            ciphertext,
+            encrypted_field.secret_path,
+            encrypted_field.derivation_path,
+        )
+    }
+}
+
+impl AlloyClient for StandaloneDeterministicClient {
+    fn get_edek_type() -> EdekType {
+        EdekType::Standalone
+    }
+
+    fn get_payload_type() -> PayloadType {
+        PayloadType::DeterministicField
+    }
+}
+
+#[uniffi::export]
+impl DeterministicFieldOps for StandaloneDeterministicClient {
+    async fn encrypt(
+        &self,
+        plaintext_field: PlaintextField,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedField, AlloyError> {
+        self.encrypt_sync(plaintext_field, &metadata.tenant_id)
     }
 
     async fn decrypt(
@@ -69,50 +115,9 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         encrypted_field: EncryptedField,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
-        let (
-            KeyIdHeader {
-                key_id,
-                edek_type,
-                payload_type,
-            },
-            ciphertext,
-        ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
-            encrypted_field.encrypted_field.into(),
-        )
-        .map_err(|_| AlloyError::InvalidInput("Ciphertext header was invalid.".to_string()))?;
-        if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
-            let secret = self
-                .config
-                .get(&encrypted_field.secret_path)
-                .ok_or_else(|| {
-                    AlloyError::InvalidConfiguration(format!(
-                        "Provided secret path `{}` does not exist in the deterministic configuration.",
-                        &encrypted_field.secret_path.0
-                    ))
-                })?;
-            let standalone_secret = secret.get_secret_with_id(&key_id).ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
-                    "Secret with key ID `{}` does not exist in the deterministic configuration",
-                    key_id.0
-                ))
-            })?;
-            let key = DeterministicEncryptionKey::derive_from_secret(
-                &standalone_secret.secret,
-                &metadata.tenant_id,
-                &encrypted_field.derivation_path,
-            );
-            decrypt_internal(
-                key,
-                ciphertext,
-                encrypted_field.secret_path,
-                encrypted_field.derivation_path,
-            )
-        } else {
-            Err(AlloyError::InvalidInput(
-                format!("The data indicated that this was not a Standalone Deterministic wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
-        }
+        self.decrypt_sync(encrypted_field, &metadata.tenant_id)
     }
+
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
@@ -149,12 +154,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                             &metadata.tenant_id,
                             &plaintext_field.derivation_path,
                         );
-                        let key_id_header = KeyIdHeader {
-                            key_id: KeyId(standalone_secret.id),
-                            edek_type: Self::get_edek_type(),
-                            payload_type: Self::get_payload_type(),
-                        };
-
+                        let key_id_header = Self::create_key_id_header(standalone_secret.id);
                         encrypt_internal(
                             key,
                             key_id_header,
@@ -165,6 +165,46 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     .map(|enc| (field_id, enc))
             })
             .try_collect()
+    }
+
+    async fn rotate_fields(
+        &self,
+        encrypted_fields: EncryptedFields,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<RotateBatchResult, AlloyError> {
+        let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
+        let reencrypt_field = |encrypted_field: EncryptedField| {
+            let (key_id, _) =
+                Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+            let maybe_new_secret = &self
+                .config
+                .get(&encrypted_field.secret_path)
+                .ok_or_else(|| {
+                    AlloyError::InvalidConfiguration(format!(
+                        "Provided secret path `{}` does not exist in the deterministic configuration.",
+                        &encrypted_field.secret_path.0
+                    ))
+                })?.current_secret;
+            if check_rotation_no_op(
+                key_id,
+                &maybe_new_secret.as_ref().map(|k| k.id),
+                parsed_new_tenant_id,
+                metadata,
+            ) {
+                Ok(encrypted_field)
+            } else {
+                self.decrypt_sync(encrypted_field, &metadata.tenant_id)
+                    .and_then(|decrypted_field| {
+                        self.encrypt_sync(decrypted_field, parsed_new_tenant_id)
+                    })
+            }
+        };
+        let batch_result = crate::util::hash_map_to_batch_result(encrypted_fields, reencrypt_field);
+        Ok(RotateBatchResult {
+            successes: batch_result.successes,
+            failures: batch_result.failures,
+        })
     }
 
     async fn get_in_rotation_prefix(
@@ -185,11 +225,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 secret_path.0
             ))
         })?;
-        let key_id_header = KeyIdHeader {
-            key_id: KeyId(in_rotation_secret.id),
-            edek_type: Self::get_edek_type(),
-            payload_type: Self::get_payload_type(),
-        };
+        let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
         Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
     }
 }
@@ -274,7 +310,7 @@ mod test {
             .decrypt(encrypted, &get_metadata())
             .await
             .unwrap_err();
-        assert_contains!(error.to_string(), "Ciphertext header was invalid");
+        assert_contains!(error.to_string(), "Encrypted header was invalid");
     }
 
     #[tokio::test]
@@ -290,6 +326,6 @@ mod test {
             .decrypt(encrypted, &get_metadata())
             .await
             .unwrap_err();
-        assert_contains!(error.to_string(), "Ciphertext header was invalid");
+        assert_contains!(error.to_string(), "Encrypted header was invalid");
     }
 }

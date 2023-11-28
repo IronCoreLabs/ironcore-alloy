@@ -1,11 +1,13 @@
 use crate::{
-    errors::AlloyError, util, AlloyMetadata, DerivationPath, EncryptedBytes, FieldId,
-    PlaintextBytes, Secret, SecretPath, TenantId,
+    errors::AlloyError,
+    util::{self},
+    AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath,
+    TenantId,
 };
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
-use ironcore_documents::key_id_header::KeyIdHeader;
+use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
 use std::collections::HashMap;
 use uniffi::custom_newtype;
 
@@ -23,7 +25,14 @@ pub struct PlaintextField {
     pub derivation_path: DerivationPath,
 }
 pub type PlaintextFields = HashMap<FieldId, PlaintextField>;
+pub type EncryptedFields = HashMap<FieldId, EncryptedField>;
 pub type GenerateQueryResult = HashMap<FieldId, Vec<EncryptedField>>;
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RotateBatchResult {
+    pub successes: HashMap<FieldId, EncryptedField>,
+    pub failures: HashMap<FieldId, String>, // TODO: export error instead...?
+}
 
 /// Key used for deterministic operations.
 #[derive(Debug, Clone)]
@@ -69,6 +78,15 @@ pub trait DeterministicFieldOps {
         fields_to_query: PlaintextFields,
         metadata: &AlloyMetadata,
     ) -> Result<GenerateQueryResult, AlloyError>;
+    /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
+    /// must contain the tenant ID that the fields were originally encrypted to. If `new_tenant_id` is empty,
+    /// the fields will simply be encrypted with the same tenant's current secret.
+    async fn rotate_fields(
+        &self,
+        encrypted_fields: EncryptedFields,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<RotateBatchResult, AlloyError>;
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
@@ -148,6 +166,16 @@ fn deterministic_decrypt_core(
     cipher
         .decrypt([associated_data], ciphertext)
         .map_err(|e| AlloyError::DecryptError(e.to_string()))
+}
+
+/// Returns `true` if the key IDs and tenant IDs are identical, otherwise `false`.
+pub(crate) fn check_rotation_no_op(
+    encrypted_key_id: KeyId,
+    maybe_current_key: &Option<u32>,
+    new_tenant_id: &TenantId,
+    metadata: &AlloyMetadata,
+) -> bool {
+    maybe_current_key == &Some(encrypted_key_id.0) && new_tenant_id == &metadata.tenant_id
 }
 
 #[cfg(test)]

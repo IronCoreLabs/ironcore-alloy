@@ -1,6 +1,6 @@
 use super::{
-    derive_key_for_path, derive_keys_many_paths, derived_key_to_vector_encryption_key,
-    get_in_rotation_prefix_internal, DeriveKeyChoice,
+    derive_keys_many_paths, derived_key_to_vector_encryption_key, get_in_rotation_prefix_internal,
+    DeriveKeyChoice,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
@@ -84,13 +84,11 @@ impl VectorOps for SaasShieldVectorClient {
                 SecretType::Vector,
             )
             .await?;
-        let derived_key = derive_key_for_path(
-            &derived_keys,
+        let derived_key = derived_keys.get_key_for_path(
             &plaintext_vector.secret_path,
             &plaintext_vector.derivation_path,
             DeriveKeyChoice::Current,
-        )
-        .await?;
+        )?;
         let (key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
         self.encrypt_core(&key, key_id, plaintext_vector)
     }
@@ -134,13 +132,11 @@ impl VectorOps for SaasShieldVectorClient {
                     SecretType::Vector,
                 )
                 .await?;
-            let derived_key = derive_key_for_path(
-                &derived_keys,
+            let derived_key = derived_keys.get_key_for_path(
                 &encrypted_vector.secret_path,
                 &encrypted_vector.derivation_path,
                 DeriveKeyChoice::Specific(key_id),
-            )
-            .await?;
+            )?;
             let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
             if derived_key_id != key_id {
                 Err(AlloyError::InvalidKey(
@@ -173,11 +169,12 @@ impl VectorOps for SaasShieldVectorClient {
             .collect_vec();
         let all_keys = derive_keys_many_paths(
             &self.tenant_security_client,
-            &metadata.clone(),
+            metadata,
             paths,
             SecretType::Vector,
         )
-        .await?;
+        .await?
+        .derived_keys;
         vectors_to_query
             .into_iter()
             .map(|(vector_id, plaintext_vector)| {
@@ -224,6 +221,5 @@ impl VectorOps for SaasShieldVectorClient {
             Self::get_edek_type(),
             Self::get_payload_type(),
         )
-        .await
     }
 }
