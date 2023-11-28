@@ -5,12 +5,11 @@ use crate::{
     AlloyMetadata, DerivationPath, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
-use futures::future::{join_all, FutureExt, TryFutureExt};
 use ironcore_documents::{
     key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType},
     vector_encryption_metadata::VectorEncryptionMetadata,
 };
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use rand::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -151,32 +150,7 @@ pub trait VectorOps {
         encrypted_vectors: EncryptedVectors,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> RotateResult {
-        let new_metadata = match &new_tenant_id {
-            None => metadata.clone(),
-            Some(tenant_id) => AlloyMetadata {
-                tenant_id: tenant_id.clone(),
-                ..metadata.clone()
-            },
-        };
-        let attempts: Vec<_> = join_all(encrypted_vectors.into_iter().map(
-            |(vector_id, encrypted_vector)| {
-                self.decrypt(encrypted_vector, metadata)
-                    .and_then(|decrypted_vector| self.encrypt(decrypted_vector, &new_metadata))
-                    .map(|r| (vector_id, r))
-            },
-        ))
-        .await;
-        let (rotate_successes, rotate_failures): (Vec<_>, Vec<_>) =
-            attempts.into_iter().partition_map(|r| match r {
-                (vector_id, Ok(rotated_vector)) => Either::Left((vector_id, rotated_vector)),
-                (vector_id, Err(e)) => Either::Right((vector_id, e.to_string())),
-            });
-        RotateResult {
-            successes: rotate_successes.into_iter().collect(),
-            failures: rotate_failures.into_iter().collect(),
-        }
-    }
+    ) -> RotateResult;
 }
 
 pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), AlloyError> {

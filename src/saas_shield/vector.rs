@@ -6,10 +6,10 @@ use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::{get_rng, OurReseedingRng};
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryResult, PlaintextVector,
-    PlaintextVectors, VectorOps,
+    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
+    PlaintextVector, PlaintextVectors, RotateResult, VectorOps,
 };
-use crate::{AlloyMetadata, DerivationPath, SecretPath, VectorEncryptionKey};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
@@ -221,5 +221,14 @@ impl VectorOps for SaasShieldVectorClient {
             Self::get_edek_type(),
             Self::get_payload_type(),
         )
+    }
+
+    async fn rotate_vectors(
+        &self,
+        _encrypted_vectors: EncryptedVectors,
+        _metadata: &AlloyMetadata,
+        _new_tenant_id: Option<TenantId>,
+    ) -> RotateResult {
+        unimplemented!()
     }
 }

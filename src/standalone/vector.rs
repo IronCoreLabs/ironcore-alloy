@@ -3,12 +3,15 @@ use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
 use crate::util::get_rng;
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, GenerateQueryResult, PlaintextVector,
-    PlaintextVectors, VectorEncryptionKey, VectorOps,
+    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
+    PlaintextVector, PlaintextVectors, RotateResult, VectorEncryptionKey, VectorOps,
 };
-use crate::{AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration};
+use crate::{
+    AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+};
+use futures::future::{join_all, FutureExt, TryFutureExt};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
@@ -26,13 +29,51 @@ impl StandaloneVectorClient {
             rng: Arc::new(Mutex::new(ChaCha20Rng::from_entropy())),
         }
     }
+    pub(crate) async fn rotate_vector(
+        &self,
+        encrypted_vector: EncryptedVector,
+        metadata: &AlloyMetadata,
+        new_metadata: &AlloyMetadata,
+    ) -> Result<EncryptedVector, AlloyError> {
+        let (original_key_id, _) =
+            Self::decompose_encrypted_field_header(encrypted_vector.paired_icl_info.clone())?;
 
-    /// The edek type for this client
+        // check if we have a current secret for this path before doing significant work
+        // and that the current secret isn't the one this was encrypted with
+        let vector_secret = self
+            .config
+            .get(&encrypted_vector.secret_path)
+            .ok_or_else(|| {
+                AlloyError::InvalidConfiguration(format!(
+                    "Provided secret path `{}` does not exist in the vector configuration.",
+                    &encrypted_vector.secret_path.0
+                ))
+            })?;
+        let standalone_secret = vector_secret
+            .secret
+            .current_secret
+            .as_ref()
+            .ok_or_else(|| {
+                AlloyError::InvalidConfiguration(
+                    "No current secret exists in the vector configuration".to_string(),
+                )
+            })?;
+
+        if original_key_id.0 == standalone_secret.id {
+            Ok(encrypted_vector)
+        } else {
+            self.decrypt(encrypted_vector, metadata)
+                .and_then(|decrypted_vector| self.encrypt(decrypted_vector, new_metadata))
+                .await
+        }
+    }
+}
+
+impl AlloyClient for StandaloneVectorClient {
     fn get_edek_type() -> EdekType {
         EdekType::Standalone
     }
 
-    /// The payload type for this client
     fn get_payload_type() -> PayloadType {
         PayloadType::VectorMetadata
     }
@@ -215,6 +256,37 @@ impl VectorOps for StandaloneVectorClient {
         };
         Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
     }
+
+    async fn rotate_vectors(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> RotateResult {
+        let new_metadata = match &new_tenant_id {
+            None => metadata.clone(),
+            Some(tenant_id) => AlloyMetadata {
+                tenant_id: tenant_id.clone(),
+                ..metadata.clone()
+            },
+        };
+        let attempts: Vec<_> = join_all(encrypted_vectors.into_iter().map(
+            |(vector_id, encrypted_vector)| {
+                self.rotate_vector(encrypted_vector, metadata, &new_metadata)
+                    .map(|rotated_vector| (vector_id, rotated_vector))
+            },
+        ))
+        .await;
+        let (rotate_successes, rotate_failures): (Vec<_>, Vec<_>) =
+            attempts.into_iter().partition_map(|r| match r {
+                (vector_id, Ok(rotated_vector)) => Either::Left((vector_id, rotated_vector)),
+                (vector_id, Err(e)) => Either::Right((vector_id, e.to_string())),
+            });
+        RotateResult {
+            successes: rotate_successes.into_iter().collect(),
+            failures: rotate_failures.into_iter().collect(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -385,7 +457,7 @@ mod test {
 
         // the old SDK can't decrypt it, either with the old tenant_id or a new one
         alloy
-            .decrypt(dbg!(rotated_vector.clone()), &get_metadata())
+            .decrypt(rotated_vector.clone(), &get_metadata())
             .await
             .expect_err("the old sdk can't decrypt the rotated value with the old tenant id");
         alloy
