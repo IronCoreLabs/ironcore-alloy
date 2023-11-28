@@ -20,7 +20,7 @@ pub(crate) mod crypto;
 
 pub type VectorId = String;
 
-#[derive(Debug, uniffi::Record)]
+#[derive(Clone, Debug, uniffi::Record)]
 pub struct EncryptedVector {
     pub encrypted_vector: Vec<f32>,
     pub secret_path: SecretPath,
@@ -28,7 +28,7 @@ pub struct EncryptedVector {
     pub paired_icl_info: Vec<u8>,
 }
 
-#[derive(Clone, uniffi::Record)]
+#[derive(Clone, Debug, uniffi::Record)]
 pub struct PlaintextVector {
     pub plaintext_vector: Vec<f32>,
     pub secret_path: SecretPath,
@@ -166,14 +166,18 @@ pub trait VectorOps {
                 (vector_id, Err(e)) => Either::Right((vector_id, e.to_string())),
             });
 
+        let new_metadata = match &new_tenant_id {
+            // TODO(murph): feels dumb to clone here when all we need is the borrow we already have
+            None => metadata.clone(),
+            Some(tenant_id) => AlloyMetadata {
+                tenant_id: tenant_id.clone(),
+                ..metadata.clone()
+            },
+        };
         let encrypt_attempts = join_all(decrypt_successes.into_iter().map(
             |(vector_id, decrypted_vector)| {
                 // use the new tenant id if it's there
-                let new_metadata = match new_tenant_id {
-                    None => metadata,
-                    Some(tenant_id) => &AlloyMetadata { tenant_id, .. },
-                };
-                self.encrypt(decrypted_vector, new_metadata)
+                self.encrypt(decrypted_vector, &new_metadata)
                     .map(|r| (vector_id, r))
             },
         ))

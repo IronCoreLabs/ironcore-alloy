@@ -258,6 +258,50 @@ mod test {
         }
     }
 
+    fn get_in_rotation_client() -> StandaloneVectorClient {
+        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let old_secret = Secret {
+            secret: vec![
+                69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
+                245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
+            ],
+        };
+        let new_secret = Secret {
+            secret: vec![
+                171, 125, 247, 37, 75, 62, 23, 74, 77, 97, 196, 201, 226, 1, 171, 94, 17, 169, 175,
+                52, 231, 241, 99, 6, 164, 181, 147, 86, 17, 110, 127, 218,
+            ],
+        };
+        let old_standalone_secret = StandaloneSecret {
+            id: 1,
+            secret: Arc::new(old_secret),
+        };
+        let new_standalone_secret = StandaloneSecret {
+            id: 2,
+            secret: Arc::new(new_secret),
+        };
+        let rotatable_secret = RotatableSecret {
+            current_secret: Some(Arc::new(new_standalone_secret)),
+            in_rotation_secret: Some(Arc::new(old_standalone_secret)),
+        };
+
+        let vector_secret = VectorSecret {
+            approximation_factor: 4.0f32,
+            secret: Arc::new(rotatable_secret),
+        };
+
+        StandaloneVectorClient {
+            rng: Arc::new(Mutex::new(k)),
+            config: Arc::new(
+                [(
+                    SecretPath("secret_path".to_string()),
+                    Arc::new(vector_secret),
+                )]
+                .into(),
+            ),
+        }
+    }
+
     fn get_metadata() -> Arc<AlloyMetadata> {
         AlloyMetadata::new_simple(TenantId("foo".to_string()))
     }
@@ -305,5 +349,48 @@ mod test {
             .await
             .unwrap();
         assert_ulps_eq!(result.plaintext_vector[..], plaintext.plaintext_vector[..]);
+    }
+
+    #[tokio::test]
+    async fn rotate_roundtrip() {
+        let alloy = get_default_client();
+        let new_tenant_id = TenantId("new_tenant".to_string());
+        let new_metadata = AlloyMetadata::new_simple(new_tenant_id.clone());
+        let plaintext = PlaintextVector {
+            plaintext_vector: vec![1., 2., 3., 4., 5.],
+            secret_path: SecretPath("secret_path".to_string()),
+            derivation_path: DerivationPath("deriv_path".to_string()),
+        };
+        let encrypt_result = alloy
+            .encrypt(plaintext.clone(), &get_metadata())
+            .await
+            .unwrap();
+        let alloy_rotated_secret = get_in_rotation_client();
+        let mut rotated_result = alloy_rotated_secret
+            .rotate_vectors(
+                HashMap::from_iter(vec![("one".to_string(), encrypt_result)].into_iter()),
+                &get_metadata(),
+                Some(new_tenant_id.clone()),
+            )
+            .await;
+        assert_eq!(rotated_result.failures, HashMap::new());
+        let rotated_vector = rotated_result.successes.remove("one").unwrap();
+        // make sure we didn't hallucinate any other vectors
+        assert!(rotated_result.successes.is_empty());
+        let result = alloy_rotated_secret
+            .decrypt(rotated_vector.clone(), &new_metadata)
+            .await
+            .unwrap();
+        assert_ulps_eq!(result.plaintext_vector[..], plaintext.plaintext_vector[..]);
+
+        // the old SDK can't decrypt it, either with the old tenant_id or a new one
+        alloy
+            .decrypt(dbg!(rotated_vector.clone()), &get_metadata())
+            .await
+            .expect_err("the old sdk can't decrypt the rotated value with the old tenant id");
+        alloy
+            .decrypt(rotated_vector, &new_metadata)
+            .await
+            .expect_err("the old sdk can't decrypt the value with the new tenant id");
     }
 }
