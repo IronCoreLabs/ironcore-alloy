@@ -169,9 +169,13 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         )
         .await?;
         let new_tenant_keys = if parsed_new_tenant_id != &metadata.tenant_id {
+            let new_metadata = AlloyMetadata {
+                tenant_id: parsed_new_tenant_id.clone(),
+                ..metadata.clone()
+            };
             derive_keys_many_paths(
                 &self.tenant_security_client,
-                metadata,
+                &new_metadata,
                 paths,
                 SecretType::Deterministic,
             )
