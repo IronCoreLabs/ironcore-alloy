@@ -167,7 +167,6 @@ pub trait VectorOps {
             });
 
         let new_metadata = match &new_tenant_id {
-            // TODO(murph): feels dumb to clone here when all we need is the borrow we already have
             None => metadata.clone(),
             Some(tenant_id) => AlloyMetadata {
                 tenant_id: tenant_id.clone(),
