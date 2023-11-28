@@ -1,6 +1,6 @@
 use super::{
-    derive_key_for_path, derive_keys_many_paths, derived_key_to_vector_encryption_key,
-    get_in_rotation_prefix_internal, DeriveKeyChoice,
+    derive_keys_many_paths, derived_key_to_vector_encryption_key, get_in_rotation_prefix_internal,
+    DeriveKeyChoice,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
@@ -84,8 +84,7 @@ impl VectorOps for SaasShieldVectorClient {
                 SecretType::Vector,
             )
             .await?;
-        let derived_key = derive_key_for_path(
-            &derived_keys,
+        let derived_key = derived_keys.get_key_for_path(
             &plaintext_vector.secret_path,
             &plaintext_vector.derivation_path,
             DeriveKeyChoice::Current,
@@ -133,8 +132,7 @@ impl VectorOps for SaasShieldVectorClient {
                     SecretType::Vector,
                 )
                 .await?;
-            let derived_key = derive_key_for_path(
-                &derived_keys,
+            let derived_key = derived_keys.get_key_for_path(
                 &encrypted_vector.secret_path,
                 &encrypted_vector.derivation_path,
                 DeriveKeyChoice::Specific(key_id),

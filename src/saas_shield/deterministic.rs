@@ -1,6 +1,4 @@
-use super::{
-    derive_key_for_path, derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice,
-};
+use super::{derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice};
 use crate::deterministic::{
     check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
     DeterministicFieldOps, EncryptedField, EncryptedFields, GenerateQueryResult, PlaintextField,
@@ -9,7 +7,7 @@ use crate::deterministic::{
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::{AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -56,17 +54,12 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 SecretType::Deterministic,
             )
             .await?;
-        let derived_key = derive_key_for_path(
-            &derived_keys,
+        let derived_key = derived_keys.get_key_for_path(
             &plaintext_field.secret_path,
             &plaintext_field.derivation_path,
             DeriveKeyChoice::Current,
         )?;
-        let key_id_header = KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
-            KeyId(derived_key.tenant_secret_id.0),
-        );
+        let key_id_header = Self::get_key_id_header(derived_key.tenant_secret_id.0);
         encrypt_internal(
             DeterministicEncryptionKey(derived_key.derived_key.0.clone()),
             key_id_header,
@@ -95,8 +88,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 SecretType::Deterministic,
             )
             .await?;
-        let derived_key = derive_key_for_path(
-            &derived_keys,
+        let derived_key = derived_keys.get_key_for_path(
             &encrypted_field.secret_path,
             &encrypted_field.derivation_path,
             DeriveKeyChoice::Specific(key_id),
@@ -144,11 +136,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                     ))?;
                 keys.iter()
                     .map(|derived_key| {
-                        let key_id_header = KeyIdHeader {
-                            key_id: KeyId(derived_key.tenant_secret_id.0),
-                            edek_type: Self::get_edek_type(),
-                            payload_type: Self::get_payload_type(),
-                        };
+                        let key_id_header = Self::get_key_id_header(derived_key.tenant_secret_id.0);
                         encrypt_internal(
                             DeterministicEncryptionKey(derived_key.derived_key.0.clone()),
                             key_id_header,
@@ -187,43 +175,42 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             )
             .await?
         } else {
-            original_tenant_keys.clone() // TODO: I only need a reference to this, but the `else` creates an owned value.
-                                         // Is there a better way to do it?
+            original_tenant_keys.clone()
         };
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (original_key_id, ciphertext) =
                 Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
-            let original_key = derive_key_for_path(
-                &original_tenant_keys,
-                &encrypted_field.secret_path,
-                &encrypted_field.derivation_path,
-                DeriveKeyChoice::Specific(original_key_id),
-            )?;
-            let new_current_key = derive_key_for_path(
-                &new_tenant_keys,
-                &encrypted_field.secret_path,
-                &encrypted_field.derivation_path,
-                DeriveKeyChoice::Current,
-            )?;
+            let maybe_current_key_id = new_tenant_keys
+                .get_current(
+                    &encrypted_field.secret_path,
+                    &encrypted_field.derivation_path,
+                )
+                .map(|k| k.tenant_secret_id.0);
             if check_rotation_no_op(
                 original_key_id,
-                &Some(new_current_key.tenant_secret_id.0),
+                &maybe_current_key_id,
                 &new_tenant_id,
                 metadata,
             ) {
                 Ok(encrypted_field)
             } else {
+                let original_key = original_tenant_keys.get_key_for_path(
+                    &encrypted_field.secret_path,
+                    &encrypted_field.derivation_path,
+                    DeriveKeyChoice::Specific(original_key_id),
+                )?;
                 let decrypted_field = decrypt_internal(
                     DeterministicEncryptionKey(original_key.derived_key.0.clone()),
                     ciphertext,
                     encrypted_field.secret_path.clone(),
                     encrypted_field.derivation_path.clone(),
                 )?;
-                let key_id_header = KeyIdHeader::new(
-                    Self::get_edek_type(),
-                    Self::get_payload_type(),
-                    KeyId(new_current_key.tenant_secret_id.0),
-                );
+                let new_current_key = new_tenant_keys.get_key_for_path(
+                    &encrypted_field.secret_path,
+                    &encrypted_field.derivation_path,
+                    DeriveKeyChoice::Current,
+                )?;
+                let key_id_header = Self::get_key_id_header(new_current_key.tenant_secret_id.0);
                 encrypt_internal(
                     DeterministicEncryptionKey(new_current_key.derived_key.0.clone()),
                     key_id_header,
@@ -272,6 +259,7 @@ mod test {
         DerivationPath, SecretPath,
     };
     use base64_type::Base64;
+    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
 
     #[tokio::test]
     async fn test_deterministic_encrypt_current() {
@@ -293,13 +281,9 @@ mod test {
             has_primary_config: true,
             derived_keys: secrets,
         };
-        let derived_key = derive_key_for_path(
-            &derived_keys,
-            &secret_path,
-            &derivation_path,
-            DeriveKeyChoice::Current,
-        )
-        .unwrap();
+        let derived_key = derived_keys
+            .get_key_for_path(&secret_path, &derivation_path, DeriveKeyChoice::Current)
+            .unwrap();
         let field = PlaintextField {
             plaintext_field: vec![1, 2, 3],
             secret_path: secret_path.clone(),
@@ -347,13 +331,13 @@ mod test {
             has_primary_config: true,
             derived_keys: secrets,
         };
-        let derived_key = derive_key_for_path(
-            &derived_keys,
-            &secret_path,
-            &derivation_path,
-            DeriveKeyChoice::Specific(KeyId(1)),
-        )
-        .unwrap();
+        let derived_key = derived_keys
+            .get_key_for_path(
+                &secret_path,
+                &derivation_path,
+                DeriveKeyChoice::Specific(KeyId(1)),
+            )
+            .unwrap();
         let field = EncryptedField {
             derivation_path: derivation_path.clone(),
             secret_path: secret_path.clone(),

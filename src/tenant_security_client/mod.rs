@@ -5,7 +5,8 @@ use errors::TenantSecurityError;
 use request::{TenantSecurityRequest, TspRequest};
 use reqwest::Client;
 pub use rest::{
-    DerivationType, DerivedKey, KeyDeriveResponse, SecretType, UnwrapKeyResponse, WrapKeyResponse,
+    DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse, SecretType, UnwrapKeyResponse,
+    WrapKeyResponse,
 };
 use serde::Serialize;
 use std::{

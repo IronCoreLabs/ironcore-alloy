@@ -1,5 +1,6 @@
 use crate::tenant_security_client::{
-    DerivationType, DerivedKey, KeyDeriveResponse, SecretType, TenantSecurityClient,
+    DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse, SecretType,
+    TenantSecurityClient,
 };
 use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
@@ -11,34 +12,6 @@ pub mod config;
 pub mod deterministic;
 pub mod standard;
 pub mod vector;
-
-enum DeriveKeyChoice {
-    Current,
-    Specific(KeyId),
-    InRotation, // Non-current
-}
-
-/// Calls the TSP to derive keys for a single secret_path/derivation_path.
-/// Then converts the result to an encryption key and key ID.
-fn derive_key_for_path<'a>(
-    derived_keys: &'a KeyDeriveResponse,
-    secret_path: &'a SecretPath,
-    deriv_path: &'a DerivationPath,
-    derive_key_choice: DeriveKeyChoice,
-) -> Result<&'a DerivedKey, AlloyError> {
-    match derive_key_choice {
-        DeriveKeyChoice::Current => derived_keys.get_current(secret_path, deriv_path),
-        DeriveKeyChoice::Specific(key_id) => {
-            derived_keys.get_by_id(secret_path, deriv_path, key_id.0)
-        }
-        DeriveKeyChoice::InRotation => derived_keys.get_in_rotation(secret_path, deriv_path),
-    }
-    .ok_or_else(|| {
-        AlloyError::TenantSecurityError(
-            "The secret path, derivation path combo didn't have the requested key.".to_string(),
-        )
-    })
-}
 
 /// Calls the TSP to derive keys for many secret_path/derivation_path combinations.
 /// Then converts the results to encryption keys and key IDs.
@@ -89,14 +62,10 @@ fn get_in_rotation_prefix_internal(
     edek_type: EdekType,
     payload_type: PayloadType,
 ) -> Result<Vec<u8>, AlloyError> {
-    let key_id = derive_key_for_path(
-        derived_keys,
-        &secret_path,
-        &derivation_path,
-        DeriveKeyChoice::InRotation,
-    )?
-    .tenant_secret_id
-    .0;
+    let key_id = derived_keys
+        .get_key_for_path(&secret_path, &derivation_path, DeriveKeyChoice::InRotation)?
+        .tenant_secret_id
+        .0;
     let key_id_header = KeyIdHeader {
         key_id: KeyId(key_id),
         edek_type,

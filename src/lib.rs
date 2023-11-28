@@ -207,6 +207,14 @@ trait AlloyClient {
     /// Returns the only PayloadType this Alloy client deals with.
     fn get_payload_type() -> PayloadType;
 
+    fn get_key_id_header(key_id: u32) -> KeyIdHeader {
+        KeyIdHeader {
+            key_id: KeyId(key_id),
+            edek_type: Self::get_edek_type(),
+            payload_type: Self::get_payload_type(),
+        }
+    }
+
     /// Decodes the header from the encrypted bytes, returning an error if the
     /// decoded EdekType or PayloadType is incorrect for this AlloyClient.
     /// Returns the decoded key ID and remaining non-header bytes.

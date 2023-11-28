@@ -175,7 +175,7 @@ pub(crate) fn check_rotation_no_op(
     new_tenant_id: &TenantId,
     metadata: &AlloyMetadata,
 ) -> bool {
-    maybe_current_key == &Some(encrypted_key_id.0) && new_tenant_id.0 == metadata.tenant_id.0
+    maybe_current_key == &Some(encrypted_key_id.0) && new_tenant_id == &metadata.tenant_id
 }
 
 #[cfg(test)]

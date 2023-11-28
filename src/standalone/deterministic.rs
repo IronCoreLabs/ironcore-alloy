@@ -8,7 +8,7 @@ use crate::errors::AlloyError;
 use crate::{
     AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
 };
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -49,11 +49,7 @@ impl StandaloneDeterministicClient {
             tenant_id,
             &plaintext_field.derivation_path,
         );
-        let key_id_header = KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
-            KeyId(current_secret.id),
-        );
+        let key_id_header = Self::get_key_id_header(current_secret.id);
         encrypt_internal(key, key_id_header, plaintext_field)
     }
 
@@ -158,12 +154,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                             &metadata.tenant_id,
                             &plaintext_field.derivation_path,
                         );
-                        let key_id_header = KeyIdHeader {
-                            key_id: KeyId(standalone_secret.id),
-                            edek_type: Self::get_edek_type(),
-                            payload_type: Self::get_payload_type(),
-                        };
-
+                        let key_id_header = Self::get_key_id_header(standalone_secret.id);
                         encrypt_internal(
                             key,
                             key_id_header,
@@ -231,11 +222,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 secret_path.0
             ))
         })?;
-        let key_id_header = KeyIdHeader {
-            key_id: KeyId(in_rotation_secret.id),
-            edek_type: Self::get_edek_type(),
-            payload_type: Self::get_payload_type(),
-        };
+        let key_id_header = Self::get_key_id_header(in_rotation_secret.id);
         Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
     }
 }
