@@ -5,8 +5,8 @@ use errors::TenantSecurityError;
 use request::{TenantSecurityRequest, TspRequest};
 use reqwest::Client;
 pub use rest::{
-    DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse, SecretType, UnwrapKeyResponse,
-    WrapKeyResponse,
+    BatchUnwrapKeyResponse, DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse,
+    SecretType, UnwrapKeyResponse, WrapKeyResponse,
 };
 use serde::Serialize;
 use std::{
@@ -65,11 +65,24 @@ impl TenantSecurityClient {
 
     pub async fn unwrap_key(
         &self,
-        edek: &[u8],
+        edek: Vec<u8>,
         metadata: &RequestMetadata,
     ) -> Result<UnwrapKeyResponse, TenantSecurityError> {
-        let base64 = Base64(edek.to_vec());
+        let base64 = Base64(edek);
         self.request.unwrap_key(&base64, metadata).await
+    }
+
+    #[allow(dead_code)]
+    pub async fn batch_unwrap_key(
+        &self,
+        edeks: HashMap<&str, Vec<u8>>,
+        metadata: &RequestMetadata,
+    ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError> {
+        let base64_edeks = edeks
+            .into_iter()
+            .map(|(key, edek)| (key, Base64(edek)))
+            .collect();
+        self.request.batch_unwrap_key(base64_edeks, metadata).await
     }
 
     /// Request the Tenant Security Proxy to derive keys by using the tenant's secret and the provided
