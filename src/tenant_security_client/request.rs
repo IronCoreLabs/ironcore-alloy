@@ -286,6 +286,7 @@ pub(crate) mod tests {
         ) -> Result<RekeyResponse, TenantSecurityError> {
             Ok(RekeyResponse {
                 dek: KNOWN_DEK.clone(),
+                edek: KNOWN_EDEK.clone(),
             })
         }
     }

@@ -96,7 +96,7 @@ pub struct BatchResponse<T> {
 
 pub type BatchUnwrapKeyResponse = BatchResponse<UnwrapKeyResponse>;
 
-pub type RekeyResponse = UnwrapKeyResponse;
+pub type RekeyResponse = WrapKeyResponse;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct TenantSecretAssignmentId(pub u32);
