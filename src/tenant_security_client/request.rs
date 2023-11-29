@@ -1,7 +1,8 @@
 use super::errors::{TenantSecurityError, TenantSecurityProxyError};
 use super::rest::{
-    DerivationType, KeyDeriveResponse, SecretType, TenantDeriveKeyRequest, TspErrorResponse,
-    UnwrapKeyRequest, UnwrapKeyResponse, WrapKeyResponse,
+    BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, DerivationType, KeyDeriveResponse, RekeyRequest,
+    RekeyResponse, SecretType, TenantDeriveKeyRequest, TspErrorResponse, UnwrapKeyRequest,
+    UnwrapKeyResponse, WrapKeyResponse,
 };
 use super::{ApiKey, RequestMetadata};
 use crate::{DerivationPath, SecretPath};
@@ -18,6 +19,8 @@ use std::collections::{HashMap, HashSet};
 const TSP_API_PREFIX: &str = "/api/1/";
 const WRAP_ENDPOINT: &str = "document/wrap";
 const UNWRAP_ENDPOINT: &str = "document/unwrap";
+const BATCH_UNWRAP_ENDPOINT: &str = "document/batch-unwrap";
+const REKEY_ENDPOINT: &str = "document/rekey";
 const TENANT_KEY_DERIVE_ENDPOINT: &str = "key/derive-with-secret-path";
 
 pub struct TspRequest {
@@ -96,6 +99,19 @@ pub(crate) trait DocumentKeyOps {
         encrypted_document_key: &Base64,
         metadata: &RequestMetadata,
     ) -> Result<UnwrapKeyResponse, TenantSecurityError>;
+
+    async fn batch_unwrap_key(
+        &self,
+        encrypted_document_keys: HashMap<&str, Base64>,
+        metadata: &RequestMetadata,
+    ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError>;
+
+    async fn rekey(
+        &self,
+        new_tenant_id: &str,
+        metadata: &RequestMetadata,
+        encrypted_document_key: &Base64,
+    ) -> Result<RekeyResponse, TenantSecurityError>;
 }
 
 #[async_trait]
@@ -124,6 +140,40 @@ impl DocumentKeyOps for TspRequest {
             .make_json_request(UNWRAP_ENDPOINT.to_string(), post_data)
             .await?
             .json::<UnwrapKeyResponse>()
+            .await?)
+    }
+
+    async fn batch_unwrap_key(
+        &self,
+        encrypted_document_keys: HashMap<&str, Base64>,
+        metadata: &RequestMetadata,
+    ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError> {
+        let post_data = serde_json::to_value(BatchUnwrapKeyRequest {
+            metadata,
+            edeks: encrypted_document_keys,
+        })?;
+        Ok(self
+            .make_json_request(BATCH_UNWRAP_ENDPOINT.to_string(), post_data)
+            .await?
+            .json::<BatchUnwrapKeyResponse>()
+            .await?)
+    }
+
+    async fn rekey(
+        &self,
+        new_tenant_id: &str,
+        metadata: &RequestMetadata,
+        encrypted_document_key: &Base64,
+    ) -> Result<RekeyResponse, TenantSecurityError> {
+        let post_data = serde_json::to_value(RekeyRequest {
+            metadata,
+            new_tenant_id,
+            encrypted_document_key,
+        })?;
+        Ok(self
+            .make_json_request(REKEY_ENDPOINT.to_string(), post_data)
+            .await?
+            .json::<RekeyResponse>()
             .await?)
     }
 }
@@ -203,6 +253,40 @@ pub(crate) mod tests {
         ) -> Result<UnwrapKeyResponse, TenantSecurityError> {
             Ok(UnwrapKeyResponse {
                 dek: KNOWN_DEK.clone(),
+            })
+        }
+
+        async fn batch_unwrap_key(
+            &self,
+            encrypted_document_keys: HashMap<&str, Base64>,
+            _metadata: &RequestMetadata,
+        ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError> {
+            let keys = encrypted_document_keys
+                .into_iter()
+                .map(|(key, _)| {
+                    (
+                        key.to_string(),
+                        UnwrapKeyResponse {
+                            dek: KNOWN_DEK.clone(),
+                        },
+                    )
+                })
+                .collect();
+            Ok(BatchUnwrapKeyResponse {
+                keys,
+                failures: HashMap::new(),
+            })
+        }
+
+        async fn rekey(
+            &self,
+            _new_tenant_id: &str,
+            _metadata: &RequestMetadata,
+            _encrypted_document_key: &Base64,
+        ) -> Result<RekeyResponse, TenantSecurityError> {
+            Ok(RekeyResponse {
+                dek: KNOWN_DEK.clone(),
+                edek: KNOWN_EDEK.clone(),
             })
         }
     }
