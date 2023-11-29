@@ -107,12 +107,10 @@ pub(crate) struct BatchResult<U> {
 /// Applies the function `func` to all the values of `hash_map`, then partitions them into
 /// success and failure hashmaps. Note that the value type for failures is currently `String`
 /// because of an issue with uniffi exporting errors.
-pub(crate) fn hash_map_to_batch_result<T, U, F>(
-    hash_map: HashMap<FieldId, T>,
-    func: F,
-) -> BatchResult<U>
+pub(crate) fn collection_to_batch_result<T, U, F, I>(hash_map: I, func: F) -> BatchResult<U>
 where
     F: Fn(T) -> Result<U, AlloyError>,
+    I: IntoIterator<Item = (FieldId, T)>,
 {
     let (successes, failures) = hash_map
         .into_iter()

@@ -1,20 +1,21 @@
 use super::config::VectorSecret;
 use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
-use crate::util::get_rng;
+use crate::util::{collection_to_batch_result, get_rng};
 use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
-    PlaintextVector, PlaintextVectors, RotateResult, VectorEncryptionKey, VectorOps,
+    PlaintextVector, PlaintextVectors, VectorEncryptionKey, VectorOps, VectorRotateResult,
 };
 use crate::{
     AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
 };
 use futures::future::{join_all, FutureExt, TryFutureExt};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
+use std::convert::identity;
 use std::sync::{Arc, Mutex};
 
 #[derive(uniffi::Object)]
@@ -59,7 +60,8 @@ impl StandaloneVectorClient {
                 )
             })?;
 
-        if original_key_id.0 == standalone_secret.id {
+        if original_key_id.0 == standalone_secret.id && metadata.tenant_id == new_metadata.tenant_id
+        {
             Ok(encrypted_vector)
         } else {
             self.decrypt(encrypted_vector, metadata)
@@ -262,8 +264,8 @@ impl VectorOps for StandaloneVectorClient {
         encrypted_vectors: EncryptedVectors,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> RotateResult {
-        let new_metadata = match &new_tenant_id {
+    ) -> VectorRotateResult {
+        let new_metadata = match new_tenant_id {
             None => metadata.clone(),
             Some(tenant_id) => AlloyMetadata {
                 tenant_id: tenant_id.clone(),
@@ -277,15 +279,7 @@ impl VectorOps for StandaloneVectorClient {
             },
         ))
         .await;
-        let (rotate_successes, rotate_failures): (Vec<_>, Vec<_>) =
-            attempts.into_iter().partition_map(|r| match r {
-                (vector_id, Ok(rotated_vector)) => Either::Left((vector_id, rotated_vector)),
-                (vector_id, Err(e)) => Either::Right((vector_id, e.to_string())),
-            });
-        RotateResult {
-            successes: rotate_successes.into_iter().collect(),
-            failures: rotate_failures.into_iter().collect(),
-        }
+        collection_to_batch_result(attempts, identity).into()
     }
 }
 

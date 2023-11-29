@@ -1,6 +1,6 @@
 use crate::{
     errors::AlloyError,
-    util::{self},
+    util::{self, BatchResult},
     AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath,
     TenantId,
 };
@@ -29,9 +29,18 @@ pub type EncryptedFields = HashMap<FieldId, EncryptedField>;
 pub type GenerateQueryResult = HashMap<FieldId, Vec<EncryptedField>>;
 
 #[derive(Debug, Clone, uniffi::Record)]
-pub struct RotateBatchResult {
+pub struct DeterministicRotateResult {
     pub successes: HashMap<FieldId, EncryptedField>,
     pub failures: HashMap<FieldId, String>, // TODO: export error instead...?
+}
+
+impl From<BatchResult<EncryptedField>> for DeterministicRotateResult {
+    fn from(value: BatchResult<EncryptedField>) -> Self {
+        Self {
+            successes: value.successes,
+            failures: value.failures,
+        }
+    }
 }
 
 /// Key used for deterministic operations.
@@ -86,7 +95,7 @@ pub trait DeterministicFieldOps {
         encrypted_fields: EncryptedFields,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> Result<RotateBatchResult, AlloyError>;
+    ) -> Result<DeterministicRotateResult, AlloyError>;
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through

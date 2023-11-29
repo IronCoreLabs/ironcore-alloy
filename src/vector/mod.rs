@@ -1,7 +1,7 @@
 use self::crypto::{shuffle, unshuffle, EncryptResult};
 use crate::{
     errors::AlloyError,
-    util::{self, AuthHash},
+    util::{self, AuthHash, BatchResult},
     AlloyMetadata, DerivationPath, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
@@ -37,10 +37,18 @@ pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
 pub type EncryptedVectors = HashMap<VectorId, EncryptedVector>;
 pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
 #[derive(Debug, uniffi::Record)]
-pub struct RotateResult {
+pub struct VectorRotateResult {
     pub successes: EncryptedVectors,
     // TODO(murph): we can't pass AlloyError across here? Only in `Result`? Using string for now
     pub failures: HashMap<VectorId, String>,
+}
+impl From<BatchResult<EncryptedVector>> for VectorRotateResult {
+    fn from(value: BatchResult<EncryptedVector>) -> Self {
+        Self {
+            successes: value.successes,
+            failures: value.failures,
+        }
+    }
 }
 
 /// Key used to for vector encryption.
@@ -150,7 +158,7 @@ pub trait VectorOps {
         encrypted_vectors: EncryptedVectors,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> RotateResult;
+    ) -> VectorRotateResult;
 }
 
 pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), AlloyError> {

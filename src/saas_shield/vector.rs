@@ -7,7 +7,7 @@ use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityCl
 use crate::util::{get_rng, OurReseedingRng};
 use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
-    PlaintextVector, PlaintextVectors, RotateResult, VectorOps,
+    PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
@@ -228,7 +228,7 @@ impl VectorOps for SaasShieldVectorClient {
         _encrypted_vectors: EncryptedVectors,
         _metadata: &AlloyMetadata,
         _new_tenant_id: Option<TenantId>,
-    ) -> RotateResult {
+    ) -> VectorRotateResult {
         unimplemented!()
     }
 }
