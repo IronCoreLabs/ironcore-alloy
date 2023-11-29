@@ -22,6 +22,15 @@ pub struct BatchUnwrapKeyRequest<'a> {
     pub edeks: HashMap<&'a str, Base64>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct RekeyRequest<'a> {
+    #[serde(flatten)]
+    pub metadata: &'a RequestMetadata,
+    pub new_tenant_id: &'a str,
+    pub encrypted_document_key: &'a Base64,
+}
+
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum DerivationType {
@@ -86,6 +95,8 @@ pub struct BatchResponse<T> {
 }
 
 pub type BatchUnwrapKeyResponse = BatchResponse<UnwrapKeyResponse>;
+
+pub type RekeyResponse = UnwrapKeyResponse;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct TenantSecretAssignmentId(pub u32);
