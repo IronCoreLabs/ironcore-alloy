@@ -102,9 +102,8 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
             .unwrap_key(
-                &edek
-                    .write_to_bytes()
-                    .expect("Writing EDEK to bytes failed. Contact IronCore Labs support.")[..], // There shouldn't be any reason this could fail.
+                edek.write_to_bytes()
+                    .expect("Writing EDEK to bytes failed. Contact IronCore Labs support."), // There shouldn't be any reason this could fail.
                 &request_metadata,
             )
             .await?;
@@ -128,9 +127,8 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
             .unwrap_key(
-                &edek
-                    .write_to_bytes()
-                    .expect("Writing edek to bytes failed.")[..], // There shouldn't be any reason this could fail.
+                edek.write_to_bytes()
+                    .expect("Writing edek to bytes failed."), // There shouldn't be any reason this could fail.
                 &request_metadata,
             )
             .await?;

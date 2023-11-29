@@ -14,6 +14,14 @@ pub(crate) struct UnwrapKeyRequest<'a> {
     pub metadata: &'a RequestMetadata,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct BatchUnwrapKeyRequest<'a> {
+    #[serde(flatten)]
+    pub metadata: &'a RequestMetadata,
+    pub edeks: HashMap<&'a str, Base64>,
+}
+
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum DerivationType {
@@ -70,6 +78,14 @@ pub struct WrapKeyResponse {
 pub struct UnwrapKeyResponse {
     pub dek: Base64,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BatchResponse<T> {
+    pub keys: HashMap<String, T>,
+    pub failures: HashMap<String, TspErrorResponse>,
+}
+
+pub type BatchUnwrapKeyResponse = BatchResponse<UnwrapKeyResponse>;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub struct TenantSecretAssignmentId(pub u32);
