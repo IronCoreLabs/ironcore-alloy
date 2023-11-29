@@ -1,11 +1,12 @@
 use super::{derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice};
 use crate::deterministic::{
     check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
-    DeterministicFieldOps, EncryptedField, EncryptedFields, GenerateQueryResult, PlaintextField,
-    PlaintextFields, RotateBatchResult,
+    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
+    GenerateQueryResult, PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
+use crate::util::collection_to_batch_result;
 use crate::{AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
 use ironcore_documents::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
@@ -155,7 +156,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         encrypted_fields: EncryptedFields,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> Result<RotateBatchResult, AlloyError> {
+    ) -> Result<DeterministicRotateResult, AlloyError> {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let paths = encrypted_fields
             .values()
@@ -220,11 +221,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 )
             }
         };
-        let batch_result = crate::util::hash_map_to_batch_result(encrypted_fields, reencrypt_field);
-        Ok(RotateBatchResult {
-            successes: batch_result.successes,
-            failures: batch_result.failures,
-        })
+        Ok(collection_to_batch_result(encrypted_fields, reencrypt_field).into())
     }
 
     async fn get_in_rotation_prefix(

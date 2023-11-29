@@ -1,10 +1,11 @@
 use super::config::RotatableSecret;
 use crate::deterministic::{
     check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
-    DeterministicFieldOps, EncryptedField, EncryptedFields, GenerateQueryResult, PlaintextField,
-    PlaintextFields, RotateBatchResult,
+    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
+    GenerateQueryResult, PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
+use crate::util::collection_to_batch_result;
 use crate::{
     AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
 };
@@ -172,7 +173,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         encrypted_fields: EncryptedFields,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> Result<RotateBatchResult, AlloyError> {
+    ) -> Result<DeterministicRotateResult, AlloyError> {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (key_id, _) =
@@ -200,11 +201,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     })
             }
         };
-        let batch_result = crate::util::hash_map_to_batch_result(encrypted_fields, reencrypt_field);
-        Ok(RotateBatchResult {
-            successes: batch_result.successes,
-            failures: batch_result.failures,
-        })
+        Ok(collection_to_batch_result(encrypted_fields, reencrypt_field).into())
     }
 
     async fn get_in_rotation_prefix(

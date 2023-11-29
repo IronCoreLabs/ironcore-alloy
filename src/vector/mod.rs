@@ -1,7 +1,7 @@
 use self::crypto::{shuffle, unshuffle, EncryptResult};
 use crate::{
     errors::AlloyError,
-    util::{self, AuthHash},
+    util::{self, AuthHash, BatchResult},
     AlloyMetadata, DerivationPath, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
@@ -19,7 +19,7 @@ pub(crate) mod crypto;
 
 pub type VectorId = String;
 
-#[derive(uniffi::Record)]
+#[derive(Clone, Debug, uniffi::Record)]
 pub struct EncryptedVector {
     pub encrypted_vector: Vec<f32>,
     pub secret_path: SecretPath,
@@ -27,14 +27,29 @@ pub struct EncryptedVector {
     pub paired_icl_info: Vec<u8>,
 }
 
-#[derive(Clone, uniffi::Record)]
+#[derive(Clone, Debug, uniffi::Record)]
 pub struct PlaintextVector {
     pub plaintext_vector: Vec<f32>,
     pub secret_path: SecretPath,
     pub derivation_path: DerivationPath,
 }
 pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
+pub type EncryptedVectors = HashMap<VectorId, EncryptedVector>;
 pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
+#[derive(Debug, uniffi::Record)]
+pub struct VectorRotateResult {
+    pub successes: EncryptedVectors,
+    // TODO(murph): we can't pass AlloyError across here? Only in `Result`? Using string for now
+    pub failures: HashMap<VectorId, String>,
+}
+impl From<BatchResult<EncryptedVector>> for VectorRotateResult {
+    fn from(value: BatchResult<EncryptedVector>) -> Self {
+        Self {
+            successes: value.successes,
+            failures: value.failures,
+        }
+    }
+}
 
 /// Key used to for vector encryption.
 #[derive(Debug, Serialize, Clone)]
@@ -127,6 +142,23 @@ pub trait VectorOps {
         derivation_path: DerivationPath,
         metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError>;
+
+    /// Rotates vectors from the in-rotation secret for their secret path to the current secret.
+    /// This can also be used to rotate data from one tenant ID to a new one, which most useful when a tenant is
+    /// internally migrated.
+    ///
+    /// WARNINGS:
+    ///     * this involves decrypting then encrypting vectors. Since the vectors are full of floating point numbers,
+    ///       this process is lossy, which will cause some drift over time. If you need perfectly preserved accuracy
+    ///       store the source vector encrypted with `standard` next to the encrypted vector. `standard` decrypt
+    ///       that, `vector` encrypt it again, and replace the encrypted vector with the result.
+    ///     * only one metadata and new tenant ID argument means each call to this needs to have one tenant's vectors.
+    async fn rotate_vectors(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> VectorRotateResult;
 }
 
 pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), AlloyError> {

@@ -42,13 +42,11 @@ impl std::fmt::Display for AlloyError {
         }
     }
 }
-
 impl From<TenantSecurityError> for AlloyError {
     fn from(value: TenantSecurityError) -> Self {
         Self::TenantSecurityError(value.to_string())
     }
 }
-
 impl From<EncryptError> for AlloyError {
     fn from(value: EncryptError) -> Self {
         match value {
@@ -57,7 +55,6 @@ impl From<EncryptError> for AlloyError {
         }
     }
 }
-
 impl From<DecryptError> for AlloyError {
     fn from(value: DecryptError) -> Self {
         match value {
@@ -68,7 +65,6 @@ impl From<DecryptError> for AlloyError {
         }
     }
 }
-
 impl From<ironcore_documents::Error> for AlloyError {
     fn from(value: ironcore_documents::Error) -> Self {
         match value {
@@ -90,11 +86,9 @@ impl From<ironcore_documents::Error> for AlloyError {
         }
     }
 }
-
 impl From<protobuf::Error> for AlloyError {
     fn from(value: protobuf::Error) -> Self {
         AlloyError::ProtobufError(value.to_string())
     }
 }
-
 impl std::error::Error for AlloyError {}
