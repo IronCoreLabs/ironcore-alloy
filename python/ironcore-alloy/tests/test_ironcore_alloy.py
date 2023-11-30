@@ -191,8 +191,23 @@ class TestIroncoreAlloy:
         assert decrypted["foo"] == b"My data"
 
     @pytest.mark.asyncio
+    async def test_rekey_edeks_standard(self):
+        document = {"foo": b"My data"}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.standard().encrypt(document, metadata)
+        edeks = {"edek": encrypted.edek}
+        new_tenant = "tenant2"
+        rekeyed = await self.sdk.standard().rekey_edeks(edeks, metadata, new_tenant)
+        assert len(rekeyed.failures) == 0
+        assert rekeyed.successes["edek"] != encrypted.edek
+        remade_document = EncryptedDocument(rekeyed.successes["edek"], encrypted.document)
+        new_metadata = AlloyMetadata.new_simple(new_tenant)
+        decrypted = await self.sdk.standard().decrypt(remade_document, new_metadata)
+        assert decrypted["foo"] == b"My data"
+
+    @pytest.mark.asyncio
     async def test_decrypt_wrong_type(self):
-        with pytest.raises(AlloyError.IronCoreDocumentsError):
+        with pytest.raises(AlloyError.InvalidInput):
             ciphertext = {
                 "foo": base64.b64decode(b"AAAAAAAAMs7OVNXWuwUuW1DJVxlTbqoRTFdWKzM=")
             }

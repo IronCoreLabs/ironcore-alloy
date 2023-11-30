@@ -1,7 +1,14 @@
 use crate::{
-    errors::AlloyError, util::get_rng, AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes,
+    alloy_client_trait::AlloyClient,
+    errors::AlloyError,
+    util::{get_rng, BatchResult},
+    AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
-use ironcore_documents::{aes::EncryptionKey, icl_header_v4, key_id_header::KeyIdHeader};
+use ironcore_documents::{
+    aes::EncryptionKey,
+    icl_header_v4,
+    key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
+};
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -43,11 +50,26 @@ pub struct EncryptedDocument {
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
 
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RekeyEdeksBatchResult {
+    pub successes: HashMap<String, EdekWithKeyIdHeader>,
+    pub failures: HashMap<String, String>,
+}
+
+impl From<BatchResult<EdekWithKeyIdHeader>> for RekeyEdeksBatchResult {
+    fn from(value: BatchResult<EdekWithKeyIdHeader>) -> Self {
+        Self {
+            successes: value.successes,
+            failures: value.failures,
+        }
+    }
+}
+
 /// API for encrypting and decrypting documents using our standard encryption. This class of encryption is the most
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
 /// encrypted value, this is likely the API you should use. Our standard encryption is fully random (or probabilistic)
 /// AES 256.
-pub trait StandardDocumentOps {
+pub trait StandardDocumentOps: AlloyClient {
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key, then each field of the
@@ -70,12 +92,28 @@ pub trait StandardDocumentOps {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError>;
+    /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
+    /// the EDEK will be encrypted to the original tenant. Because the underlying DEK does not change, a document
+    /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
+    async fn rekey_edeks(
+        &self,
+        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<RekeyEdeksBatchResult, AlloyError>;
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+        get_prefix_bytes_for_search(ironcore_documents::key_id_header::KeyIdHeader::new(
+            Self::get_edek_type(),
+            Self::get_payload_type(),
+            KeyId(id as u32),
+        ))
+        .into()
+    }
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields

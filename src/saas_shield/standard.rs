@@ -1,22 +1,26 @@
 use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, StandardDocumentOps,
+    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, RekeyEdeksBatchResult,
+    StandardDocumentOps,
 };
 use crate::tenant_security_client::errors::TenantSecurityError;
-use crate::tenant_security_client::{TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse};
-use crate::util::OurReseedingRng;
-use crate::AlloyMetadata;
+use crate::tenant_security_client::{
+    RequestMetadata, TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse,
+};
+use crate::util::{collection_to_batch_result, OurReseedingRng};
+use crate::TenantId;
+use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
+use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
-use ironcore_documents::key_id_header::{
-    self, get_prefix_bytes_for_search, EdekType, KeyId, KeyIdHeader, PayloadType,
-};
+use ironcore_documents::key_id_header::{EdekType, PayloadType};
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
+use std::convert::identity;
 use std::sync::{Arc, Mutex};
 
 #[derive(uniffi::Object)]
@@ -32,40 +36,70 @@ impl SaasShieldStandardClient {
         }
     }
 
-    /// The edek type for this client
-    fn get_edek_type() -> EdekType {
-        EdekType::SaasShield
-    }
-
-    /// The payload type for this client
-    fn get_payload_type() -> PayloadType {
-        PayloadType::StandardEdek
-    }
-
     fn encrypt_document<R: RngCore + CryptoRng>(
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,
         dek: Vec<u8>,
-        metadata: &AlloyMetadata,
+        tenant_id: TenantId,
         document: HashMap<String, Vec<u8>>,
     ) -> Result<EncryptedDocument, AlloyError> {
         let pb_edek: ironcore_documents::cmk_edek::EncryptedDek =
             protobuf::Message::parse_from_bytes(&tsc_edek)?;
         let kms_config_id = pb_edek.kmsConfigId as u32;
         let enc_key = tsc_dek_to_encryption_key(dek)?;
-        let v4_doc = generate_cmk_v4_doc_and_sign(pb_edek, enc_key, metadata)?;
+        let v4_doc = generate_cmk_v4_doc_and_sign(pb_edek, enc_key, tenant_id)?;
 
         encrypt_document_core(
             document,
             rng,
             enc_key,
-            KeyIdHeader::new(
-                Self::get_edek_type(),
-                Self::get_payload_type(),
-                KeyId(kms_config_id),
-            ),
+            Self::create_key_id_header(kms_config_id),
             v4_doc,
         )
+    }
+
+    fn get_document_header_and_edek(
+        edek: EdekWithKeyIdHeader,
+    ) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), AlloyError> {
+        let (_, v4_doc_bytes) = Self::decompose_encrypted_field_header(edek.0)?;
+        let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
+        let edek = find_cmk_edek(&v4_document.signed_payload.edeks)?.clone();
+        Ok((v4_document, edek))
+    }
+
+    async fn rekey_edek_core(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        parsed_new_tenant_id: &TenantId,
+        request_metadata: &RequestMetadata,
+    ) -> Result<EdekWithKeyIdHeader, AlloyError> {
+        let edek = Self::get_document_header_and_edek(edek).map(|res| {
+            res.1
+                .write_to_bytes()
+                .expect("Writing edek to bytes failed.") // There shouldn't be any reason this could fail.
+        })?;
+        let tsp_resp = self
+            .tenant_security_client
+            .rekey_edek(edek, parsed_new_tenant_id, request_metadata)
+            .await?;
+        Self::encrypt_document(
+            self.rng.clone(), // this isn't actually used because of the empty document
+            tsp_resp.edek.0,
+            tsp_resp.dek.0,
+            parsed_new_tenant_id.clone(),
+            HashMap::new(), // empty document. We only care about the EDEK part and there's no wasted work
+        )
+        .map(|doc| doc.edek)
+    }
+}
+
+impl AlloyClient for SaasShieldStandardClient {
+    fn get_edek_type() -> EdekType {
+        EdekType::SaasShield
+    }
+
+    fn get_payload_type() -> PayloadType {
+        PayloadType::StandardEdek
     }
 }
 
@@ -88,17 +122,18 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             self.rng.clone(),
             tsc_edek.0,
             dek.0,
-            metadata,
+            metadata.tenant_id.clone(),
             plaintext_document,
         )
     }
+
     async fn decrypt(
         &self,
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
-        let (v4_document, edek) = get_document_header_and_edek(&encrypted_document.edek)?;
+        let (v4_document, edek) = Self::get_document_header_and_edek(encrypted_document.edek)?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
             .unwrap_key(
@@ -107,23 +142,32 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                 &request_metadata,
             )
             .await?;
-        decrypt_document(v4_document, dek.0, encrypted_document)
+        decrypt_document(v4_document, dek.0, encrypted_document.document)
     }
-    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        get_prefix_bytes_for_search(ironcore_documents::key_id_header::KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
-            KeyId(id as u32),
-        ))
-        .into()
+
+    async fn rekey_edeks(
+        &self,
+        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<RekeyEdeksBatchResult, AlloyError> {
+        let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
+        let request_metadata = metadata.clone().try_into()?;
+        let tsp_responses = join_all(edeks.into_iter().map(|(id, edek)| {
+            self.rekey_edek_core(edek, parsed_new_tenant_id, &request_metadata)
+                .map(|res| (id, res))
+        }))
+        .await;
+        Ok(collection_to_batch_result(tsp_responses, identity).into())
     }
+
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
-        let (_, edek) = get_document_header_and_edek(&plaintext_document.edek)?;
+        let (_, edek) = Self::get_document_header_and_edek(plaintext_document.edek.clone())?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
             .unwrap_key(
@@ -147,11 +191,11 @@ impl StandardDocumentOps for SaasShieldStandardClient {
 fn decrypt_document(
     header: V4DocumentHeader,
     dek: Vec<u8>,
-    encrypted_document: EncryptedDocument,
+    encrypted_document: HashMap<String, Vec<u8>>,
 ) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
     let enc_key = tsc_dek_to_encryption_key(dek)?;
     verify_sig(enc_key, &header)?;
-    decrypt_document_core(encrypted_document.document, enc_key)
+    decrypt_document_core(encrypted_document, enc_key)
 }
 
 fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
@@ -172,24 +216,15 @@ fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, TenantSecuri
 fn generate_cmk_v4_doc_and_sign(
     mut edek: EncryptedDek,
     dek: EncryptionKey,
-    metadata: &AlloyMetadata,
+    tenant_id: TenantId,
 ) -> Result<V4DocumentHeader, AlloyError> {
-    edek.tenantId = metadata.tenant_id.0.clone().into();
+    edek.tenantId = tenant_id.0.into();
     let edek_wrapper = icl_header_v4::v4document_header::EdekWrapper {
         edek: Some(icl_header_v4::v4document_header::edek_wrapper::Edek::CmkEdek(edek)),
         ..Default::default()
     };
 
     Ok(ironcore_documents::create_signed_header(edek_wrapper, dek))
-}
-
-fn get_document_header_and_edek(
-    edek: &EdekWithKeyIdHeader,
-) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), AlloyError> {
-    let (_, v4_doc_bytes) = key_id_header::decode_version_prefixed_value(edek.0.clone().into())?;
-    let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
-    let edek = find_cmk_edek(&v4_document.signed_payload.edeks)?.clone();
-    Ok((v4_document, edek))
 }
 
 #[cfg(test)]
@@ -204,20 +239,21 @@ mod test {
             document: Default::default(),
         };
         assert_eq!(
-            get_document_header_and_edek(&encrypted_document.edek).unwrap_err(),
-            AlloyError::IronCoreDocumentsError("KeyIdHeaderTooShort(1)".to_string())
+            SaasShieldStandardClient::get_document_header_and_edek(encrypted_document.edek)
+                .unwrap_err(),
+            AlloyError::InvalidInput("Encrypted header was invalid.".to_string())
         );
     }
 
     #[test]
     fn get_document_header_and_edek_succeeds_for_good_header() {
-        // This is a SaaS Shield edek which is empty along with a valid header.
-        let bytes = vec![0u8, 0, 0, 42, 0, 0, 18, 4, 18, 2, 18, 0];
+        // This is a SaaS Shield Standard edek which is empty along with a valid header.
+        let bytes = vec![0u8, 0, 0, 42, 2, 0, 18, 4, 18, 2, 18, 0];
         let encrypted_doc = EncryptedDocument {
             edek: EdekWithKeyIdHeader(bytes),
             document: Default::default(),
         };
 
-        get_document_header_and_edek(&encrypted_doc.edek).unwrap();
+        SaasShieldStandardClient::get_document_header_and_edek(encrypted_doc.edek).unwrap();
     }
 }

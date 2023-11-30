@@ -7,7 +7,8 @@ use crate::deterministic::{
 use crate::errors::AlloyError;
 use crate::util::collection_to_batch_result;
 use crate::{
-    AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+    alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
+    StandaloneConfiguration, TenantId,
 };
 use ironcore_documents::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
