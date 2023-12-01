@@ -9,8 +9,8 @@ use crate::tenant_security_client::{
     RequestMetadata, TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse,
 };
 use crate::util::{collection_to_batch_result, OurReseedingRng};
-use crate::TenantId;
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
+use crate::{EncryptedBytes, PlaintextBytes, TenantId};
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
@@ -61,7 +61,7 @@ impl SaasShieldStandardClient {
     fn get_document_header_and_edek(
         edek: EdekWithKeyIdHeader,
     ) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), AlloyError> {
-        let (_, v4_doc_bytes) = Self::decompose_encrypted_field_header(edek.0)?;
+        let (_, v4_doc_bytes) = Self::decompose_key_id_header(edek.0)?;
         let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
         let edek = find_cmk_edek(&v4_document.signed_payload.edeks)?.clone();
         Ok((v4_document, edek))
@@ -191,8 +191,8 @@ impl StandardDocumentOps for SaasShieldStandardClient {
 fn decrypt_document(
     header: V4DocumentHeader,
     dek: Vec<u8>,
-    encrypted_document: HashMap<String, Vec<u8>>,
-) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
+    encrypted_document: HashMap<String, EncryptedBytes>,
+) -> Result<HashMap<String, PlaintextBytes>, AlloyError> {
     let enc_key = tsc_dek_to_encryption_key(dek)?;
     verify_sig(enc_key, &header)?;
     decrypt_document_core(encrypted_document, enc_key)

@@ -74,7 +74,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
         let (key_id, ciphertext) =
-            Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+            Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
         let paths = [(
             encrypted_field.secret_path.clone(),
             [encrypted_field.derivation_path.clone()].into(),
@@ -186,7 +186,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         };
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (original_key_id, ciphertext) =
-                Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+                Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
             let maybe_current_key_id = new_tenant_keys
                 .get_current(
                     &encrypted_field.secret_path,

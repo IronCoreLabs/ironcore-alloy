@@ -62,7 +62,7 @@ impl StandaloneDeterministicClient {
         tenant_id: &TenantId,
     ) -> Result<PlaintextField, AlloyError> {
         let (key_id, ciphertext) =
-            Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+            Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
         let secret = self
             .config
             .get(&encrypted_field.secret_path)
@@ -178,7 +178,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (key_id, _) =
-                Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+                Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
             let maybe_new_secret = &self
                 .config
                 .get(&encrypted_field.secret_path)

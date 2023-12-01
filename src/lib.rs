@@ -225,9 +225,7 @@ pub(crate) mod alloy_client_trait {
         /// Decodes the header from the encrypted bytes, returning an error if the
         /// decoded EdekType or PayloadType is incorrect for this AlloyClient.
         /// Returns the decoded key ID and remaining non-header bytes.
-        fn decompose_encrypted_field_header(
-            encrypted_bytes: Vec<u8>,
-        ) -> Result<(KeyId, Bytes), AlloyError> {
+        fn decompose_key_id_header(encrypted_bytes: Vec<u8>) -> Result<(KeyId, Bytes), AlloyError> {
             let (
                 KeyIdHeader {
                     key_id,

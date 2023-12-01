@@ -38,7 +38,7 @@ impl StandaloneVectorClient {
         new_metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError> {
         let (original_key_id, _) =
-            Self::decompose_encrypted_field_header(encrypted_vector.paired_icl_info.clone())?;
+            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
         // check if we have a current secret for this path before doing significant work
         // and that the current secret isn't the one this was encrypted with
@@ -128,7 +128,7 @@ impl VectorOps for StandaloneVectorClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
         let (key_id, icl_metadata_bytes) =
-            Self::decompose_encrypted_field_header(encrypted_vector.paired_icl_info.clone())?;
+            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
         let vector_secret = self
             .config
             .get(&encrypted_vector.secret_path)

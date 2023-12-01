@@ -107,7 +107,7 @@ impl VectorOps for SaasShieldVectorClient {
             )
         })?;
         let (key_id, icl_metadata_bytes) =
-            Self::decompose_encrypted_field_header(encrypted_vector.paired_icl_info.clone())?;
+            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
         let paths = [(
             encrypted_vector.secret_path.clone(),
