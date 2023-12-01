@@ -199,7 +199,7 @@ fn decrypt_aes_edek(
 
 /// Derives an encryption key for the given tenant and secret. Note that this is the same way that it's done in cloaked search for compatibility
 /// with edeks from there.
-fn derive_aes_encryption_key<K: AsRef<[u8]>>(
+pub(crate) fn derive_aes_encryption_key<K: AsRef<[u8]>>(
     derivation_key: &K,
     tenant_id: &TenantId,
 ) -> EncryptionKey {
