@@ -1,11 +1,28 @@
+#![allow(dead_code)]
+
+use ironcore_alloy::{saas_shield::config::SaasShieldConfiguration, SaasShield};
+use lazy_static::lazy_static;
 use std::{
     env,
     error::Error,
     path::PathBuf,
     process::{Command, ExitStatus, Stdio},
+    sync::Arc,
 };
-
 use uniffi::TargetLanguage;
+
+lazy_static! {
+    pub static ref CLIENT: Arc<SaasShield> = {
+        let config = SaasShieldConfiguration::new(
+            "http://localhost:32804".to_string(),
+            "0WUaXesNgbTAuLwn".to_string(),
+            false,
+            Some(1.1),
+        )
+        .unwrap();
+        SaasShield::new(&config)
+    };
+}
 
 pub(crate) fn build_dynamic_library() -> Result<ExitStatus, Box<dyn Error>> {
     let args: &[&str] = if cfg!(debug_assertions) {
@@ -53,6 +70,7 @@ pub(crate) fn get_dynamic_library_paths() -> Result<Vec<PathBuf>, Box<dyn Error>
     .collect::<Vec<_>>();
     Ok(paths)
 }
+
 pub(crate) fn generate_bindings(
     library_path: PathBuf,
     out_dir: PathBuf,

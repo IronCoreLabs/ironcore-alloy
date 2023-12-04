@@ -44,7 +44,7 @@ camino = "1.1"
 criterion = { version = "0.5", features = ["async_tokio"] }
 hex = "0.4.3"
 hex-literal = "0.4.1"
-lazy_static = "1.4"
+lazy_static = "1.4.0"
 proptest = "1.2.0"
 tokio = { version = "1.33", features = ["macros", "rt-multi-thread"] }
 uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
@@ -52,6 +52,9 @@ uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
 ], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
 uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
 z85 = "3.0.5"
+
+[features]
+integration_tests = []
 
 [[bench]]
 name = "ironcore_alloy_bench"

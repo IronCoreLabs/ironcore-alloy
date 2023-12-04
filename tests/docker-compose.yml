@@ -1,0 +1,9 @@
+version: "3.3"
+services:
+  tenant-security-proxy:
+    env_file:
+      - ./demo-tsp.conf
+    ports:
+      - 32804:7777
+      - 32805:9000
+    image: gcr.io/ironcore-images/tenant-security-proxy:4
