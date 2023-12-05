@@ -53,6 +53,9 @@ uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
 uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
 z85 = "3.0.5"
 
+[features]
+integration_tests = []
+
 [[bench]]
 name = "ironcore_alloy_bench"
 path = "benches/ironcore_alloy_bench.rs"
