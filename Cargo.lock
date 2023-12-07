@@ -1097,13 +1097,13 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.1.0-pre.3"
-source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?rev=357dfb0b33fd538767d15a7b613ed92e6375ced7#357dfb0b33fd538767d15a7b613ed92e6375ced7"
+version = "0.1.0-pre.4"
+source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?branch=decrypt_detached_v3#4000dce19673c1647b5f613172807b7ca550931e"
 dependencies = [
  "aes-gcm",
  "bytes",
  "hmac",
- "itertools 0.11.0",
+ "itertools 0.12.0",
  "protobuf",
  "protobuf-codegen",
  "rand",
@@ -1136,6 +1136,15 @@ name = "itertools"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
 dependencies = [
  "either",
 ]

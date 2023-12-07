@@ -4,11 +4,8 @@ use crate::{
     util::{get_rng, BatchResult},
     AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
-use ironcore_documents::{
-    aes::EncryptionKey,
-    icl_header_v4,
-    key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
-};
+use ironcore_documents::key_id_header::{get_prefix_bytes_for_search, KeyId};
+use ironcore_documents::{aes::EncryptionKey, icl_header_v4, key_id_header::KeyIdHeader, v3};
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -194,9 +191,14 @@ pub(crate) fn decrypt_document_core(
     Ok(document
         .into_iter()
         .map(|(label, ciphertext)| {
-            let dec_result =
-                ironcore_documents::aes::decrypt_detached_document(&dek, ciphertext.into());
-            dec_result.map(|c| (label, c.0))
+            // Further validation of the IronCore MAGIC will be done inside the function
+            if ciphertext.starts_with(&[3]) {
+                let encrypted_payload: v3::EncryptedPayload = ciphertext.try_into()?;
+                encrypted_payload.decrypt(&dek)
+            } else {
+                ironcore_documents::aes::decrypt_detached_document(&dek, ciphertext.into())
+            }
+            .map(|c| (label, c.0))
         })
         .try_collect()?)
 }

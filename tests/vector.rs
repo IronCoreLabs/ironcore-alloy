@@ -1,11 +1,10 @@
-use common::CLIENT;
-
 mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
     use approx::assert_ulps_eq;
+    use common::CLIENT;
     use ironcore_alloy::{
         errors::AlloyError,
         vector::{EncryptedVector, PlaintextVector, VectorOps},
@@ -21,7 +20,7 @@ mod tests {
         }
         let zipped = vec1.into_iter().zip(vec2);
         zipped.into_iter().for_each(|(f1, f2)| {
-            assert_ulps_eq!(f1, f2);
+            assert_ulps_eq!(f1, f2, max_ulps = 4);
         })
     }
 
