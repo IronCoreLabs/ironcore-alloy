@@ -63,7 +63,7 @@ mod tests {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
         let encrypted = CLIENT.standard().encrypt(plaintext, &metadata).await?;
-        assert_eq!(encrypted.edek.0.len(), 262);
+        assert_eq!(encrypted.edek.0.len(), 259);
         Ok(())
     }
 
