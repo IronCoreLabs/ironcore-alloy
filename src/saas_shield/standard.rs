@@ -43,18 +43,18 @@ impl SaasShieldStandardClient {
         tenant_id: TenantId,
         document: HashMap<String, Vec<u8>>,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let mut pb_edeks: ironcore_documents::cmk_edek::EncryptedDeks =
+        let pb_edeks: ironcore_documents::cmk_edek::EncryptedDeks =
             protobuf::Message::parse_from_bytes(&tsc_edek)?;
-        // TSP should only be sending 1 EDEK
-        let pb_edek = pb_edeks
+
+        // We will choose the first edek, so that's the id we want to put on the front.
+        let kms_config_id = pb_edeks
             .encryptedDeks
-            .pop()
-            .ok_or(AlloyError::EncryptError(
-                "TSP failed to send a valid EDEK.".to_string(),
-            ))?;
-        let kms_config_id = pb_edek.kmsConfigId as u32;
+            .iter()
+            .next()
+            .map(|edek| edek.kmsConfigId as u32)
+            .unwrap_or(0);
         let enc_key = tsc_dek_to_encryption_key(dek)?;
-        let v4_doc = generate_cmk_v4_doc_and_sign(pb_edek, enc_key, tenant_id)?;
+        let v4_doc = generate_cmk_v4_doc_and_sign(pb_edeks.encryptedDeks, enc_key, tenant_id)?;
 
         encrypt_document_core(
             document,
@@ -68,29 +68,31 @@ impl SaasShieldStandardClient {
     /// A function introduced to deal with the issue of EncryptedDeks from the TSP being mistakenly parsed as EncryptedDek.
     /// This is mostly to allow compatibility with Cloaked Search from when this was an issue.
     fn fix_encrypted_dek(
-        cmk_edek: cmk_edek::EncryptedDek,
-    ) -> Result<cmk_edek::EncryptedDek, TenantSecurityError> {
+        cmk_edek: &cmk_edek::EncryptedDek,
+    ) -> Result<cmk_edek::EncryptedDeks, TenantSecurityError> {
         // Real kms config ids can't ever be 0, so if it is we parse it as an EncryptedDeks (which came from the tsp).
         // Then we put the tenant_id on each of them.
-        let encrypted_dek = if cmk_edek.kmsConfigId == 0 {
+        let encrypted_deks = if cmk_edek.kmsConfigId == 0 {
             let bytes = cmk_edek.write_to_bytes().expect("Writing to bytes is safe");
-            let mut encrypted_deks: cmk_edek::EncryptedDeks =
+            let encrypted_deks: cmk_edek::EncryptedDeks =
                 Message::parse_from_bytes(bytes.as_ref())?;
-            // The TSP currently only ever sends 1 EDEK
-            let mut encrypted_dek =
-                encrypted_deks
-                    .encryptedDeks
-                    .pop()
-                    .ok_or(TenantSecurityError::ProtoError(
-                        "Failed to parse EDEK.".to_string(),
-                    ))?;
-            encrypted_dek.tenantId = cmk_edek.tenantId;
-            encrypted_dek
+
+            encrypted_deks
+                .encryptedDeks
+                .into_iter()
+                .map(|mut edek| {
+                    edek.tenantId = cmk_edek.tenantId.clone();
+                    edek
+                })
+                .collect()
         } else {
             // If the kms_config_id is not 0, we assume this is a edek that was generated after the fix, so we can just pass it on.
-            cmk_edek
+            vec![cmk_edek.clone()]
         };
-        Ok(encrypted_dek)
+        Ok(cmk_edek::EncryptedDeks {
+            encryptedDeks: encrypted_deks,
+            ..Default::default()
+        })
     }
 
     fn get_document_header_and_edek(
@@ -98,8 +100,8 @@ impl SaasShieldStandardClient {
     ) -> Result<(V4DocumentHeader, Vec<u8>), AlloyError> {
         let (_, v4_doc_bytes) = Self::decompose_key_id_header(edek.0)?;
         let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
-        let edek = find_cmk_edek(&v4_document.signed_payload.edeks)?.clone();
-        let fixed_edek = Self::fix_encrypted_dek(edek)?;
+        let fixed_edek =
+            Self::fix_encrypted_dek(find_cmk_edek(&v4_document.signed_payload.edeks)?)?;
         let edek_bytes = fixed_edek
             .write_to_bytes()
             .expect("Writing to bytes is safe");
@@ -241,17 +243,22 @@ fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, TenantSecuri
 }
 
 fn generate_cmk_v4_doc_and_sign(
-    mut edek: EncryptedDek,
+    edeks: Vec<EncryptedDek>,
     dek: EncryptionKey,
     tenant_id: TenantId,
 ) -> Result<V4DocumentHeader, AlloyError> {
-    edek.tenantId = tenant_id.0.into();
-    let edek_wrapper = icl_header_v4::v4document_header::EdekWrapper {
-        edek: Some(icl_header_v4::v4document_header::edek_wrapper::Edek::CmkEdek(edek)),
-        ..Default::default()
-    };
+    let edek_wrappers = edeks
+        .into_iter()
+        .map(|mut edek| {
+            edek.tenantId = tenant_id.0.clone().into();
+            icl_header_v4::v4document_header::EdekWrapper {
+                edek: Some(icl_header_v4::v4document_header::edek_wrapper::Edek::CmkEdek(edek)),
+                ..Default::default()
+            }
+        })
+        .collect();
 
-    Ok(ironcore_documents::create_signed_header(edek_wrapper, dek))
+    Ok(ironcore_documents::create_signed_header(edek_wrappers, dek))
 }
 
 #[cfg(test)]
@@ -282,7 +289,7 @@ mod test {
             ..Default::default()
         };
         let v4_doc = generate_cmk_v4_doc_and_sign(
-            edek,
+            vec![edek],
             EncryptionKey([1; 32]),
             TenantId("tenant".to_string()),
         )
