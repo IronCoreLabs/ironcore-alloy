@@ -49,8 +49,7 @@ impl SaasShieldStandardClient {
         // We will choose the first edek, so that's the id we want to put on the front.
         let kms_config_id = pb_edeks
             .encryptedDeks
-            .iter()
-            .next()
+            .first()
             .map(|edek| edek.kmsConfigId as u32)
             .unwrap_or(0);
         let enc_key = tsc_dek_to_encryption_key(dek)?;
