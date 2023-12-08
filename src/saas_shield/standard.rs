@@ -315,6 +315,7 @@ fn generate_cmk_v4_doc_and_sign(
 mod test {
     use super::*;
     use crate::standard::EdekWithKeyIdHeader;
+    use base64::{engine::general_purpose::STANDARD, Engine};
     use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]
@@ -388,8 +389,9 @@ mod test {
             86, 42, 73, 118, 87, 194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50,
             12, 116, 101, 110, 97, 110, 116, 45, 103, 99, 112, 45, 108,
         ]);
-        let edek = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
-        let edek_bytes = edek.get_edek_bytes().unwrap();
+        let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
+        assert!(matches!(edek_parts, EdekParts::V5(_, _)));
+        let edek_bytes = edek_parts.get_edek_bytes().unwrap();
         let encrypted_deks: cmk_edek::EncryptedDeks =
             Message::parse_from_bytes(&edek_bytes).unwrap();
         assert_eq!(encrypted_deks.encryptedDeks.len(), 1);
@@ -416,13 +418,31 @@ mod test {
             194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97,
             110, 116, 45, 103, 99, 112, 45, 108,
         ]);
-        let edek = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
-        let edek_bytes = edek.get_edek_bytes().unwrap();
+        let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
+        assert!(matches!(edek_parts, EdekParts::V5(_, _)));
+        let edek_bytes = edek_parts.get_edek_bytes().unwrap();
         let encrypted_deks: cmk_edek::EncryptedDeks =
             Message::parse_from_bytes(&edek_bytes).unwrap();
         assert_eq!(encrypted_deks.encryptedDeks.len(), 1);
         let encrypted_dek = encrypted_deks.encryptedDeks[0].clone();
         assert_eq!(encrypted_dek.kmsConfigId, 511);
         assert_eq!(encrypted_dek.tenantId.to_string(), "tenant-gcp-l");
+    }
+
+    #[test]
+    fn parse_v3_document_works() {
+        let edek = STANDARD.decode("CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D").unwrap();
+        // This type isn't true, but it's what a caller would be creating if they had old EDEKs
+        let liar_type_edek = EdekWithKeyIdHeader(edek);
+        let edek_parts = SaasShieldStandardClient::decompose_edek_header(liar_type_edek).unwrap();
+        assert!(matches!(edek_parts, EdekParts::V3(_)));
+        let edek_bytes = edek_parts.get_edek_bytes().unwrap();
+        let encrypted_deks: cmk_edek::EncryptedDeks =
+            Message::parse_from_bytes(&edek_bytes).unwrap();
+        assert_eq!(encrypted_deks.encryptedDeks.len(), 1);
+        let encrypted_dek = encrypted_deks.encryptedDeks[0].clone();
+        assert_eq!(encrypted_dek.kmsConfigId, 511);
+        // This EDEK came from TSC-java, where we weren't setting tenant IDs
+        assert_eq!(encrypted_dek.tenantId.to_string(), "");
     }
 }

@@ -167,8 +167,8 @@ mod tests {
         assert!(all_rekeyed.successes.contains_key("edek"));
         assert!(all_rekeyed.failures.is_empty());
         let rekeyed = all_rekeyed.successes.get("edek").unwrap();
-        // TODO: change first 4 bytes to the key ID once it's getting set properly
-        assert!(rekeyed.0.starts_with(&[0, 0, 0, 0, 2, 0]));
+        // First 4 bytes are KMS config ID 511
+        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 
@@ -185,9 +185,9 @@ mod tests {
         assert!(all_rekeyed.successes.contains_key("edek"));
         assert!(all_rekeyed.failures.is_empty());
         let rekeyed = all_rekeyed.successes.get("edek").unwrap();
-        // TODO: change first 4 bytes to the key ID once it's getting set properly
         // This is now a V5 document, which starts with the KeyIdHeader
-        assert!(rekeyed.0.starts_with(&[0, 0, 0, 0, 2, 0]));
+        // First 4 bytes are KMS config ID 511
+        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 }
