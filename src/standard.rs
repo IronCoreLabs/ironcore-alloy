@@ -37,6 +37,9 @@ impl PlaintextDocumentWithEdek {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+// Key ID header followed by V4DocumentHeader containing the EDEK.
+// Note that in the case of SaaS Shield Standard, users could create this with a
+// legacy V3 EDEK, which is just the EDEK. This has to be handled manually on decrypts.
 pub struct EdekWithKeyIdHeader(pub Vec<u8>);
 custom_newtype!(EdekWithKeyIdHeader, Vec<u8>);
 
