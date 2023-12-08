@@ -94,6 +94,9 @@ impl SaasShieldStandardClient {
         })
     }
 
+    /// Breaks an EdekWithKeyIdHeader into its V4DocumentHeader and EncryptedDeks bytes.
+    /// If the EDEK was previously parsed as an EncryptedDek instead of an EncryptedDeks,
+    /// it will be fixed first.
     fn get_document_header_and_edek(
         edek: EdekWithKeyIdHeader,
     ) -> Result<(V4DocumentHeader, Vec<u8>), AlloyError> {
