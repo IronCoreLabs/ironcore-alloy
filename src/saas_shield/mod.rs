@@ -4,7 +4,7 @@ use crate::tenant_security_client::{
 };
 use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::collections::HashSet;
 

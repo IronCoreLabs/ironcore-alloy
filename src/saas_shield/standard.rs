@@ -16,7 +16,7 @@ use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
-use ironcore_documents::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
@@ -267,7 +267,7 @@ fn generate_cmk_v4_doc_and_sign(
 mod test {
     use super::*;
     use crate::standard::EdekWithKeyIdHeader;
-    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+    use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]
     fn get_document_header_and_edek_fails_for_bad_header() {

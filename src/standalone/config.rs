@@ -1,5 +1,5 @@
 use crate::{errors::AlloyError, Secret, SecretPath};
-use ironcore_documents::key_id_header::KeyId;
+use ironcore_documents::v5::key_id_header::KeyId;
 use std::{collections::HashMap, sync::Arc};
 
 /// A secret used by standalone mode to derive encryption keys.

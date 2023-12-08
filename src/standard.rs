@@ -7,8 +7,10 @@ use crate::{
 use ironcore_documents::{
     aes::EncryptionKey,
     icl_header_v4,
-    key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
-    v5,
+    v5::{
+        self,
+        key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
+    },
 };
 use itertools::Itertools;
 use protobuf::Message;
@@ -210,7 +212,7 @@ pub(crate) fn decrypt_document_core(
 
 #[cfg(test)]
 mod test {
-    use ironcore_documents::key_id_header::{EdekType, KeyId, PayloadType};
+    use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 

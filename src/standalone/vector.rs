@@ -11,7 +11,7 @@ use crate::{
     StandaloneConfiguration, TenantId,
 };
 use futures::future::{join_all, FutureExt, TryFutureExt};
-use ironcore_documents::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;

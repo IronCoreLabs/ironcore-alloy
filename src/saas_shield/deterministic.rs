@@ -262,7 +262,7 @@ mod test {
         DerivationPath, SecretPath,
     };
     use base64_type::Base64;
-    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+    use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[tokio::test]
     async fn test_deterministic_encrypt_current() {

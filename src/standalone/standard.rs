@@ -7,7 +7,7 @@ use crate::standard::{
 use crate::util::{collection_to_batch_result, get_rng, hash256, OurReseedingRng};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, Secret, TenantId};
 use ironcore_documents::aes::EncryptionKey;
-use ironcore_documents::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
 use protobuf::Message;

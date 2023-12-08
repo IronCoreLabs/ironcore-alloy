@@ -10,7 +10,7 @@ use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
     StandaloneConfiguration, TenantId,
 };
-use ironcore_documents::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::sync::Arc;
