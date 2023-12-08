@@ -2,7 +2,7 @@
 
 use crate::errors::AlloyError;
 use bytes::Bytes;
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
 use saas_shield::standard::SaasShieldStandardClient;
@@ -233,7 +233,7 @@ pub(crate) mod alloy_client_trait {
                     payload_type,
                 },
                 remaining_bytes,
-            ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
+            ) = ironcore_documents::v5::key_id_header::decode_version_prefixed_value(
                 encrypted_bytes.into(),
             )
             .map_err(|_| AlloyError::InvalidInput("Encrypted header was invalid.".to_string()))?;

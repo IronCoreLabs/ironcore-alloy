@@ -71,7 +71,7 @@ fn get_in_rotation_prefix_internal(
         edek_type,
         payload_type,
     };
-    Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
+    Ok(ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
 }
 
 #[cfg(test)]

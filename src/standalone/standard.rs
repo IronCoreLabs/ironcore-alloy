@@ -6,9 +6,9 @@ use crate::standard::{
 };
 use crate::util::{collection_to_batch_result, get_rng, hash256, OurReseedingRng};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, Secret, TenantId};
-use ironcore_documents::aes::{generate_aes_edek_and_sign, EncryptionKey};
-use ironcore_documents::icl_header_v4;
+use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -57,7 +57,7 @@ impl StandaloneStandardClient {
         tenant_id: &TenantId,
     ) -> Result<EncryptedDocument, AlloyError> {
         let per_tenant_kek = derive_aes_encryption_key(&incoming_key, tenant_id);
-        let (aes_dek, v4_doc) = generate_aes_edek_and_sign(
+        let (aes_dek, v4_doc) = v5::aes::generate_aes_edek_and_sign(
             &mut *get_rng(&rng),
             per_tenant_kek,
             None,
@@ -146,7 +146,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
             let (current_secret_id, current_secret) = self.get_current_secret_and_id()?;
             let encryption_key =
                 derive_aes_encryption_key(&current_secret.secret, parsed_new_tenant_id);
-            let (_, v4_doc) = generate_aes_edek_and_sign(
+            let (_, v4_doc) = v5::aes::generate_aes_edek_and_sign(
                 &mut *get_rng(&self.rng),
                 encryption_key,
                 Some(dek),
@@ -196,7 +196,7 @@ fn decrypt_aes_edek(
     let aes_edek = maybe_edek_wrapper
         .map(|edek| edek.aes_256_gcm_edek())
         .ok_or_else(|| AlloyError::DecryptError("No AES EDEK found.".to_string()))?;
-    let aes_dek = ironcore_documents::aes::decrypt_aes_edek(kek, aes_edek)?;
+    let aes_dek = v5::aes::decrypt_aes_edek(kek, aes_edek)?;
     verify_sig(aes_dek, header)?;
     Ok(aes_dek)
 }
@@ -217,7 +217,7 @@ mod test {
     use super::*;
     use crate::Secret;
     use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
-    use ironcore_documents::key_id_header::{self, EdekType, KeyId, PayloadType};
+    use ironcore_documents::v5::key_id_header::{self, EdekType, KeyId, PayloadType};
 
     fn default_client() -> StandaloneStandardClient {
         new_client(Some(1))

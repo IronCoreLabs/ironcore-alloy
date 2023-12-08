@@ -10,7 +10,7 @@ use crate::tenant_security_client::{
 };
 use crate::util::{collection_to_batch_result, OurReseedingRng};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
-use crate::{EncryptedBytes, PlaintextBytes, TenantId};
+use crate::{EncryptedBytes, FieldId, PlaintextBytes, TenantId};
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
@@ -222,7 +222,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
 fn decrypt_document(
     header: V4DocumentHeader,
     dek: Vec<u8>,
-    encrypted_document: HashMap<String, EncryptedBytes>,
+    encrypted_document: HashMap<FieldId, EncryptedBytes>,
 ) -> Result<HashMap<String, PlaintextBytes>, AlloyError> {
     let enc_key = tsc_dek_to_encryption_key(dek)?;
     verify_sig(enc_key, &header)?;
@@ -260,7 +260,7 @@ fn generate_cmk_v4_doc_and_sign(
         })
         .collect();
 
-    Ok(ironcore_documents::create_signed_header(edek_wrappers, dek))
+    Ok(ironcore_documents::create_signed_proto(edek_wrappers, dek))
 }
 
 #[cfg(test)]

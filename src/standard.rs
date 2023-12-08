@@ -8,6 +8,7 @@ use ironcore_documents::{
     aes::EncryptionKey,
     icl_header_v4,
     key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
+    v5,
 };
 use itertools::Itertools;
 use protobuf::Message;
@@ -125,7 +126,7 @@ pub trait StandardDocumentOps: AlloyClient {
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        get_prefix_bytes_for_search(ironcore_documents::key_id_header::KeyIdHeader::new(
+        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
             Self::get_edek_type(),
             Self::get_payload_type(),
             KeyId(id as u32),
@@ -147,7 +148,7 @@ pub(crate) fn verify_sig(
     aes_dek: EncryptionKey,
     document: &icl_header_v4::V4DocumentHeader,
 ) -> Result<(), AlloyError> {
-    if ironcore_documents::verify_signature(aes_dek.0, document) {
+    if ironcore_documents::verify_signature(aes_dek, document) {
         Ok(())
     } else {
         Err(AlloyError::DecryptError(
@@ -179,26 +180,29 @@ pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
     let encrypted_document = document
         .into_iter()
         .map(|(label, plaintext)| {
-            ironcore_documents::aes::encrypt_detached_document(
+            ironcore_documents::aes::encrypt_document_and_attach_iv(
                 &mut *get_rng(&rng),
                 aes_dek,
                 ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec()),
             )
-            .map(|c| (label, c.0.to_vec()))
+            .map(|c| (label, v5::EncryptedPayload(c).write_to_bytes()))
         })
         .try_collect()?;
     Ok(encrypted_document)
 }
 
 pub(crate) fn decrypt_document_core(
-    document: HashMap<String, Vec<u8>>,
+    document: HashMap<FieldId, EncryptedBytes>,
     dek: EncryptionKey,
 ) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
     Ok(document
         .into_iter()
-        .map(|(label, ciphertext)| {
-            let dec_result =
-                ironcore_documents::aes::decrypt_detached_document(&dek, ciphertext.into());
+        .map(|(label, v5_edoc_bytes)| {
+            let v5_edoc: v5::EncryptedPayload = v5_edoc_bytes.try_into()?;
+            let dec_result = ironcore_documents::aes::decrypt_document_with_attached_iv(
+                &dek,
+                v5_edoc.0.as_ref(),
+            );
             dec_result.map(|c| (label, c.0))
         })
         .try_collect()?)

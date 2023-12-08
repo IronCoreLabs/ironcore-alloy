@@ -7,7 +7,7 @@ use crate::{
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
-use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 use std::collections::HashMap;
 use uniffi::custom_newtype;
 

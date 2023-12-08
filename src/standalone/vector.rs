@@ -238,7 +238,10 @@ impl VectorOps for StandaloneVectorClient {
                 )
             })?;
         let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
-        Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
+        Ok(
+            ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header)
+                .into(),
+        )
     }
 
     async fn rotate_vectors(
