@@ -43,8 +43,15 @@ impl SaasShieldStandardClient {
         tenant_id: TenantId,
         document: HashMap<String, Vec<u8>>,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let pb_edek: ironcore_documents::cmk_edek::EncryptedDek =
+        let mut pb_edeks: ironcore_documents::cmk_edek::EncryptedDeks =
             protobuf::Message::parse_from_bytes(&tsc_edek)?;
+        // TSP should only be sending 1 EDEK
+        let pb_edek = pb_edeks
+            .encryptedDeks
+            .pop()
+            .ok_or(AlloyError::EncryptError(
+                "TSP failed to send a valid EDEK.".to_string(),
+            ))?;
         let kms_config_id = pb_edek.kmsConfigId as u32;
         let enc_key = tsc_dek_to_encryption_key(dek)?;
         let v4_doc = generate_cmk_v4_doc_and_sign(pb_edek, enc_key, tenant_id)?;
@@ -58,13 +65,45 @@ impl SaasShieldStandardClient {
         )
     }
 
+    /// A function introduced to deal with the issue of EncryptedDeks from the TSP being mistakenly parsed as EncryptedDek.
+    /// This is mostly to allow compatibility with Cloaked Search from when this was an issue.
+    fn fix_encrypted_dek(
+        cmk_edek: cmk_edek::EncryptedDek,
+    ) -> Result<cmk_edek::EncryptedDek, TenantSecurityError> {
+        // Real kms config ids can't ever be 0, so if it is we parse it as an EncryptedDeks (which came from the tsp).
+        // Then we put the tenant_id on each of them.
+        let encrypted_dek = if cmk_edek.kmsConfigId == 0 {
+            let bytes = cmk_edek.write_to_bytes().expect("Writing to bytes is safe");
+            let mut encrypted_deks: cmk_edek::EncryptedDeks =
+                Message::parse_from_bytes(bytes.as_ref())?;
+            // The TSP currently only ever sends 1 EDEK
+            let mut encrypted_dek =
+                encrypted_deks
+                    .encryptedDeks
+                    .pop()
+                    .ok_or(TenantSecurityError::ProtoError(
+                        "Failed to parse EDEK.".to_string(),
+                    ))?;
+            encrypted_dek.tenantId = cmk_edek.tenantId;
+            encrypted_dek
+        } else {
+            // If the kms_config_id is not 0, we assume this is a edek that was generated after the fix, so we can just pass it on.
+            cmk_edek
+        };
+        Ok(encrypted_dek)
+    }
+
     fn get_document_header_and_edek(
         edek: EdekWithKeyIdHeader,
-    ) -> Result<(V4DocumentHeader, cmk_edek::EncryptedDek), AlloyError> {
+    ) -> Result<(V4DocumentHeader, Vec<u8>), AlloyError> {
         let (_, v4_doc_bytes) = Self::decompose_key_id_header(edek.0)?;
         let v4_document: V4DocumentHeader = Message::parse_from_bytes(&v4_doc_bytes[..])?;
         let edek = find_cmk_edek(&v4_document.signed_payload.edeks)?.clone();
-        Ok((v4_document, edek))
+        let fixed_edek = Self::fix_encrypted_dek(edek)?;
+        let edek_bytes = fixed_edek
+            .write_to_bytes()
+            .expect("Writing to bytes is safe");
+        Ok((v4_document, edek_bytes))
     }
 
     async fn rekey_edek_core(
@@ -73,11 +112,7 @@ impl SaasShieldStandardClient {
         parsed_new_tenant_id: &TenantId,
         request_metadata: &RequestMetadata,
     ) -> Result<EdekWithKeyIdHeader, AlloyError> {
-        let edek = Self::get_document_header_and_edek(edek).map(|res| {
-            res.1
-                .write_to_bytes()
-                .expect("Writing edek to bytes failed.") // There shouldn't be any reason this could fail.
-        })?;
+        let edek = Self::get_document_header_and_edek(edek).map(|(_, edek)| edek)?;
         let tsp_resp = self
             .tenant_security_client
             .rekey_edek(edek, parsed_new_tenant_id, request_metadata)
@@ -136,11 +171,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let (v4_document, edek) = Self::get_document_header_and_edek(encrypted_document.edek)?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
-            .unwrap_key(
-                edek.write_to_bytes()
-                    .expect("Writing EDEK to bytes failed. Contact IronCore Labs support."), // There shouldn't be any reason this could fail.
-                &request_metadata,
-            )
+            .unwrap_key(edek, &request_metadata)
             .await?;
         decrypt_document(v4_document, dek.0, encrypted_document.document)
     }
@@ -170,11 +201,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let (_, edek) = Self::get_document_header_and_edek(plaintext_document.edek.clone())?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
-            .unwrap_key(
-                edek.write_to_bytes()
-                    .expect("Writing edek to bytes failed."), // There shouldn't be any reason this could fail.
-                &request_metadata,
-            )
+            .unwrap_key(edek, &request_metadata)
             .await?;
 
         Ok(EncryptedDocument {
@@ -231,6 +258,7 @@ fn generate_cmk_v4_doc_and_sign(
 mod test {
     use super::*;
     use crate::standard::EdekWithKeyIdHeader;
+    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]
     fn get_document_header_and_edek_fails_for_bad_header() {
@@ -247,10 +275,24 @@ mod test {
 
     #[test]
     fn get_document_header_and_edek_succeeds_for_good_header() {
-        // This is a SaaS Shield Standard edek which is empty along with a valid header.
-        let bytes = vec![0u8, 0, 0, 42, 2, 0, 18, 4, 18, 2, 18, 0];
+        let edek = EncryptedDek {
+            encryptedDekData: vec![1, 2, 3].into(),
+            kmsConfigId: 1,
+            tenantId: "tenant".into(),
+            ..Default::default()
+        };
+        let v4_doc = generate_cmk_v4_doc_and_sign(
+            edek,
+            EncryptionKey([1; 32]),
+            TenantId("tenant".to_string()),
+        )
+        .unwrap();
+        let doc_bytes = v4_doc.write_to_bytes().unwrap();
+        let final_bytes =
+            KeyIdHeader::new(EdekType::SaasShield, PayloadType::StandardEdek, KeyId(123))
+                .put_header_on_document(doc_bytes);
         let encrypted_doc = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(bytes),
+            edek: EdekWithKeyIdHeader(final_bytes.to_vec()),
             document: Default::default(),
         };
 
