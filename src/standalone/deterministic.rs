@@ -7,9 +7,10 @@ use crate::deterministic::{
 use crate::errors::AlloyError;
 use crate::util::collection_to_batch_result;
 use crate::{
-    AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+    alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
+    StandaloneConfiguration, TenantId,
 };
-use ironcore_documents::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -61,7 +62,7 @@ impl StandaloneDeterministicClient {
         tenant_id: &TenantId,
     ) -> Result<PlaintextField, AlloyError> {
         let (key_id, ciphertext) =
-            Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+            Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
         let secret = self
             .config
             .get(&encrypted_field.secret_path)
@@ -177,7 +178,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (key_id, _) =
-                Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+                Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
             let maybe_new_secret = &self
                 .config
                 .get(&encrypted_field.secret_path)
@@ -223,7 +224,10 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             ))
         })?;
         let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
-        Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
+        Ok(
+            ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header)
+                .into(),
+        )
     }
 }
 

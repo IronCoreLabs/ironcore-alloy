@@ -16,6 +16,7 @@ use std::{
     sync::Arc,
 };
 
+use self::rest::RekeyResponse;
 #[cfg(test)]
 pub use rest::TenantSecretAssignmentId;
 
@@ -83,6 +84,18 @@ impl TenantSecurityClient {
             .map(|(key, edek)| (key, Base64(edek)))
             .collect();
         self.request.batch_unwrap_key(base64_edeks, metadata).await
+    }
+
+    pub async fn rekey_edek(
+        &self,
+        edek: Vec<u8>,
+        new_tenant_id: &TenantId,
+        metadata: &RequestMetadata,
+    ) -> Result<RekeyResponse, TenantSecurityError> {
+        let base64 = Base64(edek);
+        self.request
+            .rekey(&new_tenant_id.0, metadata, &base64)
+            .await
     }
 
     /// Request the Tenant Security Proxy to derive keys by using the tenant's secret and the provided

@@ -7,8 +7,8 @@ use crate::deterministic::{
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::collection_to_batch_result;
-use crate::{AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
-use ironcore_documents::key_id_header::{EdekType, PayloadType};
+use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -74,7 +74,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
         let (key_id, ciphertext) =
-            Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+            Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
         let paths = [(
             encrypted_field.secret_path.clone(),
             [encrypted_field.derivation_path.clone()].into(),
@@ -186,7 +186,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         };
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (original_key_id, ciphertext) =
-                Self::decompose_encrypted_field_header(encrypted_field.encrypted_field.clone())?;
+                Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
             let maybe_current_key_id = new_tenant_keys
                 .get_current(
                     &encrypted_field.secret_path,
@@ -262,7 +262,7 @@ mod test {
         DerivationPath, SecretPath,
     };
     use base64_type::Base64;
-    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+    use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[tokio::test]
     async fn test_deterministic_encrypt_current() {
@@ -356,7 +356,7 @@ mod test {
                 payload_type,
             },
             ciphertext,
-        ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
+        ) = ironcore_documents::v5::key_id_header::decode_version_prefixed_value(
             field.encrypted_field.into(),
         )
         .unwrap();

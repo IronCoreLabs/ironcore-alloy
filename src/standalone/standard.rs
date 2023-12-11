@@ -1,15 +1,14 @@
 use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, StandardDocumentOps,
+    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, RekeyEdeksBatchResult,
+    StandardDocumentOps,
 };
-use crate::util::{get_rng, hash256, OurReseedingRng};
-use crate::{AlloyMetadata, Secret, TenantId};
-use ironcore_documents::aes::{generate_aes_edek_and_sign, EncryptionKey};
-use ironcore_documents::icl_header_v4;
-use ironcore_documents::key_id_header::{
-    self, get_prefix_bytes_for_search, EdekType, KeyId, KeyIdHeader, PayloadType,
-};
+use crate::util::{collection_to_batch_result, get_rng, hash256, OurReseedingRng};
+use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, Secret, TenantId};
+use ironcore_documents::aes::EncryptionKey;
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -31,14 +30,21 @@ impl StandaloneStandardClient {
         }
     }
 
-    /// The edek type for this client
-    fn get_edek_type() -> EdekType {
-        EdekType::Standalone
-    }
-
-    /// The payload type for this client
-    fn get_payload_type() -> PayloadType {
-        PayloadType::StandardEdek
+    fn get_current_secret_and_id(&self) -> Result<(u32, &Secret), AlloyError> {
+        let primary_secret_id = self.config.primary_secret_id.ok_or_else(|| {
+            AlloyError::InvalidConfiguration(
+                "No primary secret exists in the standard configuration".to_string(),
+            )
+        })?;
+        self.config
+            .secrets
+            .get(&primary_secret_id)
+            .map(|secret| (primary_secret_id, secret))
+            .ok_or_else(|| {
+                AlloyError::InvalidConfiguration(
+                    "Primary secret id not found in secrets map".to_string(),
+                )
+            })
     }
 
     /// Encrypt all the fields from the document using a single `key`. A DEK will be generated and encrypted using a derived key.
@@ -51,16 +57,17 @@ impl StandaloneStandardClient {
         tenant_id: &TenantId,
     ) -> Result<EncryptedDocument, AlloyError> {
         let per_tenant_kek = derive_aes_encryption_key(&incoming_key, tenant_id);
-        let (aes_dek, v4_doc) = generate_aes_edek_and_sign(
+        let (aes_dek, v4_doc) = v5::aes::generate_aes_edek_and_sign(
             &mut *get_rng(&rng),
             per_tenant_kek,
-            format!("{}", key_id.0).as_str(),
+            None,
+            key_id.0.to_string().as_str(),
         )?;
         encrypt_document_core(
             document,
             rng,
             aes_dek,
-            KeyIdHeader::new(Self::get_edek_type(), Self::get_payload_type(), key_id),
+            Self::create_key_id_header(key_id.0),
             v4_doc,
         )
     }
@@ -70,33 +77,29 @@ impl StandaloneStandardClient {
     fn decrypt_document_dek(
         edek: EdekWithKeyIdHeader,
         config_secrets: &HashMap<u32, Secret>,
-        metadata: &AlloyMetadata,
+        tenant_id: &TenantId,
     ) -> Result<EncryptionKey, AlloyError> {
-        let (
-            KeyIdHeader {
-                key_id,
-                edek_type,
-                payload_type,
-            },
-            edek_bytes,
-        ) = key_id_header::decode_version_prefixed_value(edek.0.into())?;
+        let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0)?;
         let secret = config_secrets.get(&key_id.0).ok_or_else(|| {
             AlloyError::InvalidConfiguration(format!(
                 "Provided secret id `{}` does not exist in the standard configuration.",
                 &key_id.0
             ))
         })?;
-        if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
-            let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
-            let v4_document = Message::parse_from_bytes(&edek_bytes[..])
-                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
+        let per_tenant_kek = derive_aes_encryption_key(&secret.secret, tenant_id);
+        let v4_document = Message::parse_from_bytes(&edek_bytes[..])
+            .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
+        decrypt_aes_edek(&per_tenant_kek, &v4_document)
+    }
+}
 
-            Ok(decrypt_aes_edek(&per_tenant_kek, &v4_document)?)
-        } else {
-            Err(AlloyError::InvalidInput(
-            format!("The data indicated that this was not a Standalone Standard wrapped value. Found: {edek_type}, {payload_type}"),
-        ))
-        }
+impl AlloyClient for StandaloneStandardClient {
+    fn get_edek_type() -> EdekType {
+        EdekType::Standalone
+    }
+
+    fn get_payload_type() -> PayloadType {
+        PayloadType::StandardEdek
     }
 }
 
@@ -107,26 +110,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
         plaintext_document: PlaintextDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let (secret_id, secret) = self
-            .config
-            .primary_secret_id
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(
-                    "No primary secret exists in the standard configuration".to_string(),
-                )
-            })
-            .and_then(|id| {
-                self.config
-                    .secrets
-                    .get(&id)
-                    .map(|secret| (id, secret))
-                    .ok_or_else(|| {
-                        AlloyError::InvalidConfiguration(
-                            "Primary secret id not found in secrets map".to_string(),
-                        )
-                    })
-            })?;
-
+        let (secret_id, secret) = self.get_current_secret_and_id()?;
         let encrypted_doc = Self::encrypt_document(
             &secret.secret,
             plaintext_document,
@@ -134,26 +118,46 @@ impl StandardDocumentOps for StandaloneStandardClient {
             self.rng.clone(),
             &metadata.tenant_id,
         )?;
-
         Ok(encrypted_doc)
     }
+
     async fn decrypt(
         &self,
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
-        let dek =
-            Self::decrypt_document_dek(encrypted_document.edek, &self.config.secrets, metadata)?;
+        let dek = Self::decrypt_document_dek(
+            encrypted_document.edek,
+            &self.config.secrets,
+            &metadata.tenant_id,
+        )?;
         decrypt_document_core(encrypted_document.document, dek)
     }
 
-    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        get_prefix_bytes_for_search(ironcore_documents::key_id_header::KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
-            KeyId(id as u32),
-        ))
-        .into()
+    async fn rekey_edeks(
+        &self,
+        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<RekeyEdeksBatchResult, AlloyError> {
+        let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
+        let rekey_edek = |edek: EdekWithKeyIdHeader| {
+            let dek = Self::decrypt_document_dek(edek, &self.config.secrets, &metadata.tenant_id)?;
+            let (current_secret_id, current_secret) = self.get_current_secret_and_id()?;
+            let encryption_key =
+                derive_aes_encryption_key(&current_secret.secret, parsed_new_tenant_id);
+            let (_, v4_doc) = v5::aes::generate_aes_edek_and_sign(
+                &mut *get_rng(&self.rng),
+                encryption_key,
+                Some(dek),
+                current_secret_id.to_string().as_str(),
+            )?;
+            Ok(EdekWithKeyIdHeader::new(
+                Self::create_key_id_header(current_secret_id),
+                v4_doc,
+            ))
+        };
+        Ok(collection_to_batch_result(edeks, rekey_edek).into())
     }
 
     async fn encrypt_with_existing_edek(
@@ -164,7 +168,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
         let dek = Self::decrypt_document_dek(
             plaintext_document.edek.clone(),
             &self.config.secrets,
-            metadata,
+            &metadata.tenant_id,
         )?;
 
         let encrypted_document: HashMap<_, _> =
@@ -192,7 +196,7 @@ fn decrypt_aes_edek(
     let aes_edek = maybe_edek_wrapper
         .map(|edek| edek.aes_256_gcm_edek())
         .ok_or_else(|| AlloyError::DecryptError("No AES EDEK found.".to_string()))?;
-    let aes_dek = ironcore_documents::aes::decrypt_aes_edek(kek, aes_edek)?;
+    let aes_dek = v5::aes::decrypt_aes_edek(kek, aes_edek)?;
     verify_sig(aes_dek, header)?;
     Ok(aes_dek)
 }
@@ -213,7 +217,7 @@ mod test {
     use super::*;
     use crate::Secret;
     use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
-    use ironcore_documents::key_id_header::{EdekType, KeyId, PayloadType};
+    use ironcore_documents::v5::key_id_header::{self, EdekType, KeyId, PayloadType};
 
     fn default_client() -> StandaloneStandardClient {
         new_client(Some(1))
@@ -279,6 +283,82 @@ mod test {
         assert_eq!(encrypted.edek, encrypted_2.edek);
         assert_eq!(decrypted, document2);
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn rekey_edek_roundtrip() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
+        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let mut rekeyed = client
+            .rekey_edeks(
+                [("foo".to_string(), encrypted.edek.clone())].into(),
+                &metadata,
+                None,
+            )
+            .await
+            .unwrap();
+        assert!(rekeyed.failures.is_empty());
+        assert!(rekeyed.successes.contains_key("foo"));
+        let new_edek = rekeyed.successes.remove("foo").unwrap();
+        assert_ne!(encrypted.edek, new_edek);
+        let remade_document = EncryptedDocument {
+            edek: new_edek,
+            document: encrypted.document,
+        };
+        let decrypted = client.decrypt(remade_document, &metadata).await.unwrap();
+        assert_eq!(decrypted, document);
+    }
+
+    #[tokio::test]
+    async fn rekey_edek_new_current() {
+        // Manually creating client so it doesn't have secret 2.
+        let client = StandaloneStandardClient {
+            config: Arc::new(StandardSecrets {
+                primary_secret_id: Some(1),
+                secrets: [(
+                    1,
+                    Secret {
+                        secret: [0; 32].to_vec(),
+                    },
+                )]
+                .into(),
+            }),
+            rng: create_test_seeded_rng(100),
+        };
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
+        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let new_client = new_client(Some(2));
+        let mut rekeyed = new_client
+            .rekey_edeks(
+                [("foo".to_string(), encrypted.edek.clone())].into(),
+                &metadata,
+                None,
+            )
+            .await
+            .unwrap();
+        assert!(rekeyed.failures.is_empty());
+        assert!(rekeyed.successes.contains_key("foo"));
+        let new_edek = rekeyed.successes.remove("foo").unwrap();
+        assert_ne!(encrypted.edek, new_edek);
+        let remade_document = EncryptedDocument {
+            edek: new_edek,
+            document: encrypted.document,
+        };
+        // This fails because the original client doesn't have key 2, which is what the document
+        // was rekeyed to.
+        let decrypt_err = client
+            .decrypt(remade_document.clone(), &metadata)
+            .await
+            .unwrap_err();
+        assert!(decrypt_err.to_string().contains("id `2` does not exist"));
+        let decrypted = new_client
+            .decrypt(remade_document, &metadata)
+            .await
+            .unwrap();
+        assert_eq!(decrypted, document);
     }
 
     #[tokio::test]
@@ -374,7 +454,7 @@ mod test {
         assert_eq!(
             error,
             AlloyError::InvalidInput(
-                "The data indicated that this was not a Standalone Standard wrapped value. Found: SaaS Shield, Deterministic Field"
+                "The data indicated that this was not a Standalone Standard EDEK wrapped value. Found: SaaS Shield, Deterministic Field"
                     .to_string()
             )
         );

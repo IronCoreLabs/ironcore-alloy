@@ -96,6 +96,26 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun sdkStandardRekeyEdeks() {
+        val plaintextDocument = mapOf("foo" to "My data".toByteArray())
+        val metadata = AlloyMetadata.newSimple("tenant")
+        val newTenantId = "tenant2"
+        val newMetadata = AlloyMetadata.newSimple(newTenantId)
+        runBlocking {
+            val encrypted = sdk.standard().encrypt(plaintextDocument, metadata)
+            assertContains(encrypted.document, "foo")
+            val edeks = mapOf("edek" to encrypted.edek)
+            val rekeyed = sdk.standard().rekeyEdeks(edeks, metadata, newTenantId)
+            assertEquals(rekeyed.successes.size, 1)
+            assertEquals(rekeyed.failures.size, 0)
+            val remadeDocument =
+                    EncryptedDocument(rekeyed.successes.getValue("edek"), encrypted.document)
+            val decrypted = sdk.standard().decrypt(remadeDocument, newMetadata)
+            assertContentEquals(decrypted.get("foo"), plaintextDocument.get("foo"))
+        }
+    }
+
+    @Test
     fun sdkStandardEncryptWithExistingEdek() {
         val plaintextDocument = mapOf("foo" to "My data".toByteArray())
         val plaintextDocument2 = mapOf("foo" to "My data2".toByteArray())
@@ -103,7 +123,12 @@ class IroncoreAlloyTest {
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
             val encrypted = sdk.standard().encrypt(plaintextDocument, metadata)
-            val encrypted2 = sdk.standard().encryptWithExistingEdek(PlaintextDocumentWithEdek(encrypted.edek,plaintextDocument2), metadata)
+            val encrypted2 =
+                    sdk.standard()
+                            .encryptWithExistingEdek(
+                                    PlaintextDocumentWithEdek(encrypted.edek, plaintextDocument2),
+                                    metadata
+                            )
             val decrypted = sdk.standard().decrypt(encrypted2, metadata)
             assertContentEquals(encrypted.edek, encrypted2.edek)
             assertContentEquals(decrypted.get("foo"), plaintextDocument2.get("foo"))
@@ -137,6 +162,6 @@ class IroncoreAlloyTest {
                     val document = EncryptedDocument(edek.base64ToByteArray(), documentFields)
                     runBlocking { sdk.standard().decrypt(document, metadata) }
                 }
-        assertContains(err.message.toString(), " not a Standalone Standard wrapped value.")
+        assertContains(err.message.toString(), " not a Standalone Standard EDEK wrapped value.")
     }
 }

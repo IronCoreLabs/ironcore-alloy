@@ -2,6 +2,7 @@ use super::{
     derive_keys_many_paths, derived_key_to_vector_encryption_key, get_in_rotation_prefix_internal,
     DeriveKeyChoice,
 };
+use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::{get_rng, OurReseedingRng};
@@ -10,7 +11,7 @@ use crate::vector::{
     PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
 
@@ -54,7 +55,9 @@ impl SaasShieldVectorClient {
             &mut *get_rng(&self.rng),
         )
     }
+}
 
+impl AlloyClient for SaasShieldVectorClient {
     fn get_edek_type() -> EdekType {
         EdekType::SaasShield
     }
@@ -103,58 +106,41 @@ impl VectorOps for SaasShieldVectorClient {
                 "`approximation_factor` was not set in the vector configuration.".to_string(),
             )
         })?;
-        let (
-            KeyIdHeader {
-                key_id,
-                edek_type,
-                payload_type,
-            },
-            icl_metadata_bytes,
-        ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
-            encrypted_vector.paired_icl_info.clone().into(),
-        )
-        .map_err(|_| {
-            AlloyError::InvalidInput("Paired ICL info couldn't be decoded.".to_string())
-        })?;
+        let (key_id, icl_metadata_bytes) =
+            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
-        if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
-            let paths = [(
-                encrypted_vector.secret_path.clone(),
-                [encrypted_vector.derivation_path.clone()].into(),
-            )]
-            .into();
-            let derived_keys = self
-                .tenant_security_client
-                .tenant_key_derive(
-                    paths,
-                    &metadata.clone().try_into()?,
-                    DerivationType::Sha512,
-                    SecretType::Vector,
-                )
-                .await?;
-            let derived_key = derived_keys.get_key_for_path(
-                &encrypted_vector.secret_path,
-                &encrypted_vector.derivation_path,
-                DeriveKeyChoice::Specific(key_id),
-            )?;
-            let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
-            if derived_key_id != key_id {
-                Err(AlloyError::InvalidKey(
+        let paths = [(
+            encrypted_vector.secret_path.clone(),
+            [encrypted_vector.derivation_path.clone()].into(),
+        )]
+        .into();
+        let derived_keys = self
+            .tenant_security_client
+            .tenant_key_derive(
+                paths,
+                &metadata.clone().try_into()?,
+                DerivationType::Sha512,
+                SecretType::Vector,
+            )
+            .await?;
+        let derived_key = derived_keys.get_key_for_path(
+            &encrypted_vector.secret_path,
+            &encrypted_vector.derivation_path,
+            DeriveKeyChoice::Specific(key_id),
+        )?;
+        let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
+        if derived_key_id != key_id {
+            Err(AlloyError::InvalidKey(
                     "The key ID in the paired ICL info and on the key derived for decryption did not match"
                         .to_string(),
                 ))
-            } else {
-                decrypt_internal(
-                    approximation_factor,
-                    &key,
-                    encrypted_vector,
-                    icl_metadata_bytes,
-                )
-            }
         } else {
-            Err(AlloyError::InvalidInput(
-                format!("The data indicated that this was not a SaaS Shield Vector wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
+            decrypt_internal(
+                approximation_factor,
+                &key,
+                encrypted_vector,
+                icl_metadata_bytes,
+            )
         }
     }
 

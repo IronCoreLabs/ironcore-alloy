@@ -7,10 +7,11 @@ use crate::vector::{
     PlaintextVector, PlaintextVectors, VectorEncryptionKey, VectorOps, VectorRotateResult,
 };
 use crate::{
-    AlloyClient, AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+    alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
+    StandaloneConfiguration, TenantId,
 };
 use futures::future::{join_all, FutureExt, TryFutureExt};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -37,7 +38,7 @@ impl StandaloneVectorClient {
         new_metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError> {
         let (original_key_id, _) =
-            Self::decompose_encrypted_field_header(encrypted_vector.paired_icl_info.clone())?;
+            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
         // check if we have a current secret for this path before doing significant work
         // and that the current secret isn't the one this was encrypted with
@@ -126,52 +127,37 @@ impl VectorOps for StandaloneVectorClient {
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
-        let (
-            KeyIdHeader {
-                key_id,
-                edek_type,
-                payload_type,
-            },
+        let (key_id, icl_metadata_bytes) =
+            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+        let vector_secret = self
+            .config
+            .get(&encrypted_vector.secret_path)
+            .ok_or_else(|| {
+                AlloyError::InvalidConfiguration(format!(
+                    "Provided secret path `{}` does not exist in the vector configuration.",
+                    &encrypted_vector.secret_path.0
+                ))
+            })?;
+        let standalone_secret = vector_secret
+            .secret
+            .get_secret_with_id(&key_id)
+            .ok_or_else(|| {
+                AlloyError::InvalidConfiguration(format!(
+                    "Secret with key ID `{}` does not exist in the vector configuration",
+                    key_id.0
+                ))
+            })?;
+        let key = VectorEncryptionKey::derive_from_secret(
+            standalone_secret.secret.as_ref(),
+            &metadata.tenant_id,
+            &encrypted_vector.derivation_path,
+        );
+        decrypt_internal(
+            vector_secret.approximation_factor,
+            &key,
+            encrypted_vector,
             icl_metadata_bytes,
-        ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
-            encrypted_vector.paired_icl_info.clone().into(),
         )
-        .map_err(|_| AlloyError::InvalidInput("Paired ICL info was invalid.".to_string()))?;
-        if edek_type == Self::get_edek_type() && payload_type == Self::get_payload_type() {
-            let vector_secret =
-                self.config
-                    .get(&encrypted_vector.secret_path)
-                    .ok_or_else(|| {
-                        AlloyError::InvalidConfiguration(format!(
-                            "Provided secret path `{}` does not exist in the vector configuration.",
-                            &encrypted_vector.secret_path.0
-                        ))
-                    })?;
-            let standalone_secret = vector_secret
-                .secret
-                .get_secret_with_id(&key_id)
-                .ok_or_else(|| {
-                    AlloyError::InvalidConfiguration(format!(
-                        "Secret with key ID `{}` does not exist in the vector configuration",
-                        key_id.0
-                    ))
-                })?;
-            let key = VectorEncryptionKey::derive_from_secret(
-                standalone_secret.secret.as_ref(),
-                &metadata.tenant_id,
-                &encrypted_vector.derivation_path,
-            );
-            decrypt_internal(
-                vector_secret.approximation_factor,
-                &key,
-                encrypted_vector,
-                icl_metadata_bytes,
-            )
-        } else {
-            Err(AlloyError::InvalidInput(
-                format!("The data indicated that this was not a Standalone Vector wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
-        }
     }
 
     async fn generate_query_vectors(
@@ -251,12 +237,11 @@ impl VectorOps for StandaloneVectorClient {
                     "There is no in-rotation secret in the vector configuration.".to_string(),
                 )
             })?;
-        let key_id_header = KeyIdHeader {
-            key_id: KeyId(in_rotation_secret.id),
-            edek_type: Self::get_edek_type(),
-            payload_type: Self::get_payload_type(),
-        };
-        Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
+        let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
+        Ok(
+            ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header)
+                .into(),
+        )
     }
 
     async fn rotate_vectors(

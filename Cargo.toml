@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.9.2-pre.11"
+version = "0.9.2-pre.15"
 edition = "2021"
 
 [dependencies]
@@ -12,7 +12,7 @@ base64_type = { git = "https://github.com/IronCoreLabs/base64_type", version = "
 bytes = { version = "1.4.0", features = ["serde"] }
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", rev = "28f4fe607a6a2671cbe77e28d404bab658fbb668" }
+ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", rev = "d44e8d15bfb8b783a11928b22b6b21310c110637" }
 itertools = "0.11"
 ndarray = "0.15.6"
 ndarray-rand = "0.14.0"
@@ -52,6 +52,9 @@ uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
 ], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
 uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
 z85 = "3.0.5"
+
+[features]
+integration_tests = []
 
 [[bench]]
 name = "ironcore_alloy_bench"
