@@ -8,7 +8,7 @@ use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::collection_to_batch_result;
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
-use ironcore_documents::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -262,7 +262,7 @@ mod test {
         DerivationPath, SecretPath,
     };
     use base64_type::Base64;
-    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+    use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[tokio::test]
     async fn test_deterministic_encrypt_current() {
@@ -356,7 +356,7 @@ mod test {
                 payload_type,
             },
             ciphertext,
-        ) = ironcore_documents::key_id_header::decode_version_prefixed_value(
+        ) = ironcore_documents::v5::key_id_header::decode_version_prefixed_value(
             field.encrypted_field.into(),
         )
         .unwrap();

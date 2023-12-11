@@ -11,7 +11,7 @@ use crate::vector::{
     PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
-use ironcore_documents::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
 use std::sync::{Arc, Mutex};
 

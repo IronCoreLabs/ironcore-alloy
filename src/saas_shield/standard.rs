@@ -10,13 +10,13 @@ use crate::tenant_security_client::{
 };
 use crate::util::{collection_to_batch_result, OurReseedingRng};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
-use crate::{EncryptedBytes, PlaintextBytes, TenantId};
+use crate::{EncryptedBytes, FieldId, PlaintextBytes, TenantId};
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek::{self, EncryptedDek};
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
-use ironcore_documents::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
@@ -222,7 +222,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
 fn decrypt_document(
     header: V4DocumentHeader,
     dek: Vec<u8>,
-    encrypted_document: HashMap<String, EncryptedBytes>,
+    encrypted_document: HashMap<FieldId, EncryptedBytes>,
 ) -> Result<HashMap<String, PlaintextBytes>, AlloyError> {
     let enc_key = tsc_dek_to_encryption_key(dek)?;
     verify_sig(enc_key, &header)?;
@@ -260,14 +260,14 @@ fn generate_cmk_v4_doc_and_sign(
         })
         .collect();
 
-    Ok(ironcore_documents::create_signed_header(edek_wrappers, dek))
+    Ok(ironcore_documents::create_signed_proto(edek_wrappers, dek))
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::standard::EdekWithKeyIdHeader;
-    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+    use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]
     fn get_document_header_and_edek_fails_for_bad_header() {
