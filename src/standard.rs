@@ -187,7 +187,7 @@ pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
                 aes_dek,
                 ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec()),
             )
-            .map(|c| (label, v5::EncryptedPayload(c).write_to_bytes()))
+            .map(|c| (label, v5::EncryptedPayload::from(c).write_to_bytes()))
         })
         .try_collect()?;
     Ok(encrypted_document)
@@ -203,7 +203,7 @@ pub(crate) fn decrypt_document_core(
             let v5_edoc: v5::EncryptedPayload = v5_edoc_bytes.try_into()?;
             let dec_result = ironcore_documents::aes::decrypt_document_with_attached_iv(
                 &dek,
-                v5_edoc.0.as_ref(),
+                &v5_edoc.to_aes_value_with_attached_iv(),
             );
             dec_result.map(|c| (label, c.0))
         })
