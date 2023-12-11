@@ -18,7 +18,9 @@ use ironcore_documents::cmk_edek;
 use ironcore_documents::cmk_edek::EncryptedDek;
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::v5::key_id_header::{
+    decode_version_prefixed_value, EdekType, KeyId, KeyIdHeader, PayloadType,
+};
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
@@ -131,9 +133,8 @@ impl SaasShieldStandardClient {
         encrypted_bytes: EdekWithKeyIdHeader,
     ) -> Result<EdekParts, AlloyError> {
         // This doesn't just call Self::decompose_key_id_header because we still want to error on incorrect EDEK/payload type
-        let maybe_decomposed = ironcore_documents::key_id_header::decode_version_prefixed_value(
-            Bytes::copy_from_slice(&encrypted_bytes.0),
-        );
+        let maybe_decomposed =
+            decode_version_prefixed_value(Bytes::copy_from_slice(&encrypted_bytes.0));
         match maybe_decomposed {
             Ok((
                 KeyIdHeader {
@@ -308,7 +309,7 @@ fn generate_cmk_v4_doc_and_sign(
         })
         .collect();
 
-    Ok(ironcore_documents::create_signed_header(edek_wrappers, dek))
+    Ok(ironcore_documents::create_signed_proto(edek_wrappers, dek))
 }
 
 #[cfg(test)]
@@ -316,7 +317,7 @@ mod test {
     use super::*;
     use crate::standard::EdekWithKeyIdHeader;
     use base64::{engine::general_purpose::STANDARD, Engine};
-    use ironcore_documents::key_id_header::{KeyId, KeyIdHeader};
+    use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]
     fn decompose_edek_header_makes_v3_for_invalid() {

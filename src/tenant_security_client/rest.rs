@@ -1,6 +1,6 @@
 use super::{errors::TenantSecurityError, DerivationPath, RequestMetadata, SecretPath};
 use base64_type::Base64;
-use ironcore_documents::key_id_header::KeyId;
+use ironcore_documents::v5::key_id_header::KeyId;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

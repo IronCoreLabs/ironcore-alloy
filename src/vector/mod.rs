@@ -6,7 +6,10 @@ use crate::{
 };
 use bytes::Bytes;
 use ironcore_documents::{
-    key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType},
+    v5::{
+        self,
+        key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType},
+    },
     vector_encryption_metadata::VectorEncryptionMetadata,
 };
 use itertools::Itertools;
@@ -193,7 +196,7 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
             .collect(),
         rng,
     )?;
-    let (header, vector_metadata) = ironcore_documents::key_id_header::create_vector_metadata(
+    let (header, vector_metadata) = v5::key_id_header::create_vector_metadata(
         KeyIdHeader::new(edek_type, PayloadType::VectorMetadata, key_id),
         result.iv.to_vec().into(),
         result.auth_hash.0.to_vec().into(),
@@ -202,11 +205,8 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
         encrypted_vector: result.ciphertext.to_vec(),
         secret_path: plaintext_vector.secret_path,
         derivation_path: plaintext_vector.derivation_path,
-        paired_icl_info: ironcore_documents::key_id_header::encode_vector_metadata(
-            header,
-            vector_metadata,
-        )
-        .to_vec(),
+        paired_icl_info: v5::key_id_header::encode_vector_metadata(header, vector_metadata)
+            .to_vec(),
     })
 }
 

@@ -4,7 +4,7 @@ use crate::tenant_security_client::{
 };
 use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
 use crate::{DerivationPath, SecretPath};
-use ironcore_documents::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::collections::HashSet;
 
@@ -71,7 +71,7 @@ fn get_in_rotation_prefix_internal(
         edek_type,
         payload_type,
     };
-    Ok(ironcore_documents::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
+    Ok(ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header).into())
 }
 
 #[cfg(test)]
