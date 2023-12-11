@@ -1097,8 +1097,8 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.1.0-pre.6"
-source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?branch=split-versions-redux#1c185e23edc13c5193e33e7fa1d76f2eae0e8b9c"
+version = "0.1.0-pre.8"
+source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?rev=d44e8d15bfb8b783a11928b22b6b21310c110637#d44e8d15bfb8b783a11928b22b6b21310c110637"
 dependencies = [
  "aes-gcm",
  "bytes",
