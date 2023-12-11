@@ -1,10 +1,10 @@
-use common::CLIENT;
-
 mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use common::CLIENT;
     use ironcore_alloy::{
         errors::AlloyError,
         standard::{
@@ -78,6 +78,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn standard_decrypt_v3_document() -> TestResult {
+        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
+        let edek_bytes = STANDARD.decode(edek).unwrap();
+        let doc = vec![
+            3, 73, 82, 79, 78, 0, 46, 10, 28, 101, 22, 60, 138, 170, 207, 86, 19, 19, 80, 220, 33,
+            207, 60, 229, 7, 199, 67, 192, 206, 5, 184, 244, 26, 25, 152, 187, 219, 26, 14, 10, 12,
+            116, 101, 110, 97, 110, 116, 45, 103, 99, 112, 45, 108, 125, 137, 60, 34, 63, 241, 194,
+            170, 25, 76, 63, 201, 94, 4, 42, 96, 60, 43, 166, 21, 23, 241, 84, 167, 65, 83, 176, 7,
+            98, 227, 95, 197, 56, 207, 118, 75, 48, 64, 65, 92, 96, 163, 227, 114, 108, 183, 222,
+            154,
+        ];
+        let doc_bytes = [("doc".to_string(), doc)].into();
+        let document = EncryptedDocument {
+            edek: EdekWithKeyIdHeader(edek_bytes),
+            document: doc_bytes,
+        };
+        let metadata = get_metadata();
+        let decrypted = CLIENT
+            .standard()
+            .decrypt(document, &metadata)
+            .await
+            .unwrap();
+        let decrypted_string = std::str::from_utf8(decrypted.get("doc").unwrap()).unwrap();
+        assert_eq!(decrypted_string, "Encrypt these bytes!");
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn standard_encrypt_with_existing_edek_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
@@ -100,10 +128,66 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn standard_encrypt_with_existing_v3_edek_works() -> TestResult {
+        let metadata = get_metadata();
+        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
+        let edek_bytes = STANDARD.decode(edek).unwrap();
+        let plaintext: HashMap<_, _> = [("field2".to_string(), vec![1, 2, 3, 4])].into();
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: EdekWithKeyIdHeader(edek_bytes.clone()),
+            document: plaintext.clone(),
+        };
+        let encrypted = CLIENT
+            .standard()
+            .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
+            .await?;
+        assert_eq!(encrypted.edek.0, edek_bytes);
+        let decrypted = CLIENT.standard().decrypt(encrypted, &metadata).await?;
+        assert_eq!(decrypted, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn standard_get_searchable_edek_prefix_works() -> TestResult {
         let prefix = CLIENT.standard().get_searchable_edek_prefix(1);
         let expected = [0, 0, 0, 1, 2, 0];
         assert_eq!(prefix, expected);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_rekey_v5_edek_works() -> TestResult {
+        let metadata = get_metadata();
+        let edek = get_ciphertext().edek;
+        let edeks = [("edek".to_string(), edek)].into();
+        let all_rekeyed = CLIENT
+            .standard()
+            .rekey_edeks(edeks, &metadata, None)
+            .await?;
+        assert!(all_rekeyed.successes.contains_key("edek"));
+        assert!(all_rekeyed.failures.is_empty());
+        let rekeyed = all_rekeyed.successes.get("edek").unwrap();
+        // First 4 bytes are KMS config ID 511
+        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_rekey_v3_edek_works() -> TestResult {
+        let metadata = get_metadata();
+        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
+        let edek_bytes = STANDARD.decode(edek).unwrap();
+        let edeks = [("edek".to_string(), EdekWithKeyIdHeader(edek_bytes))].into();
+        let all_rekeyed = CLIENT
+            .standard()
+            .rekey_edeks(edeks, &metadata, None)
+            .await?;
+        assert!(all_rekeyed.successes.contains_key("edek"));
+        assert!(all_rekeyed.failures.is_empty());
+        let rekeyed = all_rekeyed.successes.get("edek").unwrap();
+        // This is now a V5 document, which starts with the KeyIdHeader
+        // First 4 bytes are KMS config ID 511
+        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 }

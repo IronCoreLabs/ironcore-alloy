@@ -1,10 +1,10 @@
-use common::CLIENT;
-
 mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
+    use common::CLIENT;
+
     use ironcore_alloy::{
         deterministic::{DeterministicFieldOps, EncryptedField, PlaintextField},
         errors::AlloyError,
