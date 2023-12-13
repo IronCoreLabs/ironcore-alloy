@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.9.2-rc.17"
+version = "0.9.2-pre.18"
 edition = "2021"
 
 [dependencies]
