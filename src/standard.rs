@@ -4,9 +4,9 @@ use crate::{
     util::{get_rng, BatchResult},
     AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
+use ironcore_documents::{aes::EncryptionKey, icl_header_v4, v3};
 use ironcore_documents::{
-    aes::EncryptionKey,
-    icl_header_v4,
+    v3::V3,
     v5::{
         self,
         key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
@@ -199,13 +199,16 @@ pub(crate) fn decrypt_document_core(
 ) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
     Ok(document
         .into_iter()
-        .map(|(label, v5_edoc_bytes)| {
-            let v5_edoc: v5::EncryptedPayload = v5_edoc_bytes.try_into()?;
-            let dec_result = ironcore_documents::aes::decrypt_document_with_attached_iv(
-                &dek,
-                &v5_edoc.to_aes_value_with_attached_iv(),
-            );
-            dec_result.map(|c| (label, c.0))
+        .map(|(label, ciphertext)| {
+            // Further validation of the IronCore MAGIC will be done inside the function
+            if ciphertext.starts_with(&[V3]) {
+                let encrypted_payload: v3::EncryptedPayload = ciphertext.try_into()?;
+                encrypted_payload.decrypt(&dek)
+            } else {
+                let encrypted_payload: v5::EncryptedPayload = ciphertext.try_into()?;
+                encrypted_payload.decrypt(&dek)
+            }
+            .map(|c| (label, c.0))
         })
         .try_collect()?)
 }
