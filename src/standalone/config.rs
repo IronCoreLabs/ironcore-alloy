@@ -37,6 +37,13 @@ impl StandardSecrets {
         secrets: Vec<Arc<StandaloneSecret>>,
     ) -> Result<Arc<Self>, AlloyError> {
         let mut internal_secrets = HashMap::new();
+
+        if secrets.iter().find(|secret| secret.id == 0).is_some() {
+            return Err(AlloyError::InvalidKey(
+                "Secret ids must be greater than 0".to_string(),
+            ));
+        }
+
         for standalone_secret in secrets.into_iter() {
             if internal_secrets
                 .insert(

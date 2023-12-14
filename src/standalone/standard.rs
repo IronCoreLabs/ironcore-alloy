@@ -183,7 +183,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
 
 /// Try to find the aes edek in the V4 header and decrypt the aes edek using the provided kek.
 /// Will fail if the signature verification fails, decryption fails or if an aes edek could not be found.
-fn decrypt_aes_edek(
+pub(crate) fn decrypt_aes_edek(
     kek: &EncryptionKey,
     header: &icl_header_v4::V4DocumentHeader,
 ) -> Result<EncryptionKey, AlloyError> {

@@ -1,5 +1,6 @@
 use crate::{errors::AlloyError, FieldId, VectorEncryptionKey};
 use itertools::Itertools;
+use protobuf::Message;
 use rand::{
     rngs::{adapter::ReseedingRng, OsRng},
     CryptoRng, RngCore, SeedableRng,
@@ -123,6 +124,18 @@ where
         successes,
         failures,
     }
+}
+
+pub(crate) fn v4_proto_from_bytes<B: AsRef<[u8]>>(
+    b: B,
+) -> Result<ironcore_documents::icl_header_v4::V4DocumentHeader, AlloyError> {
+    Ok(Message::parse_from_bytes(b.as_ref())?)
+}
+
+pub(crate) fn v4_proto_to_bytes(
+    v4: ironcore_documents::icl_header_v4::V4DocumentHeader,
+) -> Vec<u8> {
+    v4.write_to_bytes().expect("Writing to bytes cannot fail.")
 }
 
 #[cfg(test)]
