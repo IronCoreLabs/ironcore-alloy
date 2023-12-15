@@ -1,3 +1,5 @@
+// Standard standalone works for V4 and V5 documents. There is no suport for V3 since Standalone wasn't
+// available in V3.
 use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
@@ -12,6 +14,8 @@ use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
+use ring::digest::SHA256_OUTPUT_LEN;
+use ring::hkdf;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -80,16 +84,42 @@ impl StandaloneStandardClient {
         tenant_id: &TenantId,
     ) -> Result<EncryptionKey, AlloyError> {
         let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0)?;
-        let secret = config_secrets.get(&key_id.0).ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
-                "Provided secret id `{}` does not exist in the standard configuration.",
-                &key_id.0
-            ))
-        })?;
-        let per_tenant_kek = derive_aes_encryption_key(&secret.secret, tenant_id);
-        let v4_document = Message::parse_from_bytes(&edek_bytes[..])
-            .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
-        decrypt_aes_edek(&per_tenant_kek, &v4_document)
+
+        // Key id should never be 0. If it is we'll try all the keys we have.
+        let secrets = if key_id.0 == 0 {
+            config_secrets.values().collect_vec()
+        } else {
+            let secret = config_secrets.get(&key_id.0).ok_or_else(|| {
+                AlloyError::InvalidConfiguration(format!(
+                    "Provided secret id `{}` does not exist in the standard configuration.",
+                    &key_id.0
+                ))
+            })?;
+            vec![secret]
+        };
+
+        let attempt_decrypt = |secret: &Secret| {
+            let v4_document = Message::parse_from_bytes(&edek_bytes[..])
+                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
+            decrypt_aes_edek(
+                &derive_aes_encryption_key(&secret.secret, tenant_id),
+                &v4_document,
+            )
+            .or_else(|_| {
+                decrypt_aes_edek(
+                    &derive_aes_encryption_key_legacy(&secret.secret, tenant_id),
+                    &v4_document,
+                )
+            })
+        };
+
+        secrets
+            .into_iter()
+            .map(attempt_decrypt)
+            .find_or_first(|result| result.is_ok())
+            .unwrap_or(Err(AlloyError::InvalidConfiguration(
+                "No secret could be found to decrypt".to_string(),
+            )))
     }
 }
 
@@ -212,8 +242,27 @@ pub(crate) fn derive_aes_encryption_key<K: AsRef<[u8]>>(
     EncryptionKey(hash256(derivation_key.as_ref(), resulting_bytes))
 }
 
+///Derive random bytes using HKDF. The tenant_id is used to construct the Prk and then
+///extra_string is passed in to the expand step.
+fn derive_aes_encryption_key_legacy<K: AsRef<[u8]>>(
+    key: &K,
+    tenant_id: &TenantId,
+) -> EncryptionKey {
+    let extra_array = vec!["encryption_key".as_bytes()];
+    let hkdf_key = hkdf::Salt::new(hkdf::HKDF_SHA256, key.as_ref());
+    let prk = hkdf_key.extract(tenant_id.0.as_bytes());
+    let okm = prk.expand(&extra_array, hkdf::HKDF_SHA256).unwrap(); //unwrap is safe since len is based on the same algorithm we're using.
+    {
+        let mut buffer = [0u8; SHA256_OUTPUT_LEN];
+        //unwrap is safe since it can only fail if "the requested output length is larger than 255
+        //times the size of the digest algorithm's output."
+        okm.fill(&mut buffer).unwrap();
+        EncryptionKey(buffer)
+    }
+}
+
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use crate::Secret;
     use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
@@ -223,7 +272,7 @@ mod test {
         new_client(Some(1))
     }
 
-    fn new_client(primary_secret_id: Option<u32>) -> StandaloneStandardClient {
+    pub(crate) fn new_client(primary_secret_id: Option<u32>) -> StandaloneStandardClient {
         StandaloneStandardClient {
             config: Arc::new(StandardSecrets {
                 primary_secret_id,
@@ -238,6 +287,13 @@ mod test {
                         2u32,
                         Secret {
                             secret: [1u8; 32].to_vec(),
+                        },
+                    ),
+                    (
+                        3,
+                        Secret {
+                            // This is from cloaked search tests.
+                            secret: "super secret key".as_bytes().to_vec(),
                         },
                     ),
                 ]
@@ -413,7 +469,7 @@ mod test {
 
     #[tokio::test]
     async fn decrypt_id_not_primary() -> Result<(), AlloyError> {
-        //The edek below is for key_id 1, setting primary to 2 in the sdk to 2.
+        //The edek below is for key_id 1, setting primary to 2 in the sdk.
         let client = new_client(Some(2));
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
@@ -439,6 +495,69 @@ mod test {
         };
         let plaintext = client.decrypt(encrypted, &metadata).await.unwrap();
         assert_eq!(plaintext, document);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn decrypt_id_zero() -> Result<(), AlloyError> {
+        //The edek below is for key_id 0, setting primary to 2 in the sdk.
+        let client = new_client(Some(2));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
+        let encrypted = EncryptedDocument {
+            edek: EdekWithKeyIdHeader(vec![
+                0, 0, 0, 0, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
+                77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
+                42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
+                71, 124, 244, 209, 252, 151, 18, 48, 77, 53, 19, 139, 40, 178, 7, 81, 160, 95, 18,
+                209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
+                59, 126, 89, 87, 96, 177, 145, 45, 167, 75, 142, 49, 14, 249, 71, 29, 207, 70, 26,
+                1, 49,
+            ]),
+            document: [(
+                "hi".to_string(),
+                vec![
+                    0, 73, 82, 79, 78, 7, 10, 168, 250, 84, 170, 243, 140, 53, 47, 99, 212, 184,
+                    119, 142, 12, 136, 196, 155, 120, 225, 188, 254, 66, 143, 227, 183, 50, 78, 0,
+                    50,
+                ],
+            )]
+            .into(),
+        };
+        let plaintext = client.decrypt(encrypted, &metadata).await.unwrap();
+        assert_eq!(plaintext, document);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn decrypt_failure_with_zero_key_id() -> Result<(), AlloyError> {
+        //The edek below is for key_id 0, setting primary to 2 in the sdk.
+        let client = new_client(Some(2));
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let encrypted = EncryptedDocument {
+            edek: EdekWithKeyIdHeader(vec![
+                0, 0, 0, 0, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
+                77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
+                42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
+                71, 124, 244, 209, 252, 151, 18, 48, 77, 53, 19, 139, 40, 178, 7, 81, 160, 95, 18,
+                209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
+                59, 126, 89, 87,
+            ]),
+            document: [(
+                "hi".to_string(),
+                vec![
+                    0, 73, 82, 79, 78, 7, 10, 168, 250, 84, 170, 243, 140, 53, 47, 99, 212, 184,
+                    119, 142, 12, 136, 196, 155, 120, 225, 188, 254, 66, 143, 227, 183, 50, 78, 0,
+                    50,
+                ],
+            )]
+            .into(),
+        };
+        let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
+        assert_eq!(
+            error,
+            AlloyError::DecryptError("Unexpected EOF".to_string())
+        );
         Ok(())
     }
 

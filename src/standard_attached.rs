@@ -16,6 +16,7 @@ use ironcore_documents::{
 };
 use uniffi::custom_newtype;
 
+#[derive(Debug)]
 pub struct EncryptedAttachedDocument(pub Vec<u8>);
 custom_newtype!(EncryptedAttachedDocument, Vec<u8>);
 
@@ -60,14 +61,15 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
     let edoc = document
         .remove(&hardcoded_key)
         .ok_or(AlloyError::EncryptError(
-            "TSP didn't return a key we sent in. This shouldn't happen.".to_string(),
+            "Encryption returned a document without a passed in field. This shouldn't happen."
+                .to_string(),
         ))?;
 
     Ok(EncryptedAttachedDocument(
         v5::attached::encode_attached_edoc(&AttachedDocument {
             key_id_header,
             edek,
-            edoc: IvAndCiphertext(edoc.into()),
+            edoc: v5::EncryptedPayload::try_from(edoc)?.to_aes_value_with_attached_iv(),
         })?
         .to_vec(),
     ))
@@ -94,16 +96,11 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
             edoc,
         })
         .or_else(|_| v5::attached::decode_attached_edoc(attached_field_bytes))?;
-
     let hardcoded_id = "".to_string();
     let mut decrypted_value = standard_client
         .decrypt(
             EncryptedDocument {
-                edek: EdekWithKeyIdHeader(
-                    key_id_header
-                        .put_header_on_document(v4_proto_to_bytes(edek))
-                        .to_vec(),
-                ),
+                edek: EdekWithKeyIdHeader::new(key_id_header, edek),
                 document: [(
                     hardcoded_id.clone(),
                     v5::EncryptedPayload::from(edoc).write_to_bytes(),
