@@ -1097,6 +1097,7 @@ dependencies = [
 [[package]]
 name = "ironcore-documents"
 version = "0.1.0-pre.8"
+source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?branch=v5-attached#6f0b6a21070a9dc0eb9551e1990bbba943d4f50e"
 dependencies = [
  "aes-gcm",
  "bytes",
