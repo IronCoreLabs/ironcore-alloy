@@ -301,7 +301,7 @@ fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, TenantSecuri
     Ok(EncryptionKey(bytes))
 }
 
-pub(crate) fn generate_cmk_v4_doc_and_sign(
+pub fn generate_cmk_v4_doc_and_sign(
     edeks: Vec<EncryptedDek>,
     dek: EncryptionKey,
     tenant_id: TenantId,

@@ -12,7 +12,6 @@ use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
-use protobuf::Message;
 use rand::{CryptoRng, RngCore};
 use ring::digest::SHA256_OUTPUT_LEN;
 use ring::hkdf;
@@ -99,13 +98,14 @@ impl StandaloneStandardClient {
         };
 
         let attempt_decrypt = |secret: &Secret| {
-            let v4_document = Message::parse_from_bytes(&edek_bytes[..])
-                .map_err(|e| AlloyError::DecryptError(e.to_string()))?;
+            let v4_document = crate::util::v4_proto_from_bytes(&edek_bytes)?;
+            // For standalone we want to try out the normal derivation first.
             decrypt_aes_edek(
                 &derive_aes_encryption_key(&secret.secret, tenant_id),
                 &v4_document,
             )
             .or_else(|_| {
+                //If normal derivation doesn't work, we'll try our legacy derivation that was used in cloaked search.
                 decrypt_aes_edek(
                     &derive_aes_encryption_key_legacy(&secret.secret, tenant_id),
                     &v4_document,
@@ -242,8 +242,8 @@ pub(crate) fn derive_aes_encryption_key<K: AsRef<[u8]>>(
     EncryptionKey(hash256(derivation_key.as_ref(), resulting_bytes))
 }
 
-///Derive random bytes using HKDF. The tenant_id is used to construct the Prk and then
-///extra_string is passed in to the expand step.
+// This is a derivation that was used in cloaked search. It's not used anymore, but is here for the decryption
+// of cloaked search data.
 fn derive_aes_encryption_key_legacy<K: AsRef<[u8]>>(
     key: &K,
     tenant_id: &TenantId,

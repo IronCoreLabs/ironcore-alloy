@@ -1,12 +1,11 @@
 use crate::{
     errors::AlloyError,
-    standard::{EdekWithKeyIdHeader, EncryptedDocument, PlaintextDocument, StandardDocumentOps},
-    util::{v4_proto_from_bytes, v4_proto_to_bytes},
+    standard::{EdekWithKeyIdHeader, EncryptedDocument, StandardDocumentOps},
+    util::v4_proto_from_bytes,
     AlloyMetadata, PlaintextBytes,
 };
 use bytes::Bytes;
 use ironcore_documents::{
-    aes::IvAndCiphertext,
     v4,
     v5::{
         self,

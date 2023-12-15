@@ -132,12 +132,6 @@ pub(crate) fn v4_proto_from_bytes<B: AsRef<[u8]>>(
     Ok(Message::parse_from_bytes(b.as_ref())?)
 }
 
-pub(crate) fn v4_proto_to_bytes(
-    v4: ironcore_documents::icl_header_v4::V4DocumentHeader,
-) -> Vec<u8> {
-    v4.write_to_bytes().expect("Writing to bytes cannot fail.")
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
