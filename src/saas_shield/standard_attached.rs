@@ -1,6 +1,10 @@
 use crate::{
+    errors::AlloyError,
     standard::StandardDocumentOps,
-    standard_attached::{decrypt_core, encrypt_core, StandardAttachedDocumentOps},
+    standard_attached::{
+        decrypt_core, encrypt_core, EncryptedAttachedDocument, StandardAttachedDocumentOps,
+    },
+    AlloyMetadata, PlaintextBytes,
 };
 
 use super::standard::SaasShieldStandardClient;
@@ -13,18 +17,17 @@ pub struct SaasShieldStandardAttachedClient {
 impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     async fn encrypt(
         &self,
-        plaintext_field: crate::PlaintextBytes,
-        metadata: &crate::AlloyMetadata,
-    ) -> Result<crate::standard_attached::EncryptedAttachedDocument, crate::errors::AlloyError>
-    {
+        plaintext_field: PlaintextBytes,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedAttachedDocument, AlloyError> {
         encrypt_core(&self.standard_client, plaintext_field, metadata).await
     }
 
     async fn decrypt(
         &self,
-        attached_field: crate::standard_attached::EncryptedAttachedDocument,
-        metadata: &crate::AlloyMetadata,
-    ) -> Result<crate::PlaintextBytes, crate::errors::AlloyError> {
+        attached_field: EncryptedAttachedDocument,
+        metadata: &AlloyMetadata,
+    ) -> Result<PlaintextBytes, AlloyError> {
         decrypt_core(&self.standard_client, attached_field, metadata).await
     }
 

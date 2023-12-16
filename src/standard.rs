@@ -209,6 +209,7 @@ pub(crate) fn decrypt_document_core(
                 let encrypted_payload: v5::EncryptedPayload = ciphertext.try_into()?;
                 encrypted_payload.decrypt(&dek)
             } else {
+                // The version 4 edoc doesn't have any special bytes on the front.
                 decrypt_document_with_attached_iv(&dek, &IvAndCiphertext(ciphertext.into()))
             }
             .map(|c| (label, c.0))

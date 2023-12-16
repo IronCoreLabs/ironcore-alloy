@@ -21,16 +21,27 @@ custom_newtype!(EncryptedAttachedDocument, Vec<u8>);
 
 /// API for encrypting and decrypting documents using our standard encryption.
 pub trait StandardAttachedDocumentOps {
+    /// Encrypt a field with the provided metadata.
+    /// A DEK (document encryption key) will be generated and encrypted using a derived key.
+    /// The result is a single blob of bytes with the edek put on the front of it.
     async fn encrypt(
         &self,
         plaintext_field: PlaintextBytes,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedAttachedDocument, AlloyError>;
+    /// Decrypt a field that was encrypted with the provided metadata.
+    /// The document must have been encrypted using attached encryption and not deterministic or standard encryption.
     async fn decrypt(
         &self,
         attached_field: EncryptedAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextBytes, AlloyError>;
+    /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
+    /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
+    /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
+    /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
+    /// avoid pitfalls when encoding across byte boundaries.
+    /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
     async fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
 }
 
@@ -39,14 +50,16 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
     plaintext_field: Vec<u8>,
     metadata: &AlloyMetadata,
 ) -> Result<EncryptedAttachedDocument, AlloyError> {
-    let hardcoded_key = "".to_string();
+    // In order to call the encrypt on standard, we need a map. This is just a hardcoded string we will
+    // use to encrypt.
+    let hardcoded_id = "".to_string();
     let EncryptedDocument {
         edek: edek_with_key_id_bytes,
         // Mutable so we can removed the hardcoded key below.
         mut document,
     } = standard_client
         .encrypt(
-            [(hardcoded_key.clone(), plaintext_field)]
+            [(hardcoded_id.clone(), plaintext_field)]
                 .into_iter()
                 .collect(),
             metadata,
@@ -58,7 +71,7 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
     let edek = v4_proto_from_bytes(edek_bytes)?;
 
     let edoc = document
-        .remove(&hardcoded_key)
+        .remove(&hardcoded_id)
         .ok_or(AlloyError::EncryptError(
             "Encryption returned a document without a passed in field. This shouldn't happen."
                 .to_string(),
@@ -95,6 +108,8 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
             edoc,
         })
         .or_else(|_| v5::attached::decode_attached_edoc(attached_field_bytes))?;
+    // In order to call the decrypt on standard, we need a map. This is just a hardcoded string we will
+    // use to decrypt.
     let hardcoded_id = "".to_string();
     let mut decrypted_value = standard_client
         .decrypt(

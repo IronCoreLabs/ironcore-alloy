@@ -1,22 +1,12 @@
-use super::{
-    config::StandaloneConfiguration,
-    standard::{decrypt_aes_edek, derive_aes_encryption_key, StandaloneStandardClient},
-};
+use super::{config::StandaloneConfiguration, standard::StandaloneStandardClient};
 use crate::{
     errors::AlloyError,
     standard::StandardDocumentOps,
     standard_attached::{
         decrypt_core, encrypt_core, EncryptedAttachedDocument, StandardAttachedDocumentOps,
     },
-    AlloyMetadata, PlaintextBytes, Secret,
+    AlloyMetadata, PlaintextBytes,
 };
-use bytes::Bytes;
-use ironcore_documents::{
-    aes::{decrypt_document_with_attached_iv, encrypt_document_and_attach_iv},
-    v4::attached::{decode_attached_edoc, encode_attached_edoc},
-    v5::aes::generate_aes_edek_and_sign,
-};
-use rand::{CryptoRng, RngCore};
 
 #[derive(uniffi::Object)]
 pub struct StandaloneAttachedStandardClient {
@@ -51,38 +41,6 @@ impl StandardAttachedDocumentOps for StandaloneAttachedStandardClient {
     async fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         self.standard_client.get_searchable_edek_prefix(id)
     }
-}
-
-/// Encrypt all the fields of the document, attaching the encryption header to the resulting bytes.
-/// Each field will generate a DEK using a derived key and use it along with a random IV to
-/// encrypt the field.
-pub fn encrypt_field_attached<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-    incoming_secret: &Secret,
-    field: U,
-    rng: &mut R,
-    doc_metadata: &AlloyMetadata,
-) -> Result<Vec<u8>, AlloyError> {
-    let per_tenant_kek =
-        derive_aes_encryption_key(&incoming_secret.secret, &doc_metadata.tenant_id);
-    let (aes_dek, v4_doc) = generate_aes_edek_and_sign(rng, per_tenant_kek, None, "")?;
-    let attached_payload = encrypt_document_and_attach_iv(
-        rng,
-        aes_dek,
-        ironcore_documents::aes::PlaintextDocument(field.as_ref().to_vec()),
-    )?;
-    Ok(encode_attached_edoc(v4_doc, attached_payload)?.to_vec())
-}
-
-pub fn decrypt_field_attached(
-    incoming_secret: &Secret,
-    attached_document_bytes: Bytes,
-    doc_metadata: &AlloyMetadata,
-) -> Result<PlaintextBytes, AlloyError> {
-    let per_tenant_kek =
-        derive_aes_encryption_key(&incoming_secret.secret, &doc_metadata.tenant_id);
-    let (header, document_bytes) = decode_attached_edoc(attached_document_bytes)?;
-    let dek = decrypt_aes_edek(&per_tenant_kek, &header)?;
-    Ok(decrypt_document_with_attached_iv(&dek, &document_bytes)?.0)
 }
 
 #[cfg(test)]

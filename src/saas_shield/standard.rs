@@ -158,8 +158,10 @@ impl SaasShieldStandardClient {
             ))
                 }
             }
+            // This is the case where the value did not have a key id header. This means it's either a v4 or v3.
             Err(_) => {
                 let bytes: Bytes = encrypted_bytes.0.into();
+                // Try to decode v4 first, since it has a specific form. V3 is just proto bytes.
                 v4::attached::decode_attached_edoc(bytes.clone())
                     .map(|(edek, _)| EdekParts::V4(edek))
                     .or_else(|_| Ok(EdekParts::V3(bytes)))
