@@ -33,7 +33,7 @@ pub struct SaasShieldStandardClient {
     rng: Arc<Mutex<OurReseedingRng>>,
 }
 
-// Standard SaaS Shield edeks could be V3 or V4 if they originated in old TSCs
+// Standard SaaS Shield edeks could be V3 if they originated in old TSCs or V4 if they originated from Cloaked Search.
 #[derive(Debug)]
 enum EdekParts {
     /// Key ID and document header containing the EDEK
@@ -131,7 +131,7 @@ impl SaasShieldStandardClient {
     }
 
     /// Break the EDEK into its V3, V4 or V5 parts. This should be used instead of Self::decompose_key_id_header
-    /// in order to support V3 headers.
+    /// in order to support V3 and V4 headers.
     fn decompose_edek_header(
         encrypted_bytes: EdekWithKeyIdHeader,
     ) -> Result<EdekParts, AlloyError> {
