@@ -38,7 +38,7 @@ impl StandardSecrets {
     ) -> Result<Arc<Self>, AlloyError> {
         let mut internal_secrets = HashMap::new();
 
-        if secrets.iter().find(|secret| secret.id == 0).is_some() {
+        if secrets.iter().any(|secret| secret.id == 0) {
             return Err(AlloyError::InvalidKey(
                 "Secret ids must be greater than 0".to_string(),
             ));
