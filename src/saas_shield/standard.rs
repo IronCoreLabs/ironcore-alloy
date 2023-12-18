@@ -8,19 +8,19 @@ use crate::tenant_security_client::errors::TenantSecurityError;
 use crate::tenant_security_client::{
     RequestMetadata, TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{collection_to_batch_result, OurReseedingRng};
+use crate::util::{collection_to_batch_result, v4_proto_from_bytes, OurReseedingRng};
 use crate::TenantId;
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
 use bytes::Bytes;
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
-use ironcore_documents::cmk_edek;
 use ironcore_documents::cmk_edek::EncryptedDek;
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
 use ironcore_documents::v5::key_id_header::{
     decode_version_prefixed_value, EdekType, KeyId, KeyIdHeader, PayloadType,
 };
+use ironcore_documents::{cmk_edek, v4};
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
@@ -33,11 +33,12 @@ pub struct SaasShieldStandardClient {
     rng: Arc<Mutex<OurReseedingRng>>,
 }
 
-// Standard SaaS Shield edeks could be V3 if they originated in old TSCs
+// Standard SaaS Shield edeks could be V3 if they originated in old TSCs or V4 if they originated from Cloaked Search.
 #[derive(Debug)]
 enum EdekParts {
     /// Key ID and document header containing the EDEK
     V5(KeyId, V4DocumentHeader),
+    V4(V4DocumentHeader),
     /// Just the EDEK, ready to be sent to the TSP
     V3(Bytes),
 }
@@ -47,7 +48,7 @@ impl EdekParts {
     /// EncryptedDeks bytes ready to send to the TSP.
     fn get_edek_bytes(&self) -> Result<Vec<u8>, AlloyError> {
         match self {
-            EdekParts::V5(_, v4_document_header) => {
+            EdekParts::V5(_, v4_document_header) | EdekParts::V4(v4_document_header) => {
                 let fixed_edek =
                     fix_encrypted_dek(find_cmk_edek(&v4_document_header.signed_payload.edeks)?)?;
                 let edek_bytes = fixed_edek
@@ -62,7 +63,9 @@ impl EdekParts {
     /// Validates the signature in the case of V4 document header. V3 doesn't need validation
     fn validate_signature(&self, enc_key: EncryptionKey) -> Result<(), AlloyError> {
         match self {
-            EdekParts::V5(_, document_header) => verify_sig(enc_key, document_header),
+            EdekParts::V5(_, document_header) | EdekParts::V4(document_header) => {
+                verify_sig(enc_key, document_header)
+            }
             EdekParts::V3(_) => Ok(()), // This is just an EDEK, so doesn't require validation
         }
     }
@@ -127,8 +130,8 @@ impl SaasShieldStandardClient {
         .map(|doc| doc.edek)
     }
 
-    /// Break the EDEK into its V3 or V5 parts. This should be used instead of Self::decompose_key_id_header
-    /// in order to support V3 headers.
+    /// Break the EDEK into its V3, V4 or V5 parts. This should be used instead of Self::decompose_key_id_header
+    /// in order to support V3 and V4 headers.
     fn decompose_edek_header(
         encrypted_bytes: EdekWithKeyIdHeader,
     ) -> Result<EdekParts, AlloyError> {
@@ -147,7 +150,7 @@ impl SaasShieldStandardClient {
                 let expected_edek_type = Self::get_edek_type();
                 let expected_payload_type = Self::get_payload_type();
                 if edek_type == expected_edek_type && payload_type == expected_payload_type {
-                    let v4_document_header = Message::parse_from_bytes(&remaining_bytes[..])?;
+                    let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
                     Ok(EdekParts::V5(key_id, v4_document_header))
                 } else {
                     Err(AlloyError::InvalidInput(
@@ -155,7 +158,14 @@ impl SaasShieldStandardClient {
             ))
                 }
             }
-            Err(_) => Ok(EdekParts::V3(encrypted_bytes.0.into())),
+            // This is the case where the value did not have a key id header. This means it's either a v4 or v3.
+            Err(_) => {
+                let bytes: Bytes = encrypted_bytes.0.into();
+                // Try to decode v4 first, since it has a specific form. V3 is just proto bytes.
+                v4::attached::decode_attached_edoc(bytes.clone())
+                    .map(|(edek, _)| EdekParts::V4(edek))
+                    .or_else(|_| Ok(EdekParts::V3(bytes)))
+            }
         }
     }
 }
@@ -293,7 +303,7 @@ fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, TenantSecuri
     Ok(EncryptionKey(bytes))
 }
 
-fn generate_cmk_v4_doc_and_sign(
+pub fn generate_cmk_v4_doc_and_sign(
     edeks: Vec<EncryptedDek>,
     dek: EncryptionKey,
     tenant_id: TenantId,

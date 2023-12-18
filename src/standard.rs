@@ -4,14 +4,15 @@ use crate::{
     util::{get_rng, BatchResult},
     AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
-use ironcore_documents::{aes::EncryptionKey, icl_header_v4, v3};
 use ironcore_documents::{
-    v3::V3,
+    aes::{decrypt_document_with_attached_iv, EncryptionKey, IvAndCiphertext},
+    icl_header_v4, v3,
     v5::{
         self,
         key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
     },
 };
+
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -201,12 +202,15 @@ pub(crate) fn decrypt_document_core(
         .into_iter()
         .map(|(label, ciphertext)| {
             // Further validation of the IronCore MAGIC will be done inside the function
-            if ciphertext.starts_with(&[V3]) {
+            if ciphertext.starts_with(&v3::VERSION_AND_MAGIC) {
                 let encrypted_payload: v3::EncryptedPayload = ciphertext.try_into()?;
                 encrypted_payload.decrypt(&dek)
-            } else {
+            } else if ciphertext.starts_with(&v5::VERSION_AND_MAGIC) {
                 let encrypted_payload: v5::EncryptedPayload = ciphertext.try_into()?;
                 encrypted_payload.decrypt(&dek)
+            } else {
+                // The version 4 edoc doesn't have any special bytes on the front.
+                decrypt_document_with_attached_iv(&dek, &IvAndCiphertext(ciphertext.into()))
             }
             .map(|c| (label, c.0))
         })
