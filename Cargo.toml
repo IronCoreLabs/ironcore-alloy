@@ -12,7 +12,7 @@ base64_type = { git = "https://github.com/IronCoreLabs/base64_type", version = "
 bytes = { version = "1.4.0", features = ["serde"] }
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", branch = "v5-attached" }
+ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", rev = "76e2e20fe97e15e27f3d6146562f054144977103" }
 itertools = "0.11"
 ndarray = "0.15.6"
 ndarray-rand = "0.14.0"
