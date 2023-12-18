@@ -556,7 +556,7 @@ pub(crate) mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::DecryptError("Unexpected EOF".to_string())
+            AlloyError::ProtobufError("Unexpected EOF".to_string())
         );
         Ok(())
     }

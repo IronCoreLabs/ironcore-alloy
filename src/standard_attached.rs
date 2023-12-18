@@ -78,11 +78,12 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
         ))?;
 
     Ok(EncryptedAttachedDocument(
-        v5::attached::encode_attached_edoc(&AttachedDocument {
+        AttachedDocument {
             key_id_header,
             edek,
             edoc: v5::EncryptedPayload::try_from(edoc)?.to_aes_value_with_attached_iv(),
-        })?
+        }
+        .write_to_bytes()?
         .to_vec(),
     ))
 }
@@ -107,7 +108,7 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
             edek,
             edoc,
         })
-        .or_else(|_| v5::attached::decode_attached_edoc(attached_field_bytes))?;
+        .or_else(|_| attached_field_bytes.try_into())?;
     // In order to call the decrypt on standard, we need a map. This is just a hardcoded string we will
     // use to decrypt.
     let hardcoded_id = "".to_string();
