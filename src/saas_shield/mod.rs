@@ -3,7 +3,7 @@ use crate::tenant_security_client::{
     TenantSecurityClient,
 };
 use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
-use crate::{DerivationPath, SecretPath};
+use crate::{DerivationPath, SecretPath, TenantId};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -39,6 +39,40 @@ async fn derive_keys_many_paths(
         )
         .await?;
     Ok(derived_keys)
+}
+
+pub(crate) struct RotationKeys {
+    original_keys: KeyDeriveResponse,
+    new_keys: KeyDeriveResponse,
+}
+
+pub(crate) async fn get_keys_for_rotation(
+    metadata: &AlloyMetadata,
+    new_tenant_id: &TenantId,
+    paths: Vec<(SecretPath, DerivationPath)>,
+    tenant_security_client: &TenantSecurityClient,
+    secret_type: SecretType,
+) -> Result<RotationKeys, AlloyError> {
+    let original_tenant_keys = derive_keys_many_paths(
+        tenant_security_client,
+        metadata,
+        paths.clone(),
+        secret_type.clone(),
+    )
+    .await?;
+    let new_tenant_keys = if new_tenant_id != &metadata.tenant_id {
+        let new_metadata = AlloyMetadata {
+            tenant_id: new_tenant_id.clone(),
+            ..metadata.clone()
+        };
+        derive_keys_many_paths(tenant_security_client, &new_metadata, paths, secret_type).await?
+    } else {
+        original_tenant_keys.clone()
+    };
+    Ok(RotationKeys {
+        original_keys: original_tenant_keys,
+        new_keys: new_tenant_keys,
+    })
 }
 
 /// Converts a DerivedKey to an encryption Key (with scaling factor) and key ID

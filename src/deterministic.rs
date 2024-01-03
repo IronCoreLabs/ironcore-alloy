@@ -7,7 +7,7 @@ use crate::{
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
-use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
+use ironcore_documents::v5::key_id_header::KeyIdHeader;
 use std::collections::HashMap;
 use uniffi::custom_newtype;
 
@@ -175,16 +175,6 @@ fn deterministic_decrypt_core(
     cipher
         .decrypt([associated_data], ciphertext)
         .map_err(|e| AlloyError::DecryptError(e.to_string()))
-}
-
-/// Returns `true` if the key IDs and tenant IDs are identical, otherwise `false`.
-pub(crate) fn check_rotation_no_op(
-    encrypted_key_id: KeyId,
-    maybe_current_key: &Option<u32>,
-    new_tenant_id: &TenantId,
-    metadata: &AlloyMetadata,
-) -> bool {
-    maybe_current_key == &Some(encrypted_key_id.0) && new_tenant_id == &metadata.tenant_id
 }
 
 #[cfg(test)]

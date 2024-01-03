@@ -1,12 +1,15 @@
-use super::{derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice};
+use super::{
+    derive_keys_many_paths, get_in_rotation_prefix_internal, get_keys_for_rotation,
+    DeriveKeyChoice, RotationKeys,
+};
 use crate::deterministic::{
-    check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
-    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
-    GenerateQueryResult, PlaintextField, PlaintextFields,
+    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
+    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
+    PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::collection_to_batch_result;
+use crate::util::{check_rotation_no_op, collection_to_batch_result};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
@@ -162,28 +165,17 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
             .collect_vec();
-        let original_tenant_keys = derive_keys_many_paths(
-            &self.tenant_security_client,
+        let RotationKeys {
+            original_keys: original_tenant_keys,
+            new_keys: new_tenant_keys,
+        } = get_keys_for_rotation(
             metadata,
-            paths.clone(),
+            parsed_new_tenant_id,
+            paths,
+            &self.tenant_security_client,
             SecretType::Deterministic,
         )
         .await?;
-        let new_tenant_keys = if parsed_new_tenant_id != &metadata.tenant_id {
-            let new_metadata = AlloyMetadata {
-                tenant_id: parsed_new_tenant_id.clone(),
-                ..metadata.clone()
-            };
-            derive_keys_many_paths(
-                &self.tenant_security_client,
-                &new_metadata,
-                paths,
-                SecretType::Deterministic,
-            )
-            .await?
-        } else {
-            original_tenant_keys.clone()
-        };
         let reencrypt_field = |encrypted_field: EncryptedField| {
             let (original_key_id, ciphertext) =
                 Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;

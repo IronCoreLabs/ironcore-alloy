@@ -55,6 +55,67 @@ class TestIroncoreAlloy:
         assert decrypted.plaintext_vector == [1.0, 2.0, 3.0]
 
     @pytest.mark.asyncio
+    async def test_rotate_vector_different_tenant(self):
+        ciphertext = [5826192.0, 15508204.0, 11420345.0]
+        metadata = AlloyMetadata.new_simple("tenant")
+        icl_metadata = base64.b64decode(
+            b"AAAAAoEACgyVAnirL57DGDIdC28SIH9FFpmMs5yi5CcTcQjcUjldEE0OEdZDWtpyNI++ALnf"
+        )
+        encrypted_vector = EncryptedVector(ciphertext, "", "", icl_metadata)
+        vectors = {"vector": encrypted_vector}
+        metadata = AlloyMetadata.new_simple("tenant")
+        rotated = await self.sdk.vector().rotate_vectors(vectors, metadata, "tenant2")
+        assert len(rotated.successes) == 1
+        assert len(rotated.failures) == 0
+        new_metadata = AlloyMetadata.new_simple("tenant2")
+        decrypted = await self.sdk.vector().decrypt(rotated.successes["vector"], new_metadata)
+        assert decrypted.plaintext_vector == pytest.approx(
+            [1.0, 2.0, 3.0], rel=1e-5
+        )
+
+
+    @pytest.mark.asyncio
+    async def test_rotate_vector_different_key(self):
+        vector_secrets2 = {
+            "": VectorSecret(
+                self.approximation_factor,
+                # Switched current and in-rotation versus original sdk
+                RotatableSecret(
+                    StandaloneSecret(1, Secret(self.key_bytes)),
+                    StandaloneSecret(2, Secret(self.key_bytes)),
+                ),
+            )
+        }
+        sdk2 = Standalone(StandaloneConfiguration(self.standard_secrets, self.deterministic_secrets, vector_secrets2))
+        ciphertext = [5826192.0, 15508204.0, 11420345.0]
+        metadata = AlloyMetadata.new_simple("tenant")
+        icl_metadata = base64.b64decode(
+            b"AAAAAoEACgyVAnirL57DGDIdC28SIH9FFpmMs5yi5CcTcQjcUjldEE0OEdZDWtpyNI++ALnf"
+        )
+        encrypted_vector = EncryptedVector(ciphertext, "", "", icl_metadata)
+        vectors = {"vector": encrypted_vector}
+        metadata = AlloyMetadata.new_simple("tenant")
+        rotated = await sdk2.vector().rotate_vectors(vectors, metadata, "tenant") # unchanged tenant
+        assert len(rotated.successes) == 1
+        assert len(rotated.failures) == 0
+        # Now that it's rotated, sometime in the future we have an SDK with only the new current
+        vector_secrets3 = {
+            "": VectorSecret(
+                self.approximation_factor,
+                # Switched current and in-rotation versus original sdk
+                RotatableSecret(
+                    StandaloneSecret(1, Secret(self.key_bytes)),
+                    None
+                ),
+            )
+        }
+        sdk3 = Standalone(StandaloneConfiguration(self.standard_secrets, self.deterministic_secrets, vector_secrets3))
+        decrypted = await sdk3.vector().decrypt(rotated.successes["vector"], metadata)
+        assert decrypted.plaintext_vector == pytest.approx(
+            [1.0, 2.0, 3.0], rel=1e-5
+        )
+
+    @pytest.mark.asyncio
     async def test_encrypt_deterministic(self):
         field = PlaintextField(b"My data", "", "")
         metadata = AlloyMetadata.new_simple("tenant")
