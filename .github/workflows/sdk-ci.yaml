@@ -29,7 +29,7 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "17"
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/kotlin/src/main/resources/
@@ -58,7 +58,7 @@ jobs:
         runs-on: ["buildjet-2vcpu-ubuntu-2204"] # TODO: add back: "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", ["self-hosted", "macOS", "ARM64"] ]
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy
