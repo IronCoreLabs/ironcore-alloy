@@ -28,6 +28,7 @@ ring = "0.16.20"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
 thiserror = "1.0.50"
+# update when 0.26 (https://github.com/mozilla/uniffi-rs/issues/1911) releases
 uniffi = { git = "https://github.com/bendk/uniffi-rs.git", features = [
     "cli",
     "tokio",
@@ -37,7 +38,7 @@ z85 = "3.0.5"
 [dev-dependencies]
 approx = "0.5.1"
 ascii85 = "0.2.1"
-assertables = "7.0.1"
+assertables = "7.0.1" 
 base64 = "0.21.5"
 base85 = "2.0.0"
 camino = "1.1"

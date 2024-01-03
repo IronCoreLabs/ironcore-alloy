@@ -36,6 +36,10 @@ impl AlloyClient for SaasShieldDeterministicClient {
 
 #[uniffi::export(async_runtime = "tokio")]
 impl DeterministicFieldOps for SaasShieldDeterministicClient {
+    /// Encrypt a field with the provided metadata.
+    /// Because the field is encrypted deterministically with each call, the result will be the same for repeated calls.
+    /// This allows for exact matches and indexing of the encrypted field, but comes with some security considerations.
+    /// If you don't need to support these use cases, we recommend using `standard` encryption instead.
     async fn encrypt(
         &self,
         plaintext_field: PlaintextField,
@@ -68,6 +72,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         )
     }
 
+    /// Decrypt a field that was deterministically encrypted with the provided metadata.
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
@@ -109,6 +114,8 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         }
     }
 
+    /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
+    /// The resulting encrypted fields should be used in tandem when querying the data store.
     async fn generate_query_field_values(
         &self,
         fields_to_query: PlaintextFields,
@@ -151,6 +158,9 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             .collect()
     }
 
+    /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
+    /// must contain the tenant ID that the fields were originally encrypted to. If `new_tenant_id` is empty,
+    /// the fields will simply be encrypted with the same tenant's current secret.
     async fn rotate_fields(
         &self,
         encrypted_fields: EncryptedFields,
@@ -228,6 +238,11 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         Ok(collection_to_batch_result(encrypted_fields, reencrypt_field).into())
     }
 
+    /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
+    /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
+    /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
+    /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
+    /// avoid pitfalls when encoding across byte boundaries.
     async fn get_in_rotation_prefix(
         &self,
         secret_path: SecretPath,
