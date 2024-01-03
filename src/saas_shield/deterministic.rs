@@ -1,12 +1,12 @@
 use super::{derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice};
 use crate::deterministic::{
-    check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
-    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
-    GenerateQueryResult, PlaintextField, PlaintextFields,
+    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
+    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
+    PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::collection_to_batch_result;
+use crate::util::{check_rotation_no_op, collection_to_batch_result};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;

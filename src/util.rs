@@ -1,4 +1,5 @@
-use crate::{errors::AlloyError, FieldId, VectorEncryptionKey};
+use crate::{errors::AlloyError, AlloyMetadata, FieldId, TenantId, VectorEncryptionKey};
+use ironcore_documents::v5::key_id_header::KeyId;
 use itertools::Itertools;
 use protobuf::Message;
 use rand::{
@@ -124,6 +125,16 @@ where
         successes,
         failures,
     }
+}
+
+/// Returns `true` if the key IDs and tenant IDs are identical, otherwise `false`.
+pub(crate) fn check_rotation_no_op(
+    encrypted_key_id: KeyId,
+    maybe_current_key: &Option<u32>,
+    new_tenant_id: &TenantId,
+    metadata: &AlloyMetadata,
+) -> bool {
+    maybe_current_key == &Some(encrypted_key_id.0) && new_tenant_id == &metadata.tenant_id
 }
 
 pub(crate) fn v4_proto_from_bytes<B: AsRef<[u8]>>(

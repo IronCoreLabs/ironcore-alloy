@@ -1,11 +1,11 @@
 use super::config::RotatableSecret;
 use crate::deterministic::{
-    check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
-    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
-    GenerateQueryResult, PlaintextField, PlaintextFields,
+    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
+    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
+    PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
-use crate::util::collection_to_batch_result;
+use crate::util::{check_rotation_no_op, collection_to_batch_result};
 use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
     StandaloneConfiguration, TenantId,
