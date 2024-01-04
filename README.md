@@ -42,7 +42,8 @@ After either of the non-`--lib` `cargo` commands have been run, the Kotlin and P
 Running tests with the `integration_tests` feature flag enables SaaS Shield integration tests. These require a TSP running at `http://localhost:32804` with the configuration provided in `tests/demo-tsp.conf`. This can be started by running `docker compose up` from the `tests` directory.
 
 Run tests:
-```
+
+```bash
 cargo test --features integration_tests
 ```
 
