@@ -74,7 +74,6 @@ uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3a
 z85 = "3.0.5"
 
 [features]
-default = ["integration_tests"]
 integration_tests = []
 
 [[bench]]
