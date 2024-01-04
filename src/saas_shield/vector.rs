@@ -1,6 +1,6 @@
 use super::{
     derive_keys_many_paths, derived_key_to_vector_encryption_key, get_in_rotation_prefix_internal,
-    DeriveKeyChoice,
+    DeriveKeyChoice, SaasShieldSecurityEventOps, SecurityEvent,
 };
 use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
@@ -54,6 +54,24 @@ impl SaasShieldVectorClient {
             plaintext_vector,
             &mut *get_rng(&self.rng),
         )
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl SaasShieldSecurityEventOps for SaasShieldVectorClient {
+    /// Log the security event `event` to the tenant's log sink.
+    /// If the event time is unspecified the current time will be used.
+    async fn log_security_event(
+        &self,
+        event: SecurityEvent,
+        metadata: &AlloyMetadata,
+        event_time_millis: Option<i64>,
+    ) -> Result<(), AlloyError> {
+        let request_metadata = (metadata.clone(), event_time_millis).try_into()?;
+        Ok(self
+            .tenant_security_client
+            .log_security_event(&event, &request_metadata)
+            .await?)
     }
 }
 

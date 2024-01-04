@@ -27,6 +27,8 @@ use std::collections::HashMap;
 use std::convert::identity;
 use std::sync::{Arc, Mutex};
 
+use super::{SaasShieldSecurityEventOps, SecurityEvent};
+
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardClient {
     tenant_security_client: Arc<TenantSecurityClient>,
@@ -256,6 +258,24 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             document: encrypt_map(plaintext_document.document, self.rng.clone(), enc_key)?,
             edek: plaintext_document.edek,
         })
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl SaasShieldSecurityEventOps for SaasShieldStandardClient {
+    /// Log the security event `event` to the tenant's log sink.
+    /// If the event time is unspecified the current time will be used.
+    async fn log_security_event(
+        &self,
+        event: SecurityEvent,
+        metadata: &AlloyMetadata,
+        event_time_millis: Option<i64>,
+    ) -> Result<(), AlloyError> {
+        let request_metadata = (metadata.clone(), event_time_millis).try_into()?;
+        Ok(self
+            .tenant_security_client
+            .log_security_event(&event, &request_metadata)
+            .await?)
     }
 }
 

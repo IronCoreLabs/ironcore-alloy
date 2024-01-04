@@ -1,4 +1,7 @@
-use super::{derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice};
+use super::{
+    derive_keys_many_paths, get_in_rotation_prefix_internal, DeriveKeyChoice,
+    SaasShieldSecurityEventOps, SecurityEvent,
+};
 use crate::deterministic::{
     check_rotation_no_op, decrypt_internal, encrypt_internal, DeterministicEncryptionKey,
     DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
@@ -251,6 +254,24 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             Self::get_edek_type(),
             Self::get_payload_type(),
         )
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl SaasShieldSecurityEventOps for SaasShieldDeterministicClient {
+    /// Log the security event `event` to the tenant's log sink.
+    /// If the event time is unspecified the current time will be used.
+    async fn log_security_event(
+        &self,
+        event: SecurityEvent,
+        metadata: &AlloyMetadata,
+        event_time_millis: Option<i64>,
+    ) -> Result<(), AlloyError> {
+        let request_metadata = (metadata.clone(), event_time_millis).try_into()?;
+        Ok(self
+            .tenant_security_client
+            .log_security_event(&event, &request_metadata)
+            .await?)
     }
 }
 

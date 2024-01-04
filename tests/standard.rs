@@ -7,13 +7,18 @@ mod tests {
     use common::CLIENT;
     use ironcore_alloy::{
         errors::AlloyError,
+        saas_shield::{DataEvent, SaasShieldSecurityEventOps, SecurityEvent},
         standard::{
             EdekWithKeyIdHeader, EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek,
             StandardDocumentOps,
         },
         AlloyMetadata, TenantId,
     };
-    use std::{collections::HashMap, sync::Arc};
+    use std::{
+        collections::HashMap,
+        sync::Arc,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     type TestResult = Result<(), AlloyError>;
 
@@ -147,6 +152,47 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn standard_log_security_event_works() -> TestResult {
+        let metadata = get_metadata();
+        CLIENT
+            .standard()
+            .log_security_event(
+                SecurityEvent::Data {
+                    event: DataEvent::ChangePermissions,
+                },
+                &metadata,
+                Some(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as i64,
+                ),
+            )
+            .await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_log_security_event_fails_with_negative_time() -> TestResult {
+        let metadata = get_metadata();
+        let err = CLIENT
+            .standard()
+            .log_security_event(
+                SecurityEvent::Data {
+                    event: DataEvent::ChangePermissions,
+                },
+                &metadata,
+                Some(-1),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Invalid input: 'millis times must be >= 0.'"
+        );
+        Ok(())
+    }
     #[tokio::test]
     async fn standard_get_searchable_edek_prefix_works() -> TestResult {
         let prefix = CLIENT.standard().get_searchable_edek_prefix(1);
