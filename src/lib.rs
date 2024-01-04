@@ -15,6 +15,7 @@ use standalone::standard_attached::StandaloneAttachedStandardClient;
 use standalone::vector::StandaloneVectorClient;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tenant_security_client::errors::TenantSecurityError;
 use tenant_security_client::{RequestMetadata, RequestingId};
 use uniffi::custom_newtype;
@@ -142,11 +143,14 @@ impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
         (value, event_time_millis): (AlloyMetadata, Option<i64>),
     ) -> Result<Self, Self::Error> {
         let time_as_u64 = match event_time_millis {
-            Some(time) if time >= 0 => Ok(Some(time as u64)),
+            Some(time) if time >= 0 => Ok(time as u64),
             Some(_) => Err(AlloyError::InvalidInput(
                 "millis times must be >= 0.".to_string(),
             )),
-            None => Ok(None),
+            None => Ok(SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time moved backwards, or it's 300,000 years in the future.")
+                .as_millis() as u64),
         }?;
         Ok(Self::new(
             value.tenant_id,
@@ -160,7 +164,7 @@ impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
             value.source_ip,
             value.object_id,
             value.request_id,
-            time_as_u64,
+            Some(time_as_u64),
             value.custom_fields,
         ))
     }

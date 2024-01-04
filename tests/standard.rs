@@ -174,6 +174,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn standard_log_security_event_works_with_none() -> TestResult {
+        let metadata = get_metadata();
+        CLIENT
+            .standard()
+            .log_security_event(
+                SecurityEvent::Data {
+                    event: DataEvent::ChangePermissions,
+                },
+                &metadata,
+                None,
+            )
+            .await?;
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn standard_log_security_event_fails_with_negative_time() -> TestResult {
         let metadata = get_metadata();
         let err = CLIENT
