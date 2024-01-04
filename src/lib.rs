@@ -152,21 +152,9 @@ impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
                 .expect("Time moved backwards, or it's ~584 million years in the future.")
                 .as_millis() as u64),
         }?;
-        Ok(Self::new(
-            value.tenant_id,
-            RequestingId::new(
-                value
-                    .requesting_id
-                    .unwrap_or("IronCore Labs Alloy SDK".to_string()),
-            )
-            .map_err(|e| AlloyError::InvalidConfiguration(e.to_string()))?,
-            value.data_label,
-            value.source_ip,
-            value.object_id,
-            value.request_id,
-            Some(time_as_u64),
-            value.custom_fields,
-        ))
+        let mut request_metadata: RequestMetadata = value.try_into()?;
+        request_metadata.timestamp_millis = Some(time_as_u64);
+        Ok(request_metadata)
     }
 }
 // only make these top two publicly constructable to narrow public interface a bit

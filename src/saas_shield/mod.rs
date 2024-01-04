@@ -57,10 +57,7 @@ pub enum AdminEvent {
 
 impl ToString for AdminEvent {
     fn to_string(&self) -> String {
-        format!(
-            "ADMIN_{}",
-            format!("{:?}", self).to_case(convert_case::Case::ScreamingSnake)
-        )
+        format!("ADMIN_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
     }
 }
 
@@ -87,10 +84,7 @@ pub enum UserEvent {
 
 impl ToString for UserEvent {
     fn to_string(&self) -> String {
-        format!(
-            "USER_{}",
-            format!("{:?}", self).to_case(convert_case::Case::ScreamingSnake)
-        )
+        format!("USER_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
     }
 }
 
@@ -108,10 +102,7 @@ pub enum DataEvent {
 
 impl ToString for DataEvent {
     fn to_string(&self) -> String {
-        format!(
-            "DATA_{}",
-            format!("{:?}", self).to_case(convert_case::Case::ScreamingSnake)
-        )
+        format!("DATA_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
     }
 }
 
@@ -123,10 +114,7 @@ pub enum PeriodicEvent {
 
 impl ToString for PeriodicEvent {
     fn to_string(&self) -> String {
-        format!(
-            "PERIODIC_{}",
-            format!("{:?}", self).to_case(convert_case::Case::ScreamingSnake)
-        )
+        format!("PERIODIC_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
     }
 }
 
