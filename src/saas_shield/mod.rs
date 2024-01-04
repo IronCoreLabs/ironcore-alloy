@@ -140,7 +140,7 @@ impl CustomEvent {
     pub fn create(event_name: &str) -> Result<CustomEvent, AlloyError> {
         let regex =
             regex::Regex::new("^[A-Z_]+$").expect("Regex compilation is a development error");
-        if !regex.is_match(event_name) || event_name.starts_with("_") {
+        if !regex.is_match(event_name) || event_name.starts_with('_') {
             Err(AlloyError::InvalidInput(
                 "CustomEvents must be screaming snake case and cannot start with _".to_string(),
             ))
