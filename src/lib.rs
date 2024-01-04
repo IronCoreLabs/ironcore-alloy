@@ -149,7 +149,7 @@ impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
             )),
             None => Ok(SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .expect("Time moved backwards, or it's 300,000 years in the future.")
+                .expect("Time moved backwards, or it's ~584 million years in the future.")
                 .as_millis() as u64),
         }?;
         Ok(Self::new(
