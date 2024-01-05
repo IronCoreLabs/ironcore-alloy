@@ -8,6 +8,14 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all(serialize = "camelCase"))]
+pub(crate) struct LogSecurityEventRequest<'a> {
+    pub event: &'a str,
+    #[serde(flatten)]
+    pub metadata: &'a RequestMetadata,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub(crate) struct UnwrapKeyRequest<'a> {
     pub encrypted_document_key: &'a Base64,
     #[serde(flatten)]

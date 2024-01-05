@@ -1,8 +1,8 @@
 use super::errors::{TenantSecurityError, TenantSecurityProxyError};
 use super::rest::{
-    BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, DerivationType, KeyDeriveResponse, RekeyRequest,
-    RekeyResponse, SecretType, TenantDeriveKeyRequest, TspErrorResponse, UnwrapKeyRequest,
-    UnwrapKeyResponse, WrapKeyResponse,
+    BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, DerivationType, KeyDeriveResponse,
+    LogSecurityEventRequest, RekeyRequest, RekeyResponse, SecretType, TenantDeriveKeyRequest,
+    TspErrorResponse, UnwrapKeyRequest, UnwrapKeyResponse, WrapKeyResponse,
 };
 use super::{ApiKey, RequestMetadata};
 use crate::{DerivationPath, SecretPath};
@@ -22,6 +22,7 @@ const UNWRAP_ENDPOINT: &str = "document/unwrap";
 const BATCH_UNWRAP_ENDPOINT: &str = "document/batch-unwrap";
 const REKEY_ENDPOINT: &str = "document/rekey";
 const TENANT_KEY_DERIVE_ENDPOINT: &str = "key/derive-with-secret-path";
+const SECURITY_EVENT_ENDPOINT: &str = "event/security-event";
 
 pub struct TspRequest {
     tsp_address: String,
@@ -85,7 +86,7 @@ impl TspRequest {
 }
 
 /// Super-trait containing all the traits that TspRequest implements
-pub(crate) trait TenantSecurityRequest: DocumentKeyOps + TenantKeyOps {}
+pub(crate) trait TenantSecurityRequest: DocumentKeyOps + TenantKeyOps + EventOps {}
 
 #[async_trait]
 pub(crate) trait DocumentKeyOps {
@@ -112,6 +113,15 @@ pub(crate) trait DocumentKeyOps {
         metadata: &RequestMetadata,
         encrypted_document_key: &Base64,
     ) -> Result<RekeyResponse, TenantSecurityError>;
+}
+
+#[async_trait]
+pub(crate) trait EventOps {
+    async fn log_security_event(
+        &self,
+        event_text: &str,
+        metadata: &RequestMetadata,
+    ) -> Result<(), TenantSecurityError>;
 }
 
 #[async_trait]
@@ -208,6 +218,25 @@ impl TenantKeyOps for TspRequest {
             .make_json_request(TENANT_KEY_DERIVE_ENDPOINT.to_string(), post_data)
             .await?
             .json::<KeyDeriveResponse>()
+            .await?)
+    }
+}
+
+#[async_trait]
+impl EventOps for TspRequest {
+    async fn log_security_event(
+        &self,
+        event_text: &str,
+        metadata: &RequestMetadata,
+    ) -> Result<(), TenantSecurityError> {
+        let post_data = serde_json::to_value(LogSecurityEventRequest {
+            metadata,
+            event: event_text,
+        })?;
+        Ok(self
+            .make_json_request(SECURITY_EVENT_ENDPOINT.to_string(), post_data)
+            .await?
+            .json::<()>()
             .await?)
     }
 }
@@ -325,6 +354,17 @@ pub(crate) mod tests {
                 derived_keys,
                 has_primary_config: true,
             })
+        }
+    }
+
+    #[async_trait]
+    impl EventOps for MockOps {
+        async fn log_security_event(
+            &self,
+            _event_text: &str,
+            _metadata: &RequestMetadata,
+        ) -> Result<(), TenantSecurityError> {
+            Ok(())
         }
     }
 

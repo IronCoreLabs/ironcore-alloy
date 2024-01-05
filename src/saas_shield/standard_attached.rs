@@ -7,7 +7,7 @@ use crate::{
     AlloyMetadata, PlaintextBytes,
 };
 
-use super::standard::SaasShieldStandardClient;
+use super::{standard::SaasShieldStandardClient, SaasShieldSecurityEventOps, SecurityEvent};
 
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardAttachedClient {
@@ -44,5 +44,21 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
     async fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         self.standard_client.get_searchable_edek_prefix(id)
+    }
+}
+
+#[uniffi::export(async_runtime = "tokio")]
+impl SaasShieldSecurityEventOps for SaasShieldStandardAttachedClient {
+    /// Log the security event `event` to the tenant's log sink.
+    /// If the event time is unspecified the current time will be used.
+    async fn log_security_event(
+        &self,
+        event: SecurityEvent,
+        metadata: &AlloyMetadata,
+        event_time_millis: Option<i64>,
+    ) -> Result<(), AlloyError> {
+        self.standard_client
+            .log_security_event(event, metadata, event_time_millis)
+            .await
     }
 }
