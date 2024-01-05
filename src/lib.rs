@@ -15,6 +15,7 @@ use standalone::standard_attached::StandaloneAttachedStandardClient;
 use standalone::vector::StandaloneVectorClient;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tenant_security_client::errors::TenantSecurityError;
 use tenant_security_client::{RequestMetadata, RequestingId};
 use uniffi::custom_newtype;
@@ -58,7 +59,6 @@ pub struct AlloyMetadata {
     source_ip: Option<String>,
     object_id: Option<String>,
     request_id: Option<String>,
-    timestamp: Option<String>,
     custom_fields: HashMap<String, String>,
 }
 
@@ -74,7 +74,6 @@ impl AlloyMetadata {
     /// - `source_ip`                     - IP address of the initiator of this document request.
     /// - `object_id`                     - ID of the object/document being acted on in the host system.
     /// - `request_id`                    - Unique ID that ties host application request ID to tenant.
-    /// - `timestamp`                     - An ISO 8601 timestamp of when the associated action took place. Most useful for `SecurityEvents`.
     /// - `other_data`                    - Additional String key/value pairs to add to metadata.
     #[allow(clippy::too_many_arguments)]
     #[uniffi::constructor]
@@ -85,7 +84,6 @@ impl AlloyMetadata {
         source_ip: Option<String>,
         object_id: Option<String>,
         request_id: Option<String>,
-        timestamp: Option<String>,
         other_data: HashMap<String, String>,
     ) -> Arc<Self> {
         Arc::new(Self {
@@ -95,7 +93,6 @@ impl AlloyMetadata {
             source_ip,
             object_id,
             request_id,
-            timestamp,
             custom_fields: other_data,
         })
     }
@@ -114,7 +111,6 @@ impl AlloyMetadata {
             source_ip: None,
             object_id: None,
             request_id: None,
-            timestamp: None,
             custom_fields: HashMap::new(),
         })
     }
@@ -135,12 +131,32 @@ impl TryFrom<AlloyMetadata> for RequestMetadata {
             value.source_ip,
             value.object_id,
             value.request_id,
-            value.timestamp,
+            None,
             value.custom_fields,
         ))
     }
 }
 
+impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
+    type Error = AlloyError;
+    fn try_from(
+        (value, event_time_millis): (AlloyMetadata, Option<i64>),
+    ) -> Result<Self, Self::Error> {
+        let time_as_u64 = match event_time_millis {
+            Some(time) if time >= 0 => Ok(time as u64),
+            Some(_) => Err(AlloyError::InvalidInput(
+                "millis times must be >= 0.".to_string(),
+            )),
+            None => Ok(SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time moved backwards, or it's ~584 million years in the future.")
+                .as_millis() as u64),
+        }?;
+        let mut request_metadata: RequestMetadata = value.try_into()?;
+        request_metadata.timestamp_millis = Some(time_as_u64);
+        Ok(request_metadata)
+    }
+}
 // only make these top two publicly constructable to narrow public interface a bit
 #[derive(uniffi::Object)]
 pub struct Standalone {

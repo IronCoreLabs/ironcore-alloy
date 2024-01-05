@@ -42,10 +42,11 @@ After either of the non-`--lib` `cargo` commands have been run, the Kotlin and P
 Running tests with the `integration_tests` feature flag enables SaaS Shield integration tests. These require a TSP running at `http://localhost:32804` with the configuration provided in `tests/demo-tsp.conf`. This can be started by running `docker compose up` from the `tests` directory.
 
 Run tests:
-```
+
+```bash
 cargo test --features integration_tests
 ```
 
 ## License
 
-`ironcore-alloy` is licensed under the [GNU Affero General Public License](https://github.com/IronCoreLabs/ironoxide/blob/main/LICENSE). We also offer commercial licenses - [email](mailto:info@ironcorelabs.com) for more information or check pricing on our [website](https://ironcorelabs.com/).
+`ironcore-alloy` is licensed under the [GNU Affero General Public License](LICENSE). We also offer commercial licenses - [email](mailto:info@ironcorelabs.com) for more information or check pricing on our [website](https://ironcorelabs.com/).

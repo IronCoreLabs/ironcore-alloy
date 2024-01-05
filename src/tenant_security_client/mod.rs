@@ -1,3 +1,4 @@
+use crate::saas_shield::SecurityEvent;
 use crate::TenantId;
 use crate::{DerivationPath, SecretPath, TenantSecurityError::NonEmptyStringError};
 use base64_type::Base64;
@@ -115,6 +116,17 @@ impl TenantSecurityClient {
             .tenant_key_derive(paths, metadata, derivation_type, secret_type)
             .await
     }
+
+    /// Log a security event which will be sent to the tenant's log sink.
+    pub async fn log_security_event(
+        &self,
+        event: &SecurityEvent,
+        metadata: &RequestMetadata,
+    ) -> Result<(), TenantSecurityError> {
+        self.request
+            .log_security_event(event.to_string().as_str(), metadata)
+            .await
+    }
 }
 
 /// Holds metadata fields as part of an document request. Each document will have metadata that associates
@@ -126,6 +138,8 @@ pub struct RequestMetadata {
     pub tenant_id: TenantId,
     pub icl_fields: IclFields,
     pub custom_fields: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_millis: Option<u64>,
 }
 
 impl RequestMetadata {
@@ -149,18 +163,18 @@ impl RequestMetadata {
         source_ip: Option<String>,
         object_id: Option<String>,
         request_id: Option<String>,
-        timestamp: Option<String>,
+        timestamp_millis: Option<u64>,
         other_data: HashMap<String, String>,
     ) -> RequestMetadata {
         RequestMetadata {
             tenant_id,
+            timestamp_millis,
             icl_fields: IclFields {
                 requesting_id: requesting_user_or_service_id,
                 data_label,
                 source_ip,
                 object_id,
                 request_id,
-                timestamp,
             },
             custom_fields: other_data,
         }
@@ -179,13 +193,13 @@ impl RequestMetadata {
     ) -> RequestMetadata {
         RequestMetadata {
             tenant_id,
+            timestamp_millis: None,
             icl_fields: IclFields {
                 requesting_id: requesting_user_or_service_id,
                 data_label: None,
                 source_ip: None,
                 object_id: None,
                 request_id: None,
-                timestamp: None,
             },
             custom_fields: HashMap::new(),
         }
@@ -202,8 +216,6 @@ pub struct IclFields {
     source_ip: Option<String>,
     object_id: Option<String>,
     request_id: Option<String>,
-    /// An ISO 8601 string.
-    timestamp: Option<String>,
 }
 
 /// Unique ID of user/service that is processing data.

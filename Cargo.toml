@@ -1,7 +1,25 @@
 [package]
 name = "ironcore-alloy"
-version = "0.9.2-pre.19"
+version = "0.9.2-pre.21"
+description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
+authors = ["IronCore Labs <info@ironcorelabs.com>"]
 edition = "2021"
+# We exclude Cargo.lock instead of deleting it because we want consistent builds for generated SDKs
+exclude = ["Cargo.lock"]
+license = "AGPL-3.0-only"
+documentation = "https://docs.rs/ironcore-alloy"
+readme = "README.md"
+repository = "https://github.com/IronCoreLabs/ironcore-alloy"
+categories = ["cryptography"]
+keywords = [
+    "cryptography",
+    "saas-shield",
+    "ALE",
+    "application-layer-encryption",
+    "cloaked-ai",
+    "tenant-security-client",
+]
+rust-version = "1.75.0"
 
 [dependencies]
 aes-gcm = { version = "0.10" }
@@ -10,6 +28,7 @@ async-trait = "0.1.74"
 base64 = "0.21"
 base64_type = { git = "https://github.com/IronCoreLabs/base64_type", version = "0.1.0" }
 bytes = { version = "1.4.0", features = ["serde"] }
+convert_case = "0.6.0"
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
 ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", rev = "76e2e20fe97e15e27f3d6146562f054144977103" }
@@ -20,6 +39,7 @@ protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_distr = "0.4.3"
+regex = "1.10.2"
 reqwest = { version = "0.11", default-features = false, features = [
     "json",
     "rustls-tls",

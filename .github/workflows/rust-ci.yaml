@@ -15,7 +15,4 @@ jobs:
       run_clippy: true
       minimum_coverage: "50"
       cargo_command_test_args: "--lib" # Doesn't generate or test Python/Kotlin
-      test_matrix_rust_version: '[""]'
-      test_matrix_build_only: "[false]"
-      test_matrix_include: "[]"
     secrets: inherit
