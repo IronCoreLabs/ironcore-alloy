@@ -59,7 +59,7 @@ coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=i
 test = "coverage --no-cov {args}"
 
 [[tool.hatch.envs.test.matrix]]
-python = ["37", "38", "39", "310", "311"]
+python = ["38", "39", "310", "311"]
 
 [tool.hatch.envs.bench]
 dependencies = ["pyperf==2.6.2"]
