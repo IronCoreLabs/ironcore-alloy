@@ -87,6 +87,9 @@ impl AlloyClient for SaasShieldVectorClient {
 
 #[uniffi::export(async_runtime = "tokio")]
 impl VectorOps for SaasShieldVectorClient {
+    /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
+    /// and its values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embedding.
     async fn encrypt(
         &self,
         plaintext_vector: PlaintextVector,
@@ -115,6 +118,8 @@ impl VectorOps for SaasShieldVectorClient {
         self.encrypt_core(&key, key_id, plaintext_vector)
     }
 
+    /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
+    /// be unshuffled to their original positions during decryption.
     async fn decrypt(
         &self,
         encrypted_vector: EncryptedVector,
@@ -163,6 +168,8 @@ impl VectorOps for SaasShieldVectorClient {
         }
     }
 
+    /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
+    /// The resulting encrypted vectors should be used in tandem when querying the vector database.
     async fn generate_query_vectors(
         &self,
         vectors_to_query: PlaintextVectors,

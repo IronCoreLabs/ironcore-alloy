@@ -8,7 +8,7 @@ from packaging.tags import sys_tags
 # See https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/ for info on each tag.
 def get_cdylib_specific_tag(cdylib_platform: str) -> str:
     print(cdylib_platform)
-    # our generated python code uses python 3.7 features, so we don't actually support all py3. We're depending
+    # our generated python code uses python 3.8 features, so we don't actually support all py3. We're depending
     # on the `requires-python` value in our `pyproject.toml` to make sure earlier incompatible interpreters don't
     # install us.
     python_tag = "py3"

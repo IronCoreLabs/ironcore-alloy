@@ -184,6 +184,15 @@ impl AlloyClient for SaasShieldStandardClient {
 
 #[uniffi::export(async_runtime = "tokio")]
 impl StandardDocumentOps for SaasShieldStandardClient {
+    /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
+    /// bytes, and the same metadata must be provided when decrypting the document.
+    /// A DEK (document encryption key) will be generated and encrypted using a derived key, then each field of the
+    /// document will be encrypted separately using a random IV and this single generated DEK.
+    /// The result contains a map from field identifiers to encrypted bytes as well as the EDEK (encrypted document
+    /// encryption key) used for encryption.
+    /// The document is encrypted differently with each call, so the result is not suited for exact matches or indexing.
+    /// For the same reason however the strongest protection of the document is provided by this method.
+    /// To support these uses, see the `DeterministicFieldOps.encrypt` function.
     async fn encrypt(
         &self,
         plaintext_document: PlaintextDocument,
@@ -207,6 +216,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         )
     }
 
+    /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
+    /// of the `StandardDocumentOps.encrypt` functions. The result contains a map from field identifiers to decrypted
+    /// bytes.
     async fn decrypt(
         &self,
         encrypted_document: EncryptedDocument,
@@ -224,6 +236,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         decrypt_document_core(encrypted_document.document, enc_key)
     }
 
+    /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
+    /// the EDEK will be encrypted to the original tenant. Because the underlying DEK does not change, a document
+    /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
     async fn rekey_edeks(
         &self,
         edeks: HashMap<String, EdekWithKeyIdHeader>,
@@ -240,6 +255,10 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         Ok(collection_to_batch_result(tsp_responses, identity).into())
     }
 
+    /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
+    /// bytes, and the same metadata must be provided when decrypting the document.
+    /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
+    /// of the document.
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,

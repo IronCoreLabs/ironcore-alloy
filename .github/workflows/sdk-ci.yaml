@@ -86,7 +86,6 @@ jobs:
         with:
           # there are no builds for arm linux at all, so we'll make do with the system ones
           python-version: |
-            3.7
             3.8
             3.9
             3.10

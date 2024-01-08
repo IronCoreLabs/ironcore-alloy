@@ -84,6 +84,9 @@ impl AlloyClient for StandaloneVectorClient {
 
 #[uniffi::export]
 impl VectorOps for StandaloneVectorClient {
+    /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
+    /// and its values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embedding.
     async fn encrypt(
         &self,
         plaintext_vector: PlaintextVector,
@@ -122,6 +125,8 @@ impl VectorOps for StandaloneVectorClient {
         )
     }
 
+    /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
+    /// be unshuffled to their original positions during decryption.
     async fn decrypt(
         &self,
         encrypted_vector: EncryptedVector,
@@ -160,6 +165,8 @@ impl VectorOps for StandaloneVectorClient {
         )
     }
 
+    /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
+    /// The resulting encrypted vectors should be used in tandem when querying the vector database.
     async fn generate_query_vectors(
         &self,
         vectors_to_query: PlaintextVectors,
@@ -244,6 +251,16 @@ impl VectorOps for StandaloneVectorClient {
         )
     }
 
+    /// Rotates vectors from the in-rotation secret for their secret path to the current secret.
+    /// This can also be used to rotate data from one tenant ID to a new one, which most useful when a tenant is
+    /// internally migrated.
+    ///
+    /// WARNINGS:
+    ///     * this involves decrypting then encrypting vectors. Since the vectors are full of floating point numbers,
+    ///       this process is lossy, which will cause some drift over time. If you need perfectly preserved accuracy
+    ///       store the source vector encrypted with `standard` next to the encrypted vector. `standard` decrypt
+    ///       that, `vector` encrypt it again, and replace the encrypted vector with the result.
+    ///     * only one metadata and new tenant ID argument means each call to this needs to have one tenant's vectors.
     async fn rotate_vectors(
         &self,
         encrypted_vectors: EncryptedVectors,
