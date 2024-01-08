@@ -161,7 +161,7 @@ pub trait VectorOps {
         encrypted_vectors: EncryptedVectors,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> VectorRotateResult;
+    ) -> Result<VectorRotateResult, AlloyError>;
 }
 
 pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), AlloyError> {
