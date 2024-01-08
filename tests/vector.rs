@@ -107,4 +107,46 @@ mod tests {
             .contains("didn't have the requested key."));
         Ok(())
     }
+
+    #[tokio::test]
+    async fn vector_rotate_fields_no_op() -> TestResult {
+        let ciphertext = get_ciphertext();
+        let vectors = [("vector".to_string(), ciphertext)].into();
+        let metadata = get_metadata();
+        let mut resp = CLIENT
+            .vector()
+            .rotate_vectors(vectors, &metadata, None)
+            .await?;
+        assert_eq!(resp.successes.len(), 1);
+        assert_eq!(resp.failures.len(), 0);
+        let rotated = resp.successes.remove("vector").unwrap();
+        let decrypted = CLIENT.vector().decrypt(rotated, &metadata).await?;
+        let expected = get_plaintext().plaintext_vector;
+        assert_eq!(decrypted.plaintext_vector, expected);
+        assert_eq!(decrypted.secret_path.0, "secret");
+        assert_eq!(decrypted.derivation_path.0, "deriv");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn vector_rotate_fields_new_tenant() -> TestResult {
+        let ciphertext = get_ciphertext();
+        let vectors = [("vector".to_string(), ciphertext)].into();
+        let metadata = get_metadata();
+        let new_tenant_id = TenantId("tenant-aws-l".to_string());
+        let mut resp = CLIENT
+            .vector()
+            .rotate_vectors(vectors, &metadata, Some(new_tenant_id.clone()))
+            .await?;
+        assert_eq!(resp.successes.len(), 1);
+        assert_eq!(resp.failures.len(), 0);
+        let rotated = resp.successes.remove("vector").unwrap();
+        let new_metadata = AlloyMetadata::new_simple(new_tenant_id);
+        let decrypted = CLIENT.vector().decrypt(rotated, &new_metadata).await?;
+        let expected = get_plaintext().plaintext_vector;
+        assert_eq!(decrypted.plaintext_vector, expected);
+        assert_eq!(decrypted.secret_path.0, "secret");
+        assert_eq!(decrypted.derivation_path.0, "deriv");
+        Ok(())
+    }
 }

@@ -266,7 +266,7 @@ impl VectorOps for StandaloneVectorClient {
         encrypted_vectors: EncryptedVectors,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
-    ) -> VectorRotateResult {
+    ) -> Result<VectorRotateResult, AlloyError> {
         let new_metadata = match new_tenant_id {
             None => metadata.clone(),
             Some(tenant_id) => AlloyMetadata {
@@ -281,7 +281,7 @@ impl VectorOps for StandaloneVectorClient {
             },
         ))
         .await;
-        collection_to_batch_result(attempts, identity).into()
+        Ok(collection_to_batch_result(attempts, identity).into())
     }
 }
 
@@ -440,7 +440,8 @@ mod test {
                 &get_metadata(),
                 Some(new_tenant_id.clone()),
             )
-            .await;
+            .await
+            .unwrap();
         assert_eq!(rotated_result.failures, HashMap::new());
         let rotated_vector = rotated_result.successes.remove("one").unwrap();
         // make sure we didn't hallucinate any other vectors

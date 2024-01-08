@@ -73,6 +73,80 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun sdkVectorRotateDifferentTenant() {
+        val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
+        val iclMetadata =
+                "AAAAAoEACgxPGmuySl4VniL/cbMSIOykrH8Xa9rVT4vtQZE73EM3G6AOrEae4tVgIpxA3lhp".base64ToByteArray()
+        val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
+        val vectors = mapOf("vector" to encrypted)
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val rotated = sdk.vector().rotateVectors(vectors, metadata, "tenant2")
+            assertEquals(rotated.successes.size, 1)
+            assertEquals(rotated.failures.size, 0)
+            assert(rotated.successes.containsKey("vector"))
+            val newMetadata = AlloyMetadata.newSimple("tenant2")
+            val decrypted = sdk.vector().decrypt(rotated.successes.get("vector")!!, newMetadata)
+            val expected = listOf(1.0f, 2.0f, 3.0f)
+            for (i in 0..(decrypted.plaintextVector.size - 1)) {
+                decrypted.plaintextVector.get(i).sameValueAs(expected.get(i))
+            }
+        }
+    }
+
+    @Test
+    fun sdkVectorRotateDifferentKey() {
+        val vectorSecrets2 =
+                mapOf(
+                        "" to
+                                VectorSecret(
+                                        approximationFactor,
+                                        RotatableSecret(
+                                                // Switched current and in-rotation vs original sdk
+                                                StandaloneSecret(1, Secret(keyByteArray)),
+                                                StandaloneSecret(2, Secret(keyByteArray)),
+                                        )
+                                )
+                )
+        val config2 = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets2)
+        val sdk2 = Standalone(config2)
+        val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
+        val iclMetadata =
+                "AAAAAoEACgxPGmuySl4VniL/cbMSIOykrH8Xa9rVT4vtQZE73EM3G6AOrEae4tVgIpxA3lhp".base64ToByteArray()
+        val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
+        val vectors = mapOf("vector" to encrypted)
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val rotated =
+                    sdk2.vector().rotateVectors(vectors, metadata, "tenant") // unchanged tenant
+            assertEquals(rotated.successes.size, 1)
+            assertEquals(rotated.failures.size, 0)
+            assert(rotated.successes.containsKey("vector"))
+            // Now that it's rotated, sometime in the future we have an SDK with only the new
+            // current
+            val vectorSecrets3 =
+                    mapOf(
+                            "" to
+                                    VectorSecret(
+                                            approximationFactor,
+                                            RotatableSecret(
+                                                    StandaloneSecret(1, Secret(keyByteArray)),
+                                                    null
+                                            )
+                                    )
+                    )
+            val config3 =
+                    StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets3)
+            val sdk3 = Standalone(config3)
+            val decrypted = sdk3.vector().decrypt(rotated.successes.get("vector")!!, metadata)
+            val expected = listOf(1.0f, 2.0f, 3.0f)
+            for (i in 0..(decrypted.plaintextVector.size - 1)) {
+                decrypted.plaintextVector.get(i).sameValueAs(expected.get(i))
+            }
+        }
+    }
+
+    @Test
     fun sdkEncryptDeterministic() {
         val field = PlaintextField("My data".toByteArray(), "", "")
         val metadata = AlloyMetadata.newSimple("tenant")

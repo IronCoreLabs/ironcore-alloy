@@ -1,11 +1,12 @@
 use super::{
     derive_keys_many_paths, derived_key_to_vector_encryption_key, get_in_rotation_prefix_internal,
-    DeriveKeyChoice, SaasShieldSecurityEventOps, SecurityEvent,
+    get_keys_for_rotation, DeriveKeyChoice, RotationKeys, SaasShieldSecurityEventOps,
+    SecurityEvent,
 };
 use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::{get_rng, OurReseedingRng};
+use crate::util::{check_rotation_no_op, collection_to_batch_result, get_rng, OurReseedingRng};
 use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
     PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
@@ -206,6 +207,83 @@ impl VectorOps for SaasShieldVectorClient {
             .collect()
     }
 
+    async fn rotate_vectors(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<VectorRotateResult, AlloyError> {
+        let approximation_factor = self.approximation_factor.ok_or_else(|| {
+            AlloyError::InvalidConfiguration(
+                "`approximation_factor` was not set in the vector configuration.".to_string(),
+            )
+        })?;
+        let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
+        let paths = encrypted_vectors
+            .values()
+            .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
+            .collect_vec();
+        let RotationKeys {
+            original_keys: original_tenant_keys,
+            new_keys: new_tenant_keys,
+        } = get_keys_for_rotation(
+            metadata,
+            parsed_new_tenant_id,
+            paths,
+            &self.tenant_security_client,
+            SecretType::Vector,
+        )
+        .await?;
+        let reencrypt_vector = |encrypted_vector: EncryptedVector| {
+            let (original_key_id, icl_metadata_bytes) =
+                Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+            let maybe_current_key_id = new_tenant_keys
+                .get_current(
+                    &encrypted_vector.secret_path,
+                    &encrypted_vector.derivation_path,
+                )
+                .map(|k| k.tenant_secret_id.0);
+            if check_rotation_no_op(
+                original_key_id,
+                &maybe_current_key_id,
+                parsed_new_tenant_id,
+                metadata,
+            ) {
+                Ok(encrypted_vector)
+            } else {
+                let original_derived_key = original_tenant_keys.get_key_for_path(
+                    &encrypted_vector.secret_path,
+                    &encrypted_vector.derivation_path,
+                    DeriveKeyChoice::Specific(original_key_id),
+                )?;
+                let (_, original_vector_key) =
+                    derived_key_to_vector_encryption_key(original_derived_key)?;
+                let decrypted_vector = decrypt_internal(
+                    approximation_factor,
+                    &original_vector_key,
+                    encrypted_vector,
+                    icl_metadata_bytes,
+                )?;
+                let new_derived_key = new_tenant_keys.get_key_for_path(
+                    &decrypted_vector.secret_path,
+                    &decrypted_vector.derivation_path,
+                    DeriveKeyChoice::Current,
+                )?;
+                let (new_key_id, new_vector_key) =
+                    derived_key_to_vector_encryption_key(new_derived_key)?;
+                encrypt_internal(
+                    approximation_factor,
+                    &new_vector_key,
+                    new_key_id,
+                    Self::get_edek_type(),
+                    decrypted_vector,
+                    &mut *get_rng(&self.rng),
+                )
+            }
+        };
+        Ok(collection_to_batch_result(encrypted_vectors, reencrypt_vector).into())
+    }
+
     /// Get the byte prefix for the InRotation secret corresponding to this secret_path/derivation_path.
     /// Note that if you use z85 or ascii85 encoding, the result of this function should be passed to `base85_compat_prefix_bytes`
     /// before searching your datastore.
@@ -232,24 +310,5 @@ impl VectorOps for SaasShieldVectorClient {
             Self::get_edek_type(),
             Self::get_payload_type(),
         )
-    }
-
-    /// Rotates vectors from the in-rotation secret for their secret path to the current secret.
-    /// This can also be used to rotate data from one tenant ID to a new one, which most useful when a tenant is
-    /// internally migrated.
-    ///
-    /// WARNINGS:
-    ///     * this involves decrypting then encrypting vectors. Since the vectors are full of floating point numbers,
-    ///       this process is lossy, which will cause some drift over time. If you need perfectly preserved accuracy
-    ///       store the source vector encrypted with `standard` next to the encrypted vector. `standard` decrypt
-    ///       that, `vector` encrypt it again, and replace the encrypted vector with the result.
-    ///     * only one metadata and new tenant ID argument means each call to this needs to have one tenant's vectors.
-    async fn rotate_vectors(
-        &self,
-        _encrypted_vectors: EncryptedVectors,
-        _metadata: &AlloyMetadata,
-        _new_tenant_id: Option<TenantId>,
-    ) -> VectorRotateResult {
-        unimplemented!()
     }
 }
