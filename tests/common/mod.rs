@@ -82,6 +82,7 @@ pub(crate) fn generate_bindings(
         &camino_lib_path,
         None,
         &[language],
+        None,
         &camino_out_dir,
         true,
     )?;

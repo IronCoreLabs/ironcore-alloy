@@ -3,6 +3,6 @@
 [project]
 name = "ironcore-alloy-examples"
 authors = [{ name = "IronCore Labs", email = "info@ironcorelabs.com" }]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dependencies = ["ironcore-alloy"]
 dynamic = ["version"]

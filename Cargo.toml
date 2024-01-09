@@ -48,16 +48,17 @@ ring = "0.16.20"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
 thiserror = "1.0.50"
-uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
+# update when 0.26 (https://github.com/mozilla/uniffi-rs/issues/1911) releases
+uniffi = { git = "https://github.com/bendk/uniffi-rs.git", features = [
     "cli",
     "tokio",
-], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
+], branch = "foreign-trait-interfaces-opt-in" }
 z85 = "3.0.5"
 
 [dev-dependencies]
 approx = "0.5.1"
 ascii85 = "0.2.1"
-assertables = "7.0.1"
+assertables = "7.0.1" 
 base64 = "0.21.5"
 base85 = "2.0.0"
 camino = "1.1"
@@ -67,10 +68,10 @@ hex-literal = "0.4.1"
 lazy_static = "1.4"
 proptest = "1.2.0"
 tokio = { version = "1.33", features = ["macros", "rt-multi-thread"] }
-uniffi = { git = "https://github.com/skeet70/uniffi-rs.git", features = [
+uniffi = { git = "https://github.com/bendk/uniffi-rs.git", features = [
     "bindgen-tests",
-], rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
-uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs.git", rev = "5c3aa4a9f7c603437c42c500833347e3d7dfe0c2" }
+], branch = "foreign-trait-interfaces-opt-in" }
+uniffi_bindgen = { git = "https://github.com/bendk/uniffi-rs.git", branch = "foreign-trait-interfaces-opt-in" }
 z85 = "3.0.5"
 
 [features]

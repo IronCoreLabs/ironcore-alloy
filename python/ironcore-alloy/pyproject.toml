@@ -12,7 +12,7 @@ name = "ironcore-alloy"
 authors = [{ name = "IronCore Labs", email = "info@ironcorelabs.com" }]
 description = "Python bindings to the IronCore Labs Alloy SDK. Used for encrypting and decrypting embeddings and their related metadata."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
@@ -48,10 +48,10 @@ serve = "mkdocs serve --dev-addr localhost:8000 {args}"
 
 [tool.hatch.envs.test]
 dependencies = [
-  "pytest==7.4.2",
-  "pytest-cov==4.1.0",
-  "pytest-metadata==3.0.0",
-  "pytest-asyncio==0.21.1",
+    "pytest==7.4.2",
+    "pytest-cov==4.1.0",
+    "pytest-metadata==3.0.0",
+    "pytest-asyncio==0.21.1",
 ]
 
 [tool.hatch.envs.test.scripts]
@@ -59,12 +59,10 @@ coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=i
 test = "coverage --no-cov {args}"
 
 [[tool.hatch.envs.test.matrix]]
-python = ["37", "38", "39", "310", "311"]
+python = ["38", "39", "310", "311"]
 
 [tool.hatch.envs.bench]
-dependencies = [
-    "pyperf==2.6.2"
-]
+dependencies = ["pyperf==2.6.2"]
 
 [tool.hatch.envs.bench.scripts]
 bench = "rm bench.json; python bench.py -o bench.json"
