@@ -1,5 +1,7 @@
 use crate::tenant_security_client::errors::TenantSecurityError;
-use crate::vector::crypto::{DecryptError, EncryptError};
+use crate::vector::crypto::{
+    DecryptError as VectorDecryptError, EncryptError as VectorEncryptError,
+};
 
 /// Errors related to IronCore Alloy SDK
 #[derive(Debug, uniffi::Error, PartialEq, Eq)]
@@ -19,8 +21,6 @@ pub enum AlloyError {
     ProtobufError(String),
     /// Error with requests to TSC
     TenantSecurityError(String),
-    /// Error with IronCore Documents
-    IronCoreDocumentsError(String),
 }
 impl std::fmt::Display for AlloyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -36,9 +36,6 @@ impl std::fmt::Display for AlloyError {
             AlloyError::TenantSecurityError(message) => {
                 write!(f, "Tenant security client error: '{message}'")
             }
-            AlloyError::IronCoreDocumentsError(message) => {
-                write!(f, "IronCore Documents error: '{message}'")
-            }
         }
     }
 }
@@ -47,20 +44,20 @@ impl From<TenantSecurityError> for AlloyError {
         Self::TenantSecurityError(value.to_string())
     }
 }
-impl From<EncryptError> for AlloyError {
-    fn from(value: EncryptError) -> Self {
+impl From<VectorEncryptError> for AlloyError {
+    fn from(value: VectorEncryptError) -> Self {
         match value {
-            EncryptError::InvalidKey(s) => Self::InvalidKey(s),
-            EncryptError::OverflowError => Self::InvalidInput(value.to_string()),
+            VectorEncryptError::InvalidKey(s) => Self::InvalidKey(s),
+            VectorEncryptError::OverflowError => Self::InvalidInput(value.to_string()),
         }
     }
 }
-impl From<DecryptError> for AlloyError {
-    fn from(value: DecryptError) -> Self {
+impl From<VectorDecryptError> for AlloyError {
+    fn from(value: VectorDecryptError) -> Self {
         match value {
-            DecryptError::InvalidKey(s) => Self::InvalidKey(s),
-            DecryptError::InvalidAuthHash => {
-                Self::DecryptError("Invalid authentication hash".to_string())
+            VectorDecryptError::InvalidKey(s) => Self::InvalidKey(s),
+            VectorDecryptError::InvalidAuthHash => {
+                Self::InvalidInput("Invalid authentication hash".to_string())
             }
         }
     }
@@ -78,7 +75,7 @@ impl From<ironcore_documents::Error> for AlloyError {
             | ironcore_documents::Error::PayloadTypeError(_)
             | ironcore_documents::Error::KeyIdHeaderTooShort(_)
             | ironcore_documents::Error::KeyIdHeaderMalformed(_) => {
-                AlloyError::IronCoreDocumentsError(value.to_string())
+                AlloyError::InvalidInput(value.to_string())
             }
             ironcore_documents::Error::ProtoSerializationErr(m) => AlloyError::ProtobufError(m),
             ironcore_documents::Error::EncryptError(m) => AlloyError::EncryptError(m),

@@ -319,7 +319,10 @@ pub fn generate_cmk_v4_doc_and_sign(
         })
         .collect();
 
-    Ok(ironcore_documents::create_signed_proto(edek_wrappers, dek))
+    Ok(ironcore_documents::v4::aes::create_signed_proto(
+        edek_wrappers,
+        dek,
+    ))
 }
 
 #[cfg(test)]

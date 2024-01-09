@@ -172,9 +172,12 @@ fn deterministic_decrypt_core(
     associated_data: &[u8],
 ) -> Result<Vec<u8>, AlloyError> {
     let mut cipher = Aes256Siv::new(&key.into());
-    cipher
-        .decrypt([associated_data], ciphertext)
-        .map_err(|e| AlloyError::DecryptError(e.to_string()))
+    cipher.decrypt([associated_data], ciphertext).map_err(|_| {
+        AlloyError::DecryptError(
+            "Failed deterministic decryption. Ensure the data and tenant ID are correct"
+                .to_string(),
+        )
+    })
 }
 
 /// Returns `true` if the key IDs and tenant IDs are identical, otherwise `false`.
