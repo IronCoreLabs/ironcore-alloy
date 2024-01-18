@@ -214,6 +214,18 @@ class TestIroncoreAlloy:
         expected = b"My data"
         assert decrypted.plaintext_field == expected
 
+    @pytest.mark.asyncio
+    async def test_rotate_deterministic_failures(self):
+        field = EncryptedField(
+            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "wrong_path", "wrong_path"
+        )
+        fields = {"doc": field}
+        metadata = AlloyMetadata.new_simple("tenant")
+        rotated = await self.sdk.deterministic().rotate_fields(fields, metadata, "tenant2")
+        assert len(rotated.successes) == 0
+        assert len(rotated.failures) == 1
+        assert "Provided secret path `wrong_path` does not exist" in rotated.failures["doc"].msg 
+
     @pytest.mark.skip(reason="need seeded client")
     @pytest.mark.asyncio
     async def test_encrypt_probabilistic_metadata(self):
