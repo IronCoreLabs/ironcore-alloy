@@ -468,8 +468,8 @@ pub(crate) mod test {
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidConfiguration{msg: 
-                "No primary secret exists in the standard configuration".to_string()
+            AlloyError::InvalidConfiguration {
+                msg: "No primary secret exists in the standard configuration".to_string()
             }
         );
         Ok(())
@@ -484,8 +484,8 @@ pub(crate) mod test {
         let error = client.encrypt(document, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidConfiguration{msg: 
-                "Primary secret id not found in secrets map".to_string()
+            AlloyError::InvalidConfiguration {
+                msg: "Primary secret id not found in secrets map".to_string()
             }
         );
         Ok(())
@@ -580,7 +580,9 @@ pub(crate) mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::ProtobufError{msg: "Unexpected EOF".to_string()}
+            AlloyError::ProtobufError {
+                msg: "Unexpected EOF".to_string()
+            }
         );
         Ok(())
     }
@@ -596,7 +598,7 @@ pub(crate) mod test {
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
         assert_eq!(
             error,
-            AlloyError::InvalidInput{msg: 
+            AlloyError::InvalidInput{ msg:
                 "The data indicated that this was not a Standalone Standard EDEK wrapped value. Found: SaaS Shield, Deterministic Field"
                     .to_string()
             }

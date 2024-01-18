@@ -42,11 +42,12 @@ impl SaasShieldVectorClient {
         key_id: KeyId,
         plaintext_vector: PlaintextVector,
     ) -> Result<EncryptedVector, AlloyError> {
-        let approximation_factor = self.approximation_factor.ok_or_else(|| {
-            AlloyError::InvalidConfiguration{msg: 
-                "`approximation_factor` was not set in the vector configuration.".to_string(),
-            }
-        })?;
+        let approximation_factor =
+            self.approximation_factor
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: "`approximation_factor` was not set in the vector configuration."
+                        .to_string(),
+                })?;
         encrypt_internal(
             approximation_factor,
             key,
@@ -69,10 +70,9 @@ impl SaasShieldSecurityEventOps for SaasShieldVectorClient {
         event_time_millis: Option<i64>,
     ) -> Result<(), AlloyError> {
         let request_metadata = (metadata.clone(), event_time_millis).try_into()?;
-        Ok(self
-            .tenant_security_client
+        self.tenant_security_client
             .log_security_event(&event, &request_metadata)
-            .await?)
+            .await
     }
 }
 
@@ -125,11 +125,12 @@ impl VectorOps for SaasShieldVectorClient {
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
-        let approximation_factor = self.approximation_factor.ok_or_else(|| {
-            AlloyError::InvalidConfiguration{msg:
-                "`approximation_factor` was not set in the vector configuration.".to_string(),
-            }
-        })?;
+        let approximation_factor =
+            self.approximation_factor
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: "`approximation_factor` was not set in the vector configuration."
+                        .to_string(),
+                })?;
         let (key_id, icl_metadata_bytes) =
             Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
@@ -154,7 +155,7 @@ impl VectorOps for SaasShieldVectorClient {
         )?;
         let (derived_key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
         if derived_key_id != key_id {
-            Err(AlloyError::InvalidKey{msg: 
+            Err(AlloyError::InvalidKey{ msg:
                     "The key ID in the paired ICL info and on the key derived for decryption did not match"
                         .to_string(),
         })
@@ -194,10 +195,8 @@ impl VectorOps for SaasShieldVectorClient {
                     .get(&plaintext_vector.secret_path)
                     .and_then(|deriv| deriv.get(&plaintext_vector.derivation_path))
                     .ok_or(AlloyError::RequestError {
-                            msg: "Failed to derive keys for provided path using the TSP."
-                                .to_string(),
-                        },
-                    )?;
+                        msg: "Failed to derive keys for provided path using the TSP.".to_string(),
+                    })?;
                 keys.iter()
                     .map(|derived_key| {
                         let (key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;

@@ -154,7 +154,7 @@ impl SaasShieldStandardClient {
                     let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
                     Ok(EdekParts::V5(key_id, v4_document_header))
                 } else {
-                    Err(AlloyError::InvalidInput{msg: 
+                    Err(AlloyError::InvalidInput{ msg:
                 format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
                 })
                 }
@@ -290,10 +290,9 @@ impl SaasShieldSecurityEventOps for SaasShieldStandardClient {
         event_time_millis: Option<i64>,
     ) -> Result<(), AlloyError> {
         let request_metadata = (metadata.clone(), event_time_millis).try_into()?;
-        Ok(self
-            .tenant_security_client
+        self.tenant_security_client
             .log_security_event(&event, &request_metadata)
-            .await?)
+            .await
     }
 }
 
@@ -337,9 +336,9 @@ fn fix_encrypted_dek(
 }
 
 fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, AlloyError> {
-    let bytes: [u8; 32] = dek
-        .try_into()
-        .map_err(|_| AlloyError::InvalidKey { msg: "Invalid DEK".to_string() })?;
+    let bytes: [u8; 32] = dek.try_into().map_err(|_| AlloyError::InvalidKey {
+        msg: "Invalid DEK".to_string(),
+    })?;
     Ok(EncryptionKey(bytes))
 }
 

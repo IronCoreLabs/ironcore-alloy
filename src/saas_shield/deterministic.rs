@@ -104,7 +104,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             DeriveKeyChoice::Specific(key_id),
         )?;
         if derived_key.tenant_secret_id.0 != key_id.0 {
-            Err(AlloyError::InvalidKey{msg: 
+            Err(AlloyError::InvalidKey{ msg:
                     "The key ID in the document header and on the key derived for decryption did not match"
                         .to_string(),
         })
@@ -145,8 +145,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                     .and_then(|deriv| deriv.get(&plaintext_field.derivation_path))
                     .ok_or(AlloyError::RequestError {
                         msg: "Failed to derive keys for provided path using the TSP.".to_string(),
-                    },
-                )?;
+                    })?;
                 keys.iter()
                     .map(|derived_key| {
                         let key_id_header =
@@ -274,10 +273,9 @@ impl SaasShieldSecurityEventOps for SaasShieldDeterministicClient {
         event_time_millis: Option<i64>,
     ) -> Result<(), AlloyError> {
         let request_metadata = (metadata.clone(), event_time_millis).try_into()?;
-        Ok(self
-            .tenant_security_client
+        self.tenant_security_client
             .log_security_event(&event, &request_metadata)
-            .await?)
+            .await
     }
 }
 
