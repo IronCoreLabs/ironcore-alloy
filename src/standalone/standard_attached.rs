@@ -152,7 +152,7 @@ mod test {
             .decrypt(EncryptedAttachedDocument(encrypted.to_vec()), &metadata)
             .await
             .unwrap_err();
-        assert_eq!(err, AlloyError::DecryptError("aead::Error".to_string()))
+        assert!(matches!(err, AlloyError::DecryptError(_)))
     }
 
     #[tokio::test]

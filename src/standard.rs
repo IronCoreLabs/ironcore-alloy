@@ -151,7 +151,7 @@ pub(crate) fn verify_sig(
     aes_dek: EncryptionKey,
     document: &icl_header_v4::V4DocumentHeader,
 ) -> Result<(), AlloyError> {
-    if ironcore_documents::verify_signature(aes_dek, document) {
+    if ironcore_documents::v5::aes::verify_signature(aes_dek, document) {
         Ok(())
     } else {
         Err(AlloyError::DecryptError(
