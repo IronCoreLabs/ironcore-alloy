@@ -72,10 +72,10 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
 
     let edoc = document
         .remove(&hardcoded_id)
-        .ok_or(AlloyError::EncryptError(
-            "Encryption returned a document without a passed in field. This shouldn't happen."
+        .ok_or(AlloyError::EncryptError {
+            msg: "Encryption returned a document without a passed in field. This shouldn't happen."
                 .to_string(),
-        ))?;
+        })?;
 
     Ok(EncryptedAttachedDocument(
         AttachedDocument {

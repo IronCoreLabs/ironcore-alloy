@@ -1,10 +1,11 @@
-use super::errors::{TenantSecurityError, TenantSecurityProxyError};
+use super::errors::TenantSecurityProxyError;
 use super::rest::{
     BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, DerivationType, KeyDeriveResponse,
     LogSecurityEventRequest, RekeyRequest, RekeyResponse, SecretType, TenantDeriveKeyRequest,
     TspErrorResponse, UnwrapKeyRequest, UnwrapKeyResponse, WrapKeyResponse,
 };
 use super::{ApiKey, RequestMetadata};
+use crate::errors::AlloyError;
 use crate::{DerivationPath, SecretPath};
 use async_trait::async_trait;
 use base64_type::Base64;
@@ -54,7 +55,7 @@ impl TspRequest {
         &self,
         endpoint: String,
         post_data: A,
-    ) -> Result<Response, TenantSecurityError> {
+    ) -> Result<Response, AlloyError> {
         let url = format!("{}{}{}", self.tsp_address, TSP_API_PREFIX, endpoint);
         let resp = self
             .client
@@ -69,17 +70,20 @@ impl TspRequest {
                 let parsed_error = resp
                     .json::<Value>()
                     .await
-                    .map_err(|_| {
-                        TenantSecurityError::RequestError(format!(
+                    .map_err(|_| AlloyError::RequestError {
+                        msg: format!(
                             "Response from the TSP URL was not valid JSON. Status: {}",
                             status.as_str()
-                        ))
+                        ),
                     })
                     .and_then(|json| TspErrorResponse::try_from_value(json, status))?;
-                Err(super::errors::TenantSecurityError::TspError(
-                    TenantSecurityProxyError::code_to_error(parsed_error.code),
-                    status,
-                ))
+                let error_variant = TenantSecurityProxyError::code_to_error(parsed_error.code);
+                Err(AlloyError::TspError {
+                    msg: error_variant.to_string(),
+                    err: error_variant,
+                    http_code: status.as_u16(),
+                    tsp_code: parsed_error.code,
+                })
             }
         }
     }
@@ -90,29 +94,26 @@ pub(crate) trait TenantSecurityRequest: DocumentKeyOps + TenantKeyOps + EventOps
 
 #[async_trait]
 pub(crate) trait DocumentKeyOps {
-    async fn wrap_key(
-        &self,
-        metadata: &RequestMetadata,
-    ) -> Result<WrapKeyResponse, TenantSecurityError>;
+    async fn wrap_key(&self, metadata: &RequestMetadata) -> Result<WrapKeyResponse, AlloyError>;
 
     async fn unwrap_key(
         &self,
         encrypted_document_key: &Base64,
         metadata: &RequestMetadata,
-    ) -> Result<UnwrapKeyResponse, TenantSecurityError>;
+    ) -> Result<UnwrapKeyResponse, AlloyError>;
 
     async fn batch_unwrap_key(
         &self,
         encrypted_document_keys: HashMap<&str, Base64>,
         metadata: &RequestMetadata,
-    ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError>;
+    ) -> Result<BatchUnwrapKeyResponse, AlloyError>;
 
     async fn rekey(
         &self,
         new_tenant_id: &str,
         metadata: &RequestMetadata,
         encrypted_document_key: &Base64,
-    ) -> Result<RekeyResponse, TenantSecurityError>;
+    ) -> Result<RekeyResponse, AlloyError>;
 }
 
 #[async_trait]
@@ -121,15 +122,12 @@ pub(crate) trait EventOps {
         &self,
         event_text: &str,
         metadata: &RequestMetadata,
-    ) -> Result<(), TenantSecurityError>;
+    ) -> Result<(), AlloyError>;
 }
 
 #[async_trait]
 impl DocumentKeyOps for TspRequest {
-    async fn wrap_key(
-        &self,
-        metadata: &RequestMetadata,
-    ) -> Result<WrapKeyResponse, TenantSecurityError> {
+    async fn wrap_key(&self, metadata: &RequestMetadata) -> Result<WrapKeyResponse, AlloyError> {
         Ok(self
             .make_json_request(WRAP_ENDPOINT.to_string(), metadata)
             .await?
@@ -141,7 +139,7 @@ impl DocumentKeyOps for TspRequest {
         &self,
         encrypted_document_key: &Base64,
         metadata: &RequestMetadata,
-    ) -> Result<UnwrapKeyResponse, TenantSecurityError> {
+    ) -> Result<UnwrapKeyResponse, AlloyError> {
         let post_data = serde_json::to_value(UnwrapKeyRequest {
             encrypted_document_key,
             metadata,
@@ -157,7 +155,7 @@ impl DocumentKeyOps for TspRequest {
         &self,
         encrypted_document_keys: HashMap<&str, Base64>,
         metadata: &RequestMetadata,
-    ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError> {
+    ) -> Result<BatchUnwrapKeyResponse, AlloyError> {
         let post_data = serde_json::to_value(BatchUnwrapKeyRequest {
             metadata,
             edeks: encrypted_document_keys,
@@ -174,7 +172,7 @@ impl DocumentKeyOps for TspRequest {
         new_tenant_id: &str,
         metadata: &RequestMetadata,
         encrypted_document_key: &Base64,
-    ) -> Result<RekeyResponse, TenantSecurityError> {
+    ) -> Result<RekeyResponse, AlloyError> {
         let post_data = serde_json::to_value(RekeyRequest {
             metadata,
             new_tenant_id,
@@ -196,7 +194,7 @@ pub trait TenantKeyOps {
         metadata: &RequestMetadata,
         derivation_type: DerivationType,
         secret_type: SecretType,
-    ) -> Result<KeyDeriveResponse, TenantSecurityError>;
+    ) -> Result<KeyDeriveResponse, AlloyError>;
 }
 
 #[async_trait]
@@ -207,7 +205,7 @@ impl TenantKeyOps for TspRequest {
         metadata: &RequestMetadata,
         derivation_type: DerivationType,
         secret_type: SecretType,
-    ) -> Result<KeyDeriveResponse, TenantSecurityError> {
+    ) -> Result<KeyDeriveResponse, AlloyError> {
         let post_data = serde_json::to_value(TenantDeriveKeyRequest {
             metadata,
             paths,
@@ -228,7 +226,7 @@ impl EventOps for TspRequest {
         &self,
         event_text: &str,
         metadata: &RequestMetadata,
-    ) -> Result<(), TenantSecurityError> {
+    ) -> Result<(), AlloyError> {
         let post_data = serde_json::to_value(LogSecurityEventRequest {
             metadata,
             event: event_text,
@@ -265,10 +263,7 @@ pub(crate) mod tests {
 
     #[async_trait]
     impl DocumentKeyOps for MockOps {
-        async fn wrap_key(
-            &self,
-            _: &RequestMetadata,
-        ) -> Result<WrapKeyResponse, TenantSecurityError> {
+        async fn wrap_key(&self, _: &RequestMetadata) -> Result<WrapKeyResponse, AlloyError> {
             Ok(WrapKeyResponse {
                 dek: KNOWN_DEK.clone(),
                 edek: KNOWN_EDEK.clone(),
@@ -279,7 +274,7 @@ pub(crate) mod tests {
             &self,
             _: &Base64,
             _: &RequestMetadata,
-        ) -> Result<UnwrapKeyResponse, TenantSecurityError> {
+        ) -> Result<UnwrapKeyResponse, AlloyError> {
             Ok(UnwrapKeyResponse {
                 dek: KNOWN_DEK.clone(),
             })
@@ -289,7 +284,7 @@ pub(crate) mod tests {
             &self,
             encrypted_document_keys: HashMap<&str, Base64>,
             _metadata: &RequestMetadata,
-        ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError> {
+        ) -> Result<BatchUnwrapKeyResponse, AlloyError> {
             let keys = encrypted_document_keys
                 .into_iter()
                 .map(|(key, _)| {
@@ -312,7 +307,7 @@ pub(crate) mod tests {
             _new_tenant_id: &str,
             _metadata: &RequestMetadata,
             _encrypted_document_key: &Base64,
-        ) -> Result<RekeyResponse, TenantSecurityError> {
+        ) -> Result<RekeyResponse, AlloyError> {
             Ok(RekeyResponse {
                 dek: KNOWN_DEK.clone(),
                 edek: KNOWN_EDEK.clone(),
@@ -328,7 +323,7 @@ pub(crate) mod tests {
             _metadata: &RequestMetadata,
             _derivation_type: DerivationType,
             _secret_type: SecretType,
-        ) -> Result<KeyDeriveResponse, TenantSecurityError> {
+        ) -> Result<KeyDeriveResponse, AlloyError> {
             let derived_keys = paths
                 .into_iter()
                 .map(|(secret_path, derivation_paths)| {
@@ -363,7 +358,7 @@ pub(crate) mod tests {
             &self,
             _event_text: &str,
             _metadata: &RequestMetadata,
-        ) -> Result<(), TenantSecurityError> {
+        ) -> Result<(), AlloyError> {
             Ok(())
         }
     }
@@ -371,7 +366,7 @@ pub(crate) mod tests {
     impl TenantSecurityRequest for MockOps {}
 
     #[tokio::test]
-    async fn wrap_key_response() -> Result<(), TenantSecurityError> {
+    async fn wrap_key_response() -> Result<(), AlloyError> {
         let key_ops = MockOps;
         let metadata =
             RequestMetadata::new_simple(TenantId("tenant".to_string()), "id".try_into()?);
@@ -382,7 +377,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn unwrap_key_response() -> Result<(), TenantSecurityError> {
+    async fn unwrap_key_response() -> Result<(), AlloyError> {
         let key_ops = MockOps;
         let metadata =
             RequestMetadata::new_simple(TenantId("tenant".to_string()), "id".try_into()?);
@@ -394,7 +389,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn tenant_derive_response() -> Result<(), TenantSecurityError> {
+    async fn tenant_derive_response() -> Result<(), AlloyError> {
         let key_ops = MockOps;
         let metadata =
             RequestMetadata::new_simple(TenantId("tenant".to_string()), "id".try_into()?);

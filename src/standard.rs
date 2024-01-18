@@ -75,7 +75,7 @@ pub struct EncryptedDocument {
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct RekeyEdeksBatchResult {
     pub successes: HashMap<String, EdekWithKeyIdHeader>,
-    pub failures: HashMap<String, String>,
+    pub failures: HashMap<String, AlloyError>,
 }
 
 impl From<BatchResult<EdekWithKeyIdHeader>> for RekeyEdeksBatchResult {
@@ -154,9 +154,9 @@ pub(crate) fn verify_sig(
     if ironcore_documents::v5::aes::verify_signature(aes_dek, document) {
         Ok(())
     } else {
-        Err(AlloyError::DecryptError(
-            "EDEK signature verification failed.".to_string(),
-        ))
+        Err(AlloyError::DecryptError {
+            msg: "EDEK signature verification failed.".to_string(),
+        })
     }
 }
 

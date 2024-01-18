@@ -42,8 +42,7 @@ pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
 #[derive(Debug, uniffi::Record)]
 pub struct VectorRotateResult {
     pub successes: EncryptedVectors,
-    // TODO(murph): we can't pass AlloyError across here? Only in `Result`? Using string for now
-    pub failures: HashMap<VectorId, String>,
+    pub failures: HashMap<VectorId, AlloyError>,
 }
 impl From<BatchResult<EncryptedVector>> for VectorRotateResult {
     fn from(value: BatchResult<EncryptedVector>) -> Self {
@@ -169,13 +168,15 @@ pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), All
     let iv = vector_proto.iv;
     let auth_hash = vector_proto.auth_hash;
     Ok((
-        iv[..]
-            .try_into()
-            .map_err(|_| AlloyError::DecryptError("Invalid IV".to_string()))?,
+        iv[..].try_into().map_err(|_| AlloyError::DecryptError {
+            msg: "Invalid IV".to_string(),
+        })?,
         AuthHash(
             auth_hash[..]
                 .try_into()
-                .map_err(|_| AlloyError::DecryptError("Invalid authentication hash".to_string()))?,
+                .map_err(|_| AlloyError::DecryptError {
+                    msg: "Invalid authentication hash".to_string(),
+                })?,
         ),
     ))
 }

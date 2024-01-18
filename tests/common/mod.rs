@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
-use ironcore_alloy::{saas_shield::config::SaasShieldConfiguration, SaasShield};
-use lazy_static::lazy_static;
+use ironcore_alloy::{
+    errors::AlloyError, saas_shield::config::SaasShieldConfiguration, SaasShield,
+};
 use std::{
     env,
     error::Error,
@@ -11,17 +12,17 @@ use std::{
 };
 use uniffi::TargetLanguage;
 
-lazy_static! {
-    pub static ref CLIENT: Arc<SaasShield> = {
-        let config = SaasShieldConfiguration::new(
-            "http://localhost:32804".to_string(),
-            "0WUaXesNgbTAuLwn".to_string(),
-            false,
-            Some(1.1),
-        )
-        .unwrap();
-        SaasShield::new(&config)
-    };
+pub type TestResult = Result<(), AlloyError>;
+
+pub fn get_client() -> Arc<SaasShield> {
+    let config = SaasShieldConfiguration::new(
+        "http://localhost:32804".to_string(),
+        "0WUaXesNgbTAuLwn".to_string(),
+        false,
+        Some(1.1),
+    )
+    .unwrap();
+    SaasShield::new(&config)
 }
 
 pub(crate) fn build_dynamic_library() -> Result<ExitStatus, Box<dyn Error>> {

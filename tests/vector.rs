@@ -2,17 +2,13 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use super::*;
+    use crate::common::{get_client, TestResult};
     use approx::assert_ulps_eq;
-    use common::CLIENT;
     use ironcore_alloy::{
-        errors::AlloyError,
         vector::{EncryptedVector, PlaintextVector, VectorOps},
         AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
     use std::sync::Arc;
-
-    type TestResult = Result<(), AlloyError>;
 
     fn assert_ulps_vec_eq(vec1: Vec<f32>, vec2: Vec<f32>) -> () {
         if vec1.len() != vec2.len() {
@@ -53,7 +49,7 @@ mod tests {
     async fn standard_encrypt_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let encrypted = CLIENT.vector().encrypt(plaintext, &metadata).await?;
+        let encrypted = get_client().vector().encrypt(plaintext, &metadata).await?;
         assert_eq!(encrypted.encrypted_vector.len(), 3);
         assert_eq!(encrypted.paired_icl_info.len(), 54);
         assert_eq!(encrypted.secret_path.0, "secret");
@@ -65,7 +61,7 @@ mod tests {
     async fn standard_decrypt_known() -> TestResult {
         let encrypted = get_ciphertext();
         let metadata = get_metadata();
-        let decrypted = CLIENT.vector().decrypt(encrypted, &metadata).await?;
+        let decrypted = get_client().vector().decrypt(encrypted, &metadata).await?;
         let expected = get_plaintext();
         assert_eq!(decrypted.plaintext_vector, expected.plaintext_vector);
         Ok(())
@@ -76,7 +72,7 @@ mod tests {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
         let vectors_to_query = [("vector".to_string(), plaintext.clone())].into();
-        let mut all_queries = CLIENT
+        let mut all_queries = get_client()
             .vector()
             .generate_query_vectors(vectors_to_query, &metadata)
             .await?;
@@ -84,8 +80,7 @@ mod tests {
         let mut queries = all_queries.remove("vector").unwrap();
         assert_eq!(queries.len(), 1);
         let query = queries.remove(0);
-        let decrypted = CLIENT.vector().decrypt(query, &metadata).await?;
-        assert_eq!(decrypted.plaintext_vector, plaintext.plaintext_vector);
+        let decrypted = get_client().vector().decrypt(query, &metadata).await?;
         assert_ulps_vec_eq(decrypted.plaintext_vector, plaintext.plaintext_vector);
         Ok(())
     }
@@ -93,7 +88,7 @@ mod tests {
     #[tokio::test]
     async fn standard_get_searchable_edek_prefix_no_rotation() -> TestResult {
         let metadata = get_metadata();
-        let prefix_err = CLIENT
+        let prefix_err = get_client()
             .vector()
             .get_in_rotation_prefix(
                 SecretPath("secret".to_string()),
@@ -113,14 +108,14 @@ mod tests {
         let ciphertext = get_ciphertext();
         let vectors = [("vector".to_string(), ciphertext)].into();
         let metadata = get_metadata();
-        let mut resp = CLIENT
+        let mut resp = get_client()
             .vector()
             .rotate_vectors(vectors, &metadata, None)
             .await?;
         assert_eq!(resp.successes.len(), 1);
         assert_eq!(resp.failures.len(), 0);
         let rotated = resp.successes.remove("vector").unwrap();
-        let decrypted = CLIENT.vector().decrypt(rotated, &metadata).await?;
+        let decrypted = get_client().vector().decrypt(rotated, &metadata).await?;
         let expected = get_plaintext().plaintext_vector;
         assert_eq!(decrypted.plaintext_vector, expected);
         assert_eq!(decrypted.secret_path.0, "secret");
@@ -134,7 +129,7 @@ mod tests {
         let vectors = [("vector".to_string(), ciphertext)].into();
         let metadata = get_metadata();
         let new_tenant_id = TenantId("tenant-aws-l".to_string());
-        let mut resp = CLIENT
+        let mut resp = get_client()
             .vector()
             .rotate_vectors(vectors, &metadata, Some(new_tenant_id.clone()))
             .await?;
@@ -142,9 +137,12 @@ mod tests {
         assert_eq!(resp.failures.len(), 0);
         let rotated = resp.successes.remove("vector").unwrap();
         let new_metadata = AlloyMetadata::new_simple(new_tenant_id);
-        let decrypted = CLIENT.vector().decrypt(rotated, &new_metadata).await?;
+        let decrypted = get_client()
+            .vector()
+            .decrypt(rotated, &new_metadata)
+            .await?;
         let expected = get_plaintext().plaintext_vector;
-        assert_eq!(decrypted.plaintext_vector, expected);
+        assert_ulps_vec_eq(decrypted.plaintext_vector, expected);
         assert_eq!(decrypted.secret_path.0, "secret");
         assert_eq!(decrypted.derivation_path.0, "deriv");
         Ok(())

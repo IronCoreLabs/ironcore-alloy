@@ -16,7 +16,6 @@ use standalone::vector::StandaloneVectorClient;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tenant_security_client::errors::TenantSecurityError;
 use tenant_security_client::{RequestMetadata, RequestingId};
 use uniffi::custom_newtype;
 use vector::VectorEncryptionKey;
@@ -126,7 +125,7 @@ impl TryFrom<AlloyMetadata> for RequestMetadata {
                     .requesting_id
                     .unwrap_or("IronCore Labs Alloy SDK".to_string()),
             )
-            .map_err(|e| AlloyError::InvalidConfiguration(e.to_string()))?,
+            .map_err(|e| AlloyError::InvalidConfiguration { msg: e.to_string() })?,
             value.data_label,
             value.source_ip,
             value.object_id,
@@ -144,9 +143,9 @@ impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
     ) -> Result<Self, Self::Error> {
         let time_as_u64 = match event_time_millis {
             Some(time) if time >= 0 => Ok(time as u64),
-            Some(_) => Err(AlloyError::InvalidInput(
-                "millis times must be >= 0.".to_string(),
-            )),
+            Some(_) => Err(AlloyError::InvalidInput {
+                msg: "millis times must be >= 0.".to_string(),
+            }),
             None => Ok(SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("Time moved backwards, or it's ~584 million years in the future.")
@@ -259,15 +258,17 @@ pub(crate) mod alloy_client_trait {
             ) = ironcore_documents::v5::key_id_header::decode_version_prefixed_value(
                 encrypted_bytes.into(),
             )
-            .map_err(|_| AlloyError::InvalidInput("Encrypted header was invalid.".to_string()))?;
+            .map_err(|_| AlloyError::InvalidInput {
+                msg: "Encrypted header was invalid.".to_string(),
+            })?;
             let expected_edek_type = Self::get_edek_type();
             let expected_payload_type = Self::get_payload_type();
             if edek_type == expected_edek_type && payload_type == expected_payload_type {
                 Ok((key_id, remaining_bytes))
             } else {
-                Err(AlloyError::InvalidInput(
+                Err(AlloyError::InvalidInput{msg: 
                     format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
-                ))
+            })
             }
         }
     }
@@ -317,9 +318,9 @@ impl Secret {
     #[uniffi::constructor]
     pub fn new(secret: Vec<u8>) -> Result<Arc<Self>, AlloyError> {
         if secret.len() < 32 {
-            Err(AlloyError::InvalidConfiguration(
+            Err(AlloyError::InvalidConfiguration{msg: 
                 "Secrets must be at least 32 cryptographically random bytes.".to_string(),
-            ))
+        })
         } else {
             Ok(Arc::new(Self { secret }))
         }

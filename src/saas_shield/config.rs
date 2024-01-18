@@ -29,8 +29,7 @@ impl SaasShieldConfiguration {
             approximation_factor,
             tenant_security_client: Arc::new(TenantSecurityClient::new(
                 tsp_uri,
-                ApiKey::try_from(api_key)
-                    .map_err(|e| AlloyError::InvalidConfiguration(format!("{}", e)))?,
+                ApiKey::try_from(api_key)?,
                 reqwest_client,
             )),
         }))

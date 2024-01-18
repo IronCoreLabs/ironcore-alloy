@@ -4,7 +4,6 @@ use crate::standard::{
     EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, RekeyEdeksBatchResult,
     StandardDocumentOps,
 };
-use crate::tenant_security_client::errors::TenantSecurityError;
 use crate::tenant_security_client::{
     RequestMetadata, TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse,
 };
@@ -155,9 +154,9 @@ impl SaasShieldStandardClient {
                     let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
                     Ok(EdekParts::V5(key_id, v4_document_header))
                 } else {
-                    Err(AlloyError::InvalidInput(
+                    Err(AlloyError::InvalidInput{msg: 
                 format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
-            ))
+                })
                 }
             }
             // This is the case where the value did not have a key id header. This means it's either a v4 or v3.
@@ -302,7 +301,9 @@ fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
     let maybe_edek_wrapper = edeks.iter().find(|edek| edek.has_cmk_edek());
     let cmk_edek = maybe_edek_wrapper
         .map(|edek| edek.cmk_edek())
-        .ok_or_else(|| AlloyError::DecryptError("No Saas Shield EDEK found.".to_string()))?;
+        .ok_or_else(|| AlloyError::DecryptError {
+            msg: "No Saas Shield EDEK found.".to_string(),
+        })?;
     Ok(cmk_edek)
 }
 
@@ -310,7 +311,7 @@ fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
 /// This is mostly to allow compatibility with Cloaked Search from when this was an issue.
 fn fix_encrypted_dek(
     cmk_edek: &cmk_edek::EncryptedDek,
-) -> Result<cmk_edek::EncryptedDeks, TenantSecurityError> {
+) -> Result<cmk_edek::EncryptedDeks, AlloyError> {
     // Real kms config ids can't ever be 0, so if it is we parse it as an EncryptedDeks (which came from the tsp).
     // Then we put the tenant_id on each of them.
     let encrypted_deks = if cmk_edek.kmsConfigId == 0 {
@@ -335,10 +336,10 @@ fn fix_encrypted_dek(
     })
 }
 
-fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, TenantSecurityError> {
+fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, AlloyError> {
     let bytes: [u8; 32] = dek
         .try_into()
-        .map_err(|_| TenantSecurityError::InvalidDek)?;
+        .map_err(|_| AlloyError::InvalidKey { msg: "Invalid DEK".to_string() })?;
     Ok(EncryptionKey(bytes))
 }
 
@@ -394,7 +395,7 @@ mod test {
 
         assert!(matches!(
             SaasShieldStandardClient::decompose_edek_header(encrypted_doc.edek).unwrap_err(),
-            AlloyError::InvalidInput(_)
+            AlloyError::InvalidInput { msg: _ }
         ));
     }
 

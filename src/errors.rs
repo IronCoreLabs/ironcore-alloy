@@ -1,64 +1,79 @@
-use crate::tenant_security_client::errors::TenantSecurityError;
+pub use crate::tenant_security_client::errors::{
+    KmsError, SecurityEventError, ServiceError, TenantSecretError, TenantSecurityProxyError,
+};
 use crate::vector::crypto::{
     DecryptError as VectorDecryptError, EncryptError as VectorEncryptError,
 };
 
 /// Errors related to IronCore Alloy SDK
-#[derive(Debug, uniffi::Error, PartialEq, Eq)]
-#[uniffi(flat_error)]
+#[derive(Debug, uniffi::Error, PartialEq, Eq, Clone)]
 pub enum AlloyError {
     /// Error while loading configuration.
-    InvalidConfiguration(String),
+    InvalidConfiguration { msg: String },
     /// Error with key used
-    InvalidKey(String),
+    InvalidKey { msg: String },
     /// Error with user input
-    InvalidInput(String),
+    InvalidInput { msg: String },
     /// Errors while encrypting
-    EncryptError(String),
+    EncryptError { msg: String },
     /// Errors while decrypting
-    DecryptError(String),
+    DecryptError { msg: String },
     /// Error when parsing encryption headers/metadata
-    ProtobufError(String),
-    /// Error with requests to TSC
-    TenantSecurityError(String),
+    ProtobufError { msg: String },
+    /// Error when making a request to the TSP
+    RequestError { msg: String },
+    /// Error converting request data to JSON
+    SerdeJsonError { msg: String },
+    /// Error directly from the TSP
+    TspError {
+        err: TenantSecurityProxyError,
+        http_code: u16,
+        tsp_code: u16,
+        msg: String,
+    },
 }
 impl std::fmt::Display for AlloyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AlloyError::InvalidConfiguration(message) => {
-                write!(f, "Invalid configuration: '{message}'")
+            AlloyError::InvalidConfiguration { msg } => {
+                write!(f, "Invalid configuration: '{msg}'")
             }
-            AlloyError::InvalidKey(message) => write!(f, "Invalid key: '{message}'"),
-            AlloyError::InvalidInput(message) => write!(f, "Invalid input: '{message}'"),
-            AlloyError::EncryptError(message) => write!(f, "Encrypt error: '{message}'"),
-            AlloyError::DecryptError(message) => write!(f, "Decrypt error: '{message}'"),
-            AlloyError::ProtobufError(message) => write!(f, "Protobuf error: '{message}'"),
-            AlloyError::TenantSecurityError(message) => {
-                write!(f, "Tenant security client error: '{message}'")
-            }
+            AlloyError::InvalidKey { msg } => write!(f, "Invalid key: '{msg}'"),
+            AlloyError::InvalidInput { msg } => write!(f, "Invalid input: '{msg}'"),
+            AlloyError::EncryptError { msg } => write!(f, "Encrypt error: '{msg}'"),
+            AlloyError::DecryptError { msg } => write!(f, "Decrypt error: '{msg}'"),
+            AlloyError::ProtobufError { msg } => write!(f, "Protobuf error: '{msg}'"),
+            AlloyError::RequestError { msg } => write!(f, "Request error: '{msg}'"),
+            AlloyError::SerdeJsonError { msg } => write!(f, "Serde JSON error: '{msg}'"),
+            AlloyError::TspError {
+                err,
+                tsp_code,
+                http_code,
+                msg,
+            } => write!(
+                f,
+                "TSP error variant: '{err}', HTTP code: {http_code}, TSP code: {tsp_code}, Message: {msg}"
+            ),
         }
-    }
-}
-impl From<TenantSecurityError> for AlloyError {
-    fn from(value: TenantSecurityError) -> Self {
-        Self::TenantSecurityError(value.to_string())
     }
 }
 impl From<VectorEncryptError> for AlloyError {
     fn from(value: VectorEncryptError) -> Self {
         match value {
-            VectorEncryptError::InvalidKey(s) => Self::InvalidKey(s),
-            VectorEncryptError::OverflowError => Self::InvalidInput(value.to_string()),
+            VectorEncryptError::InvalidKey(s) => Self::InvalidKey { msg: s },
+            VectorEncryptError::OverflowError => Self::InvalidInput {
+                msg: value.to_string(),
+            },
         }
     }
 }
 impl From<VectorDecryptError> for AlloyError {
     fn from(value: VectorDecryptError) -> Self {
         match value {
-            VectorDecryptError::InvalidKey(s) => Self::InvalidKey(s),
-            VectorDecryptError::InvalidAuthHash => {
-                Self::InvalidInput("Invalid authentication hash".to_string())
-            }
+            VectorDecryptError::InvalidKey(s) => Self::InvalidKey { msg: s },
+            VectorDecryptError::InvalidAuthHash => Self::InvalidInput {
+                msg: "Invalid authentication hash".to_string(),
+            },
         }
     }
 }
@@ -74,18 +89,32 @@ impl From<ironcore_documents::Error> for AlloyError {
             | ironcore_documents::Error::EdekTypeError(_)
             | ironcore_documents::Error::PayloadTypeError(_)
             | ironcore_documents::Error::KeyIdHeaderTooShort(_)
-            | ironcore_documents::Error::KeyIdHeaderMalformed(_) => {
-                AlloyError::InvalidInput(value.to_string())
+            | ironcore_documents::Error::KeyIdHeaderMalformed(_) => AlloyError::InvalidInput {
+                msg: value.to_string(),
+            },
+            ironcore_documents::Error::ProtoSerializationErr(msg) => {
+                AlloyError::ProtobufError { msg }
             }
-            ironcore_documents::Error::ProtoSerializationErr(m) => AlloyError::ProtobufError(m),
-            ironcore_documents::Error::EncryptError(m) => AlloyError::EncryptError(m),
-            ironcore_documents::Error::DecryptError(m) => AlloyError::DecryptError(m),
+            ironcore_documents::Error::EncryptError(msg) => AlloyError::EncryptError { msg },
+            ironcore_documents::Error::DecryptError(msg) => AlloyError::DecryptError { msg },
         }
     }
 }
 impl From<protobuf::Error> for AlloyError {
     fn from(value: protobuf::Error) -> Self {
-        AlloyError::ProtobufError(value.to_string())
+        AlloyError::ProtobufError {
+            msg: value.to_string(),
+        }
+    }
+}
+impl From<reqwest::Error> for AlloyError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::RequestError { msg: e.to_string() }
+    }
+}
+impl From<serde_json::Error> for AlloyError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::SerdeJsonError { msg: e.to_string() }
     }
 }
 impl std::error::Error for AlloyError {}

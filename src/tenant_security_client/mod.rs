@@ -1,8 +1,7 @@
 use crate::saas_shield::SecurityEvent;
 use crate::TenantId;
-use crate::{DerivationPath, SecretPath, TenantSecurityError::NonEmptyStringError};
+use crate::{DerivationPath, SecretPath};
 use base64_type::Base64;
-use errors::TenantSecurityError;
 use request::{TenantSecurityRequest, TspRequest};
 use reqwest::Client;
 pub use rest::{
@@ -18,6 +17,7 @@ use std::{
 };
 
 use self::rest::RekeyResponse;
+use crate::errors::AlloyError;
 #[cfg(test)]
 pub use rest::TenantSecretAssignmentId;
 
@@ -29,18 +29,20 @@ mod rest;
 pub struct ApiKey(String);
 
 impl TryFrom<String> for ApiKey {
-    type Error = TenantSecurityError;
+    type Error = AlloyError;
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        use TenantSecurityError::ValidationError;
+        use AlloyError::InvalidConfiguration;
         Base64::from_str(value.as_str())
-            .map_err(|_| ValidationError("API_KEY was not valid Base64.".to_string()))
+            .map_err(|_| InvalidConfiguration {
+                msg: "API_KEY was not valid Base64.".to_string(),
+            })
             .and_then(|base64| {
                 if base64.len() == 12 {
                     Ok(ApiKey(value))
                 } else {
-                    Err(ValidationError(
-                        "API_KEY was not 16 characters.".to_string(),
-                    ))
+                    Err(InvalidConfiguration {
+                        msg: "API_KEY was not 16 characters.".to_string(),
+                    })
                 }
             })
     }
@@ -61,7 +63,7 @@ impl TenantSecurityClient {
     pub async fn wrap_key(
         &self,
         metadata: &RequestMetadata,
-    ) -> Result<WrapKeyResponse, TenantSecurityError> {
+    ) -> Result<WrapKeyResponse, AlloyError> {
         self.request.wrap_key(metadata).await
     }
 
@@ -69,7 +71,7 @@ impl TenantSecurityClient {
         &self,
         edek: Vec<u8>,
         metadata: &RequestMetadata,
-    ) -> Result<UnwrapKeyResponse, TenantSecurityError> {
+    ) -> Result<UnwrapKeyResponse, AlloyError> {
         let base64 = Base64(edek);
         self.request.unwrap_key(&base64, metadata).await
     }
@@ -79,7 +81,7 @@ impl TenantSecurityClient {
         &self,
         edeks: HashMap<&str, Vec<u8>>,
         metadata: &RequestMetadata,
-    ) -> Result<BatchUnwrapKeyResponse, TenantSecurityError> {
+    ) -> Result<BatchUnwrapKeyResponse, AlloyError> {
         let base64_edeks = edeks
             .into_iter()
             .map(|(key, edek)| (key, Base64(edek)))
@@ -92,7 +94,7 @@ impl TenantSecurityClient {
         edek: Vec<u8>,
         new_tenant_id: &TenantId,
         metadata: &RequestMetadata,
-    ) -> Result<RekeyResponse, TenantSecurityError> {
+    ) -> Result<RekeyResponse, AlloyError> {
         let base64 = Base64(edek);
         self.request
             .rekey(&new_tenant_id.0, metadata, &base64)
@@ -111,7 +113,7 @@ impl TenantSecurityClient {
         metadata: &RequestMetadata,
         derivation_type: DerivationType,
         secret_type: SecretType,
-    ) -> Result<KeyDeriveResponse, TenantSecurityError> {
+    ) -> Result<KeyDeriveResponse, AlloyError> {
         self.request
             .tenant_key_derive(paths, metadata, derivation_type, secret_type)
             .await
@@ -122,7 +124,7 @@ impl TenantSecurityClient {
         &self,
         event: &SecurityEvent,
         metadata: &RequestMetadata,
-    ) -> Result<(), TenantSecurityError> {
+    ) -> Result<(), AlloyError> {
         self.request
             .log_security_event(event.to_string().as_str(), metadata)
             .await
@@ -222,23 +224,25 @@ pub struct IclFields {
 #[derive(Debug, Clone, Serialize)]
 pub struct RequestingId(String);
 impl RequestingId {
-    pub fn new(id: String) -> Result<RequestingId, TenantSecurityError> {
+    pub fn new(id: String) -> Result<RequestingId, AlloyError> {
         id.try_into()
     }
 }
 impl TryFrom<String> for RequestingId {
-    type Error = TenantSecurityError;
+    type Error = AlloyError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            Err(NonEmptyStringError("RequestingId".to_string()))
+            Err(AlloyError::InvalidInput {
+                msg: "RequestingId cannot be empty.".to_string(),
+            })
         } else {
             Ok(RequestingId(value))
         }
     }
 }
 impl TryFrom<&str> for RequestingId {
-    type Error = TenantSecurityError;
+    type Error = AlloyError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         value.to_string().try_into()
