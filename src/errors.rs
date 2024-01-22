@@ -24,7 +24,8 @@ pub enum AlloyError {
     RequestError { msg: String },
     /// Error converting request data to JSON
     SerdeJsonError { msg: String },
-    /// Error directly from the TSP
+    /// Error directly from the TSP. See https://ironcorelabs.com/docs/saas-shield/tenant-security-proxy/errors/
+    /// for details about these error codes.
     TspError {
         error: TenantSecurityProxyError,
         http_code: u16,
