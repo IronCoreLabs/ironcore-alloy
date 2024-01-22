@@ -26,7 +26,7 @@ pub enum AlloyError {
     SerdeJsonError { msg: String },
     /// Error directly from the TSP
     TspError {
-        err: TenantSecurityProxyError,
+        error: TenantSecurityProxyError,
         http_code: u16,
         tsp_code: u16,
         msg: String,
@@ -46,13 +46,13 @@ impl std::fmt::Display for AlloyError {
             AlloyError::RequestError { msg } => write!(f, "Request error: '{msg}'"),
             AlloyError::SerdeJsonError { msg } => write!(f, "Serde JSON error: '{msg}'"),
             AlloyError::TspError {
-                err,
+                error,
                 tsp_code,
                 http_code,
                 msg,
             } => write!(
                 f,
-                "TSP error variant: '{err}', HTTP code: {http_code}, TSP code: {tsp_code}, Message: {msg}"
+                "TSP error variant: '{error}', HTTP code: {http_code}, TSP code: {tsp_code}, Message: {msg}"
             ),
         }
     }

@@ -80,7 +80,7 @@ impl TspRequest {
                 let error_variant = TenantSecurityProxyError::code_to_error(parsed_error.code);
                 Err(AlloyError::TspError {
                     msg: error_variant.to_string(),
-                    err: error_variant,
+                    error: error_variant,
                     http_code: status.as_u16(),
                     tsp_code: parsed_error.code,
                 })

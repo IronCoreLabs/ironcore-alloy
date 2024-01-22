@@ -7,10 +7,10 @@ use thiserror::Error;
 #[derive(Error, Debug, PartialEq, Eq, uniffi::Enum, Clone)]
 #[non_exhaustive]
 pub enum TenantSecurityProxyError {
-    Service { err: ServiceError },
-    Kms { err: KmsError },
-    SecurityEvent { err: SecurityEventError },
-    TenantSecret { err: TenantSecretError },
+    Service { error: ServiceError },
+    Kms { error: KmsError },
+    SecurityEvent { error: SecurityEventError },
+    TenantSecret { error: TenantSecretError },
 }
 
 /// Errors communicating with the TSP
@@ -60,57 +60,65 @@ impl TenantSecurityProxyError {
         use TenantSecretError::*;
 
         match code {
-            100 => Self::Service { err: UnknownError },
+            100 => Self::Service {
+                error: UnknownError,
+            },
             101 => Self::Service {
-                err: UnauthorizedRequest,
+                error: UnauthorizedRequest,
             },
             102 => Self::Service {
-                err: InvalidRequestBody,
+                error: InvalidRequestBody,
             },
             200 => Self::Kms {
-                err: NoPrimaryKmsConfiguration,
+                error: NoPrimaryKmsConfiguration,
             },
             201 => Self::Kms {
-                err: UnknownTenantOrNoActiveKmsConfigurations,
+                error: UnknownTenantOrNoActiveKmsConfigurations,
             },
             202 => Self::Kms {
-                err: KmsConfigurationDisabled,
+                error: KmsConfigurationDisabled,
             },
             203 => Self::Kms {
-                err: InvalidProvidedEdek,
+                error: InvalidProvidedEdek,
             },
-            204 => Self::Kms { err: KmsWrapFailed },
+            204 => Self::Kms {
+                error: KmsWrapFailed,
+            },
             205 => Self::Kms {
-                err: KmsUnwrapFailed,
+                error: KmsUnwrapFailed,
             },
             206 => Self::Kms {
-                err: KmsAuthorizationFailed,
+                error: KmsAuthorizationFailed,
             },
             207 => Self::Kms {
-                err: KmsConfigurationInvalid,
+                error: KmsConfigurationInvalid,
             },
             208 => Self::Kms {
-                err: KmsUnreachable,
+                error: KmsUnreachable,
             },
-            209 => Self::Kms { err: KmsThrottled },
+            209 => Self::Kms {
+                error: KmsThrottled,
+            },
             301 => Self::SecurityEvent {
-                err: SecurityEventRejected,
+                error: SecurityEventRejected,
             },
             401 => Self::TenantSecret {
-                err: SecretCreationFailed,
+                error: SecretCreationFailed,
             },
-            _ => Self::Service { err: UnknownError },
+            _ => Self::Service {
+                error: UnknownError,
+            },
         }
     }
 
     pub fn get_code(&self) -> u16 {
         match self {
-            Self::Service { err: e, .. } => match e {
+            Self::Service { error, .. } => match error {
                 ServiceError::UnknownError => 100,
                 ServiceError::UnauthorizedRequest => 101,
                 ServiceError::InvalidRequestBody => 102,
             },
-            Self::Kms { err: e, .. } => match e {
+            Self::Kms { error, .. } => match error {
                 KmsError::NoPrimaryKmsConfiguration => 200,
                 KmsError::UnknownTenantOrNoActiveKmsConfigurations => 201,
                 KmsError::KmsConfigurationDisabled => 202,
@@ -122,10 +130,10 @@ impl TenantSecurityProxyError {
                 KmsError::KmsUnreachable => 208,
                 KmsError::KmsThrottled => 209,
             },
-            Self::SecurityEvent { err: e, .. } => match e {
+            Self::SecurityEvent { error, .. } => match error {
                 SecurityEventError::SecurityEventRejected => 301,
             },
-            Self::TenantSecret { err: e, .. } => match e {
+            Self::TenantSecret { error, .. } => match error {
                 TenantSecretError::SecretCreationFailed => 401,
             },
         }
@@ -135,10 +143,10 @@ impl TenantSecurityProxyError {
 impl Display for TenantSecurityProxyError {
     fn fmt(&self, f: &mut Formatter) -> DisplayResult {
         match self {
-            Self::Service { err } => write!(f, "{err}"),
-            Self::Kms { err } => write!(f, "{err}"),
-            Self::SecurityEvent { err } => write!(f, "{err}"),
-            Self::TenantSecret { err } => write!(f, "{err}"),
+            Self::Service { error } => write!(f, "{error}"),
+            Self::Kms { error } => write!(f, "{error}"),
+            Self::SecurityEvent { error } => write!(f, "{error}"),
+            Self::TenantSecret { error } => write!(f, "{error}"),
         }
     }
 }

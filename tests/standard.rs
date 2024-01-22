@@ -274,8 +274,8 @@ mod tests {
         assert!(matches!(
             err,
             AlloyError::TspError {
-                err: TenantSecurityProxyError::Kms {
-                    err: KmsError::UnknownTenantOrNoActiveKmsConfigurations,
+                error: TenantSecurityProxyError::Kms {
+                    error: KmsError::UnknownTenantOrNoActiveKmsConfigurations,
                 },
                 ..
             }
