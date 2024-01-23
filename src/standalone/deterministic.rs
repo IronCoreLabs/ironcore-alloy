@@ -35,17 +35,19 @@ impl StandaloneDeterministicClient {
         let secret = self
             .config
             .get(&plaintext_field.secret_path)
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: format!(
                     "Provided secret path `{}` does not exist in the deterministic configuration.",
                     &plaintext_field.secret_path.0
-                ))
+                ),
             })?;
-        let current_secret = secret.current_secret.as_ref().ok_or_else(|| {
-            AlloyError::InvalidConfiguration(
-                "No current secret exists in the deterministic configuration".to_string(),
-            )
-        })?;
+        let current_secret =
+            secret
+                .current_secret
+                .as_ref()
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: "No current secret exists in the deterministic configuration".to_string(),
+                })?;
         let key = DeterministicEncryptionKey::derive_from_secret(
             &current_secret.secret,
             tenant_id,
@@ -66,18 +68,21 @@ impl StandaloneDeterministicClient {
         let secret = self
             .config
             .get(&encrypted_field.secret_path)
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: format!(
                     "Provided secret path `{}` does not exist in the deterministic configuration.",
                     &encrypted_field.secret_path.0
-                ))
+                ),
             })?;
-        let standalone_secret = secret.get_secret_with_id(&key_id).ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
-                "Secret with key ID `{}` does not exist in the deterministic configuration",
-                key_id.0
-            ))
-        })?;
+        let standalone_secret =
+            secret
+                .get_secret_with_id(&key_id)
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: format!(
+                        "Secret with key ID `{}` does not exist in the deterministic configuration",
+                        key_id.0
+                    ),
+                })?;
         let key = DeterministicEncryptionKey::derive_from_secret(
             &standalone_secret.secret,
             tenant_id,
@@ -139,20 +144,20 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     .config
                     .get(&plaintext_field.secret_path)
                     .ok_or_else(|| {
-                        AlloyError::InvalidConfiguration(format!(
+                        AlloyError::InvalidConfiguration{msg: format!(
                             "Provided secret path `{}` does not exist in the deterministic configuration.",
                             &plaintext_field.secret_path.0
-                        ))
+                        )}
                     })?;
                 let RotatableSecret {
                     current_secret,
                     in_rotation_secret,
                 } = secret.as_ref();
                 if current_secret.is_none() && in_rotation_secret.is_none() {
-                    Err(AlloyError::InvalidConfiguration(format!(
+                    Err(AlloyError::InvalidConfiguration{msg: format!(
                         "No secrets exist in the deterministic configuration for secret path `{}`.",
                         plaintext_field.secret_path.0
-                    )))?;
+                    )})?;
                 }
                 current_secret
                     .iter()
@@ -193,10 +198,10 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 .config
                 .get(&encrypted_field.secret_path)
                 .ok_or_else(|| {
-                    AlloyError::InvalidConfiguration(format!(
+                    AlloyError::InvalidConfiguration{msg: format!(
                         "Provided secret path `{}` does not exist in the deterministic configuration.",
                         &encrypted_field.secret_path.0
-                    ))
+                    )}
                 })?.current_secret;
             if check_rotation_no_op(
                 key_id,
@@ -226,18 +231,25 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         _derivation_path: DerivationPath,
         _metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
-        let secret = self.config.get(&secret_path).ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
+        let secret =
+            self.config
+                .get(&secret_path)
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: format!(
                 "Provided secret path `{}` does not exist in the deterministic configuration.",
                 &secret_path.0
-            ))
-        })?;
-        let in_rotation_secret = secret.in_rotation_secret.as_ref().ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
+            ),
+                })?;
+        let in_rotation_secret =
+            secret
+                .in_rotation_secret
+                .as_ref()
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: format!(
                 "There is no in-rotation secret for path `{}` in the deterministic configuration.",
                 secret_path.0
-            ))
-        })?;
+            ),
+                })?;
         let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
         Ok(
             ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header)

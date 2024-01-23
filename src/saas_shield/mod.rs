@@ -129,9 +129,10 @@ impl CustomEvent {
         let regex =
             regex::Regex::new("^[A-Z_]+$").expect("Regex compilation is a development error");
         if !regex.is_match(event_name) || event_name.starts_with('_') {
-            Err(AlloyError::InvalidInput(
-                "CustomEvents must be screaming snake case and cannot start with _".to_string(),
-            ))
+            Err(AlloyError::InvalidInput {
+                msg: "CustomEvents must be screaming snake case and cannot start with _"
+                    .to_string(),
+            })
         } else {
             Ok(CustomEvent {
                 event_name: event_name.to_string(),
@@ -212,9 +213,9 @@ fn derived_key_to_vector_encryption_key(
     derived_key: &DerivedKey,
 ) -> Result<(KeyId, VectorEncryptionKey), AlloyError> {
     let key = if derived_key.derived_key.len() < 35 {
-        Err(AlloyError::TenantSecurityError(
-            "Derivation didn't return enough bytes. HMAC-SHA512 should always return 64 bytes, so the TSP is misbehaving.".to_string(),
-        ))
+        Err(AlloyError::RequestError {msg:
+            "Derivation didn't return enough bytes. HMAC-SHA512 should always return 64 bytes, so the TSP is misbehaving.".to_string()
+        })
     } else {
         let key_bytes = &derived_key.derived_key.0[..];
         Ok(VectorEncryptionKey::unsafe_bytes_to_key(key_bytes))
@@ -392,16 +393,18 @@ mod test {
     fn test_custom_create() {
         assert_eq!(
             CustomEvent::create("_THIS_FAILS").unwrap_err(),
-            AlloyError::InvalidInput(
-                "CustomEvents must be screaming snake case and cannot start with _".to_string()
-            )
+            AlloyError::InvalidInput {
+                msg: "CustomEvents must be screaming snake case and cannot start with _"
+                    .to_string()
+            }
         );
 
         assert_eq!(
             CustomEvent::create("thisAlso").unwrap_err(),
-            AlloyError::InvalidInput(
-                "CustomEvents must be screaming snake case and cannot start with _".to_string()
-            )
+            AlloyError::InvalidInput {
+                msg: "CustomEvents must be screaming snake case and cannot start with _"
+                    .to_string()
+            }
         );
     }
 }

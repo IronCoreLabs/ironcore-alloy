@@ -29,6 +29,9 @@ class TestIroncoreAlloy:
     )
     sdk = Standalone(config)
 
+    # Tests using this are skipped by default. Unskip them as needed
+    integration_sdk = SaasShield(SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", False, 1.1))
+
     def test_floating_point_math(self):
         pass
 
@@ -211,6 +214,18 @@ class TestIroncoreAlloy:
         expected = b"My data"
         assert decrypted.plaintext_field == expected
 
+    @pytest.mark.asyncio
+    async def test_rotate_deterministic_failures(self):
+        field = EncryptedField(
+            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "wrong_path", "wrong_path"
+        )
+        fields = {"doc": field}
+        metadata = AlloyMetadata.new_simple("tenant")
+        rotated = await self.sdk.deterministic().rotate_fields(fields, metadata, "tenant2")
+        assert len(rotated.successes) == 0
+        assert len(rotated.failures) == 1
+        assert "Provided secret path `wrong_path` does not exist" in rotated.failures["doc"].msg 
+
     @pytest.mark.skip(reason="need seeded client")
     @pytest.mark.asyncio
     async def test_encrypt_probabilistic_metadata(self):
@@ -311,3 +326,19 @@ class TestIroncoreAlloy:
         importlib.reload(ironcore_alloy)
         # if it can still create a Standalone object through the FFI we'll assume it's still good after the reload
         sdk = Standalone(self.config)
+
+    @pytest.mark.skip(reason="Integration test. Unskip as desired")
+    @pytest.mark.asyncio
+    async def test_unknown_tenant(self):
+        with pytest.raises(AlloyError.TspError) as tsp_error:
+            metadata = AlloyMetadata.new_simple("fake_tenant")
+            await self.integration_sdk.vector().encrypt(PlaintextVector([1, 2, 4], "", ""), metadata)
+        assert "Tenant either doesn't exist" in tsp_error.value.msg
+
+    @pytest.mark.asyncio
+    async def test_bad_request(self):
+        with pytest.raises(AlloyError.RequestError) as request_error:
+            bad_integration_sdk = SaasShield(SaasShieldConfiguration("http://bad-url", "0WUaXesNgbTAuLwn", False, 1.1))
+            metadata = AlloyMetadata.new_simple("fake_tenant")
+            await bad_integration_sdk.vector().encrypt(PlaintextVector([1, 2, 4], "", ""), metadata)
+        assert "error sending request for url" in str(request_error.value.msg)

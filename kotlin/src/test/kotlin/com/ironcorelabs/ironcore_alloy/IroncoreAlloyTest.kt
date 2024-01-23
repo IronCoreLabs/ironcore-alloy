@@ -42,6 +42,16 @@ class IroncoreAlloyTest {
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
 
+    val integrationSdk =
+            SaasShield(
+                    SaasShieldConfiguration(
+                            "http://localhost:32804",
+                            "0WUaXesNgbTAuLwn",
+                            false,
+                            1.1f
+                    )
+            )
+
     @Test
     fun sdkVectorRoundtrip() {
         val data = listOf(1.0f, 2.0f, 3.0f)
@@ -224,7 +234,7 @@ class IroncoreAlloyTest {
     @Test
     fun sdkStandardDecryptWrongType() {
         val err =
-                assertFailsWith<AlloyException.InvalidInput>("foo") {
+                assertFailsWith<AlloyException.InvalidInput>() {
                     val documentFields =
                             mapOf(
                                     "foo" to
@@ -236,6 +246,21 @@ class IroncoreAlloyTest {
                     val document = EncryptedDocument(edek.base64ToByteArray(), documentFields)
                     runBlocking { sdk.standard().decrypt(document, metadata) }
                 }
-        assertContains(err.message.toString(), " not a Standalone Standard EDEK wrapped value.")
+        assertContains(err.message, " not a Standalone Standard EDEK wrapped value.")
+    }
+
+    @Test
+    // This test is ignored by default because it requires the TSP from tests/docker-compose.yml to
+    // be running. Uncomment to test as needed
+    @Ignore
+    fun integrationSdkUnknownTenant() {
+        val err =
+                assertFailsWith<AlloyException.TspException>() {
+                    val data = listOf(1.0f, 2.0f, 3.0f)
+                    val plaintext = PlaintextVector(data, "", "")
+                    val metadata = AlloyMetadata.newSimple("fake-tenant")
+                    runBlocking { integrationSdk.vector().encrypt(plaintext, metadata) }
+                }
+        assertContains(err.msg, "Tenant either doesn't exist")
     }
 }

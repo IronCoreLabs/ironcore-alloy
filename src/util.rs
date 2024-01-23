@@ -103,7 +103,7 @@ pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T
 
 pub(crate) struct BatchResult<U> {
     pub successes: HashMap<FieldId, U>,
-    pub failures: HashMap<FieldId, String>,
+    pub failures: HashMap<FieldId, AlloyError>,
 }
 
 /// Applies the function `func` to all the values of `collection`, then partitions them into
@@ -118,7 +118,7 @@ where
         .into_iter()
         .map(|(key, value)| match func(value) {
             Ok(x) => Ok((key, x)),
-            Err(x) => Err((key, x.to_string())), // TODO: remove to_string when returning AlloyError works
+            Err(x) => Err((key, x)),
         })
         .partition_result();
     BatchResult {

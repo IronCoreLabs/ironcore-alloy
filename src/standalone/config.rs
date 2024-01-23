@@ -39,9 +39,9 @@ impl StandardSecrets {
         let mut internal_secrets = HashMap::new();
 
         if secrets.iter().any(|secret| secret.id == 0) {
-            return Err(AlloyError::InvalidKey(
-                "Secret ids must be greater than 0".to_string(),
-            ));
+            return Err(AlloyError::InvalidKey {
+                msg: "Secret ids must be greater than 0".to_string(),
+            });
         }
 
         for standalone_secret in secrets.into_iter() {
@@ -52,19 +52,21 @@ impl StandardSecrets {
                 )
                 .is_some()
             {
-                return Err(AlloyError::InvalidKey(format!(
-                    "Duplicate secret id encountered while initializing Standalone mode: {}",
-                    standalone_secret.id
-                )));
+                return Err(AlloyError::InvalidKey {
+                    msg: format!(
+                        "Duplicate secret id encountered while initializing Standalone mode: {}",
+                        standalone_secret.id
+                    ),
+                });
             }
         }
 
         // check that the provided primary does in fact exist
         if let Some(id) = primary_secret_id {
             if internal_secrets.get(&(id as u32)).is_none() {
-                return Err(AlloyError::InvalidKey(format!(
-                    "Primary secret id not found in provided secrets: {id}"
-                )));
+                return Err(AlloyError::InvalidKey {
+                    msg: format!("Primary secret id not found in provided secrets: {id}"),
+                });
             }
         }
 
@@ -93,9 +95,9 @@ impl RotatableSecret {
         in_rotation_secret: Option<Arc<StandaloneSecret>>,
     ) -> Result<Arc<Self>, AlloyError> {
         if current_secret.is_none() && in_rotation_secret.is_none() {
-            Err(AlloyError::InvalidKey(
-                "Cannot create a RotatingSecret with no secrets.".to_string(),
-            ))
+            Err(AlloyError::InvalidKey {
+                msg: "Cannot create a RotatingSecret with no secrets.".to_string(),
+            })
         } else {
             Ok(Arc::new(Self {
                 current_secret,

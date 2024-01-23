@@ -2,11 +2,10 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use super::*;
+    use crate::common::{get_client, TestResult};
     use base64::{engine::general_purpose::STANDARD, Engine};
-    use common::CLIENT;
     use ironcore_alloy::{
-        errors::AlloyError,
+        errors::{AlloyError, KmsError, TenantSecurityProxyError},
         saas_shield::{DataEvent, SaasShieldSecurityEventOps, SecurityEvent},
         standard::{
             EdekWithKeyIdHeader, EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek,
@@ -19,8 +18,6 @@ mod tests {
         sync::Arc,
         time::{SystemTime, UNIX_EPOCH},
     };
-
-    type TestResult = Result<(), AlloyError>;
 
     fn get_metadata() -> Arc<AlloyMetadata> {
         AlloyMetadata::new_simple(TenantId("tenant-gcp-l".to_string()))
@@ -67,7 +64,10 @@ mod tests {
     async fn standard_encrypt_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let encrypted = CLIENT.standard().encrypt(plaintext, &metadata).await?;
+        let encrypted = get_client()
+            .standard()
+            .encrypt(plaintext, &metadata)
+            .await?;
         assert_eq!(encrypted.edek.0.len(), 259);
         Ok(())
     }
@@ -76,7 +76,10 @@ mod tests {
     async fn standard_decrypt_known() -> TestResult {
         let encrypted = get_ciphertext();
         let metadata = get_metadata();
-        let decrypted = CLIENT.standard().decrypt(encrypted, &metadata).await?;
+        let decrypted = get_client()
+            .standard()
+            .decrypt(encrypted, &metadata)
+            .await?;
         let expected = get_plaintext();
         assert_eq!(decrypted, expected);
         Ok(())
@@ -100,7 +103,7 @@ mod tests {
             document: doc_bytes,
         };
         let metadata = get_metadata();
-        let decrypted = CLIENT
+        let decrypted = get_client()
             .standard()
             .decrypt(document, &metadata)
             .await
@@ -114,17 +117,20 @@ mod tests {
     async fn standard_encrypt_with_existing_edek_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let encrypted = CLIENT.standard().encrypt(plaintext, &metadata).await?;
+        let encrypted = get_client()
+            .standard()
+            .encrypt(plaintext, &metadata)
+            .await?;
         let plaintext2: HashMap<_, _> = [("field2".to_string(), vec![1, 2, 3, 4])].into();
         let plaintext_with_edek = PlaintextDocumentWithEdek {
             edek: encrypted.edek,
             document: plaintext2.clone(),
         };
-        let second_encrypted = CLIENT
+        let second_encrypted = get_client()
             .standard()
             .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
             .await?;
-        let decrypted = CLIENT
+        let decrypted = get_client()
             .standard()
             .decrypt(second_encrypted, &metadata)
             .await?;
@@ -142,12 +148,15 @@ mod tests {
             edek: EdekWithKeyIdHeader(edek_bytes.clone()),
             document: plaintext.clone(),
         };
-        let encrypted = CLIENT
+        let encrypted = get_client()
             .standard()
             .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
             .await?;
         assert_eq!(encrypted.edek.0, edek_bytes);
-        let decrypted = CLIENT.standard().decrypt(encrypted, &metadata).await?;
+        let decrypted = get_client()
+            .standard()
+            .decrypt(encrypted, &metadata)
+            .await?;
         assert_eq!(decrypted, plaintext);
         Ok(())
     }
@@ -155,7 +164,7 @@ mod tests {
     #[tokio::test]
     async fn standard_log_security_event_works() -> TestResult {
         let metadata = get_metadata();
-        CLIENT
+        get_client()
             .standard()
             .log_security_event(
                 SecurityEvent::Data {
@@ -176,7 +185,7 @@ mod tests {
     #[tokio::test]
     async fn standard_log_security_event_works_with_none() -> TestResult {
         let metadata = get_metadata();
-        CLIENT
+        get_client()
             .standard()
             .log_security_event(
                 SecurityEvent::Data {
@@ -192,7 +201,7 @@ mod tests {
     #[tokio::test]
     async fn standard_log_security_event_fails_with_negative_time() -> TestResult {
         let metadata = get_metadata();
-        let err = CLIENT
+        let err = get_client()
             .standard()
             .log_security_event(
                 SecurityEvent::Data {
@@ -211,7 +220,7 @@ mod tests {
     }
     #[tokio::test]
     async fn standard_get_searchable_edek_prefix_works() -> TestResult {
-        let prefix = CLIENT.standard().get_searchable_edek_prefix(1);
+        let prefix = get_client().standard().get_searchable_edek_prefix(1);
         let expected = [0, 0, 0, 1, 2, 0];
         assert_eq!(prefix, expected);
         Ok(())
@@ -222,7 +231,7 @@ mod tests {
         let metadata = get_metadata();
         let edek = get_ciphertext().edek;
         let edeks = [("edek".to_string(), edek)].into();
-        let all_rekeyed = CLIENT
+        let all_rekeyed = get_client()
             .standard()
             .rekey_edeks(edeks, &metadata, None)
             .await?;
@@ -240,7 +249,7 @@ mod tests {
         let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
         let edek_bytes = STANDARD.decode(edek).unwrap();
         let edeks = [("edek".to_string(), EdekWithKeyIdHeader(edek_bytes))].into();
-        let all_rekeyed = CLIENT
+        let all_rekeyed = get_client()
             .standard()
             .rekey_edeks(edeks, &metadata, None)
             .await?;
@@ -250,6 +259,27 @@ mod tests {
         // This is now a V5 document, which starts with the KeyIdHeader
         // First 4 bytes are KMS config ID 511
         assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_error_variant() -> TestResult {
+        let encrypted = get_ciphertext();
+        let metadata = AlloyMetadata::new_simple(TenantId("fake-tenant".to_string()));
+        let err = get_client()
+            .standard()
+            .decrypt(encrypted, &metadata)
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            AlloyError::TspError {
+                error: TenantSecurityProxyError::Kms {
+                    error: KmsError::UnknownTenantOrNoActiveKmsConfigurations,
+                },
+                ..
+            }
+        ));
         Ok(())
     }
 }

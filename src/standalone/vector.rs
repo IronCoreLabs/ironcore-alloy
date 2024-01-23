@@ -45,20 +45,18 @@ impl StandaloneVectorClient {
         let vector_secret = self
             .config
             .get(&encrypted_vector.secret_path)
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
                     &encrypted_vector.secret_path.0
-                ))
+                ),
             })?;
         let standalone_secret = vector_secret
             .secret
             .current_secret
             .as_ref()
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(
-                    "No current secret exists in the vector configuration".to_string(),
-                )
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: "No current secret exists in the vector configuration".to_string(),
             })?;
 
         if original_key_id.0 == standalone_secret.id && metadata.tenant_id == new_metadata.tenant_id
@@ -95,20 +93,18 @@ impl VectorOps for StandaloneVectorClient {
         let vector_secret = self
             .config
             .get(&plaintext_vector.secret_path)
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
                     &plaintext_vector.secret_path.0
-                ))
+                ),
             })?;
         let standalone_secret = vector_secret
             .secret
             .current_secret
             .as_ref()
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(
-                    "No current secret exists in the vector configuration".to_string(),
-                )
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: "No current secret exists in the vector configuration".to_string(),
             })?;
         let key = VectorEncryptionKey::derive_from_secret(
             standalone_secret.secret.as_ref(),
@@ -137,20 +133,20 @@ impl VectorOps for StandaloneVectorClient {
         let vector_secret = self
             .config
             .get(&encrypted_vector.secret_path)
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
                     &encrypted_vector.secret_path.0
-                ))
+                ),
             })?;
         let standalone_secret = vector_secret
             .secret
             .get_secret_with_id(&key_id)
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(format!(
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: format!(
                     "Secret with key ID `{}` does not exist in the vector configuration",
                     key_id.0
-                ))
+                ),
             })?;
         let key = VectorEncryptionKey::derive_from_secret(
             standalone_secret.secret.as_ref(),
@@ -178,21 +174,23 @@ impl VectorOps for StandaloneVectorClient {
                 let vector_secret =
                     self.config
                         .get(&plaintext_vector.secret_path)
-                        .ok_or_else(|| {
-                            AlloyError::InvalidConfiguration(format!(
+                        .ok_or_else(|| AlloyError::InvalidConfiguration {
+                            msg: format!(
                             "Provided secret path `{}` does not exist in the vector configuration.",
                             &plaintext_vector.secret_path.0
-                        ))
+                        ),
                         })?;
                 let RotatableSecret {
                     current_secret,
                     in_rotation_secret,
                 } = vector_secret.secret.as_ref();
                 if current_secret.is_none() && in_rotation_secret.is_none() {
-                    Err(AlloyError::InvalidConfiguration(format!(
-                        "No secrets exist in the vector configuration for secret path `{}`.",
-                        plaintext_vector.secret_path.0
-                    )))?;
+                    Err(AlloyError::InvalidConfiguration {
+                        msg: format!(
+                            "No secrets exist in the vector configuration for secret path `{}`.",
+                            plaintext_vector.secret_path.0
+                        ),
+                    })?;
                 }
                 current_secret
                     .iter()
@@ -229,20 +227,21 @@ impl VectorOps for StandaloneVectorClient {
         _derivation_path: DerivationPath,
         _metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
-        let vector_secret = self.config.get(&secret_path).ok_or_else(|| {
-            AlloyError::InvalidConfiguration(format!(
-                "Provided secret path `{}` does not exist in the vector configuration.",
-                &secret_path.0
-            ))
-        })?;
+        let vector_secret =
+            self.config
+                .get(&secret_path)
+                .ok_or_else(|| AlloyError::InvalidConfiguration {
+                    msg: format!(
+                        "Provided secret path `{}` does not exist in the vector configuration.",
+                        &secret_path.0
+                    ),
+                })?;
         let in_rotation_secret = vector_secret
             .secret
             .in_rotation_secret
             .as_ref()
-            .ok_or_else(|| {
-                AlloyError::InvalidConfiguration(
-                    "There is no in-rotation secret in the vector configuration.".to_string(),
-                )
+            .ok_or_else(|| AlloyError::InvalidConfiguration {
+                msg: "There is no in-rotation secret in the vector configuration.".to_string(),
             })?;
         let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
         Ok(

@@ -2,17 +2,12 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use super::*;
-    use common::CLIENT;
-
+    use crate::common::{get_client, TestResult};
     use ironcore_alloy::{
         deterministic::{DeterministicFieldOps, EncryptedField, PlaintextField},
-        errors::AlloyError,
         AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
     use std::sync::Arc;
-
-    type TestResult = Result<(), AlloyError>;
 
     fn get_metadata() -> Arc<AlloyMetadata> {
         AlloyMetadata::new_simple(TenantId("tenant-gcp-l".to_string()))
@@ -41,7 +36,10 @@ mod tests {
     async fn deterministic_encrypt_known() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let encrypted = CLIENT.deterministic().encrypt(plaintext, &metadata).await?;
+        let encrypted = get_client()
+            .deterministic()
+            .encrypt(plaintext, &metadata)
+            .await?;
         let expected = get_ciphertext().encrypted_field;
         assert_eq!(encrypted.encrypted_field, expected);
         assert_eq!(encrypted.secret_path.0, "secret");
@@ -53,7 +51,10 @@ mod tests {
     async fn deterministic_decrypt_known() -> TestResult {
         let encrypted = get_ciphertext();
         let metadata = get_metadata();
-        let decrypted = CLIENT.deterministic().decrypt(encrypted, &metadata).await?;
+        let decrypted = get_client()
+            .deterministic()
+            .decrypt(encrypted, &metadata)
+            .await?;
         let expected = get_plaintext().plaintext_field;
         assert_eq!(decrypted.plaintext_field, expected);
         assert_eq!(decrypted.secret_path.0, "secret");
@@ -66,7 +67,7 @@ mod tests {
         let plaintext = get_plaintext();
         let fields = [("field".to_string(), plaintext)].into();
         let metadata = get_metadata();
-        let resp = CLIENT
+        let resp = get_client()
             .deterministic()
             .generate_query_field_values(fields, &metadata)
             .await?;
@@ -84,14 +85,17 @@ mod tests {
         let ciphertext = get_ciphertext();
         let fields = [("field".to_string(), ciphertext)].into();
         let metadata = get_metadata();
-        let mut resp = CLIENT
+        let mut resp = get_client()
             .deterministic()
             .rotate_fields(fields, &metadata, None)
             .await?;
         assert_eq!(resp.successes.len(), 1);
         assert_eq!(resp.failures.len(), 0);
         let rotated = resp.successes.remove("field").unwrap();
-        let decrypted = CLIENT.deterministic().decrypt(rotated, &metadata).await?;
+        let decrypted = get_client()
+            .deterministic()
+            .decrypt(rotated, &metadata)
+            .await?;
         let expected = get_plaintext().plaintext_field;
         assert_eq!(decrypted.plaintext_field, expected);
         assert_eq!(decrypted.secret_path.0, "secret");
@@ -105,7 +109,7 @@ mod tests {
         let fields = [("field".to_string(), ciphertext)].into();
         let metadata = get_metadata();
         let new_tenant_id = TenantId("tenant-aws-l".to_string());
-        let mut resp = CLIENT
+        let mut resp = get_client()
             .deterministic()
             .rotate_fields(fields, &metadata, Some(new_tenant_id.clone()))
             .await?;
@@ -113,7 +117,7 @@ mod tests {
         assert_eq!(resp.failures.len(), 0);
         let rotated = resp.successes.remove("field").unwrap();
         let new_metadata = AlloyMetadata::new_simple(new_tenant_id);
-        let decrypted = CLIENT
+        let decrypted = get_client()
             .deterministic()
             .decrypt(rotated, &new_metadata)
             .await?;

@@ -31,7 +31,7 @@ pub type GenerateQueryResult = HashMap<FieldId, Vec<EncryptedField>>;
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct DeterministicRotateResult {
     pub successes: HashMap<FieldId, EncryptedField>,
-    pub failures: HashMap<FieldId, String>, // TODO: export error instead...?
+    pub failures: HashMap<FieldId, AlloyError>,
 }
 
 impl From<BatchResult<EncryptedField>> for DeterministicRotateResult {
@@ -114,10 +114,10 @@ pub(crate) fn encrypt_internal(
     key_id_header: KeyIdHeader,
     plaintext_field: PlaintextField,
 ) -> Result<EncryptedField, AlloyError> {
-    let current_derived_key_sized: [u8; 64] = key
-        .0
-        .try_into()
-        .map_err(|_| AlloyError::InvalidKey("The derived key was not 64 bytes.".to_string()))?;
+    let current_derived_key_sized: [u8; 64] =
+        key.0.try_into().map_err(|_| AlloyError::InvalidKey {
+            msg: "The derived key was not 64 bytes.".to_string(),
+        })?;
     let encrypted_bytes = deterministic_encrypt(
         current_derived_key_sized,
         plaintext_field.plaintext_field.as_slice(),
@@ -136,10 +136,9 @@ pub(crate) fn decrypt_internal(
     secret_path: SecretPath,
     derivation_path: DerivationPath,
 ) -> Result<PlaintextField, AlloyError> {
-    let sized_key: [u8; 64] = key
-        .0
-        .try_into()
-        .map_err(|_| AlloyError::InvalidKey("The derived key was not 64 bytes.".to_string()))?;
+    let sized_key: [u8; 64] = key.0.try_into().map_err(|_| AlloyError::InvalidKey {
+        msg: "The derived key was not 64 bytes.".to_string(),
+    })?;
     deterministic_decrypt(sized_key, &ciphertext).map(|res| PlaintextField {
         plaintext_field: res,
         secret_path,
@@ -159,7 +158,7 @@ fn deterministic_encrypt_core(
     let mut cipher = Aes256Siv::new(&key.into());
     cipher
         .encrypt([associated_data], plaintext)
-        .map_err(|e| AlloyError::EncryptError(e.to_string()))
+        .map_err(|e| AlloyError::EncryptError { msg: e.to_string() })
 }
 
 fn deterministic_decrypt(key: [u8; 64], ciphertext: &[u8]) -> Result<Vec<u8>, AlloyError> {
@@ -172,12 +171,12 @@ fn deterministic_decrypt_core(
     associated_data: &[u8],
 ) -> Result<Vec<u8>, AlloyError> {
     let mut cipher = Aes256Siv::new(&key.into());
-    cipher.decrypt([associated_data], ciphertext).map_err(|_| {
-        AlloyError::DecryptError(
-            "Failed deterministic decryption. Ensure the data and tenant ID are correct"
+    cipher
+        .decrypt([associated_data], ciphertext)
+        .map_err(|_| AlloyError::DecryptError {
+            msg: "Failed deterministic decryption. Ensure the data and tenant ID are correct"
                 .to_string(),
-        )
-    })
+        })
 }
 
 #[cfg(test)]

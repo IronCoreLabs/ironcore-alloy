@@ -1,4 +1,5 @@
-use super::{errors::TenantSecurityError, DerivationPath, RequestMetadata, SecretPath};
+use super::{DerivationPath, RequestMetadata, SecretPath};
+use crate::errors::AlloyError;
 use base64_type::Base64;
 use ironcore_documents::v5::key_id_header::KeyId;
 use reqwest::StatusCode;
@@ -74,13 +75,15 @@ pub struct TspErrorResponse {
 }
 
 impl TspErrorResponse {
-    pub fn try_from_value(value: Value, status: StatusCode) -> Result<Self, TenantSecurityError> {
+    pub fn try_from_value(value: Value, status: StatusCode) -> Result<Self, AlloyError> {
         serde_json::from_value::<TspErrorResponse>(value.clone()).map_err(|_| {
-            TenantSecurityError::RequestError(format!(
-                "TSP gave an invalid response: `{}`. Status: {}",
-                value,
-                status.as_str()
-            ))
+            AlloyError::RequestError {
+                msg: format!(
+                    "TSP gave an invalid response: `{}`. Status: {}",
+                    value,
+                    status.as_str()
+                ),
+            }
         })
     }
 }
@@ -140,16 +143,15 @@ impl KeyDeriveResponse {
         secret_path: &SecretPath,
         deriv_path: &DerivationPath,
         derive_key_choice: DeriveKeyChoice,
-    ) -> Result<&DerivedKey, TenantSecurityError> {
+    ) -> Result<&DerivedKey, AlloyError> {
         match derive_key_choice {
             DeriveKeyChoice::Current => self.get_current(secret_path, deriv_path),
             DeriveKeyChoice::Specific(key_id) => self.get_by_id(secret_path, deriv_path, key_id.0),
             DeriveKeyChoice::InRotation => self.get_in_rotation(secret_path, deriv_path),
         }
-        .ok_or_else(|| {
-            TenantSecurityError::RequestError(
-                "The secret path, derivation path combo didn't have the requested key.".to_string(),
-            )
+        .ok_or_else(|| AlloyError::RequestError {
+            msg: "The secret path, derivation path combo didn't have the requested key."
+                .to_string(),
         })
     }
 
@@ -193,12 +195,12 @@ impl KeyDeriveResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{errors::TenantSecurityError, request::tests::KNOWN_NUM_ID};
+    use super::super::request::tests::KNOWN_NUM_ID;
     use super::*;
     use std::str::FromStr;
 
     #[test]
-    fn key_derive_get_primary() -> Result<(), TenantSecurityError> {
+    fn key_derive_get_primary() -> Result<(), AlloyError> {
         let secret_path = SecretPath("foo-bar-baz".to_string());
         let derivation_path = DerivationPath("qux".to_string());
         let mut derivation_paths = HashMap::new();
