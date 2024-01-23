@@ -828,9 +828,9 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "goblin"
-version = "0.6.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d6b4de4a8eb6c46a8c77e1d3be942cb9a8bf073c22374578e5ba4b08ed0ff68"
+checksum = "bb07a4ffed2093b118a525b1d8f5204ae274faed5604537caf7135d0f18d9887"
 dependencies = [
  "log",
  "plain",
@@ -1772,18 +1772,18 @@ dependencies = [
 
 [[package]]
 name = "scroll"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04c565b551bafbef4157586fa379538366e4385d42082f255bfd96e4fe8519da"
+checksum = "6ab8598aa408498679922eff7fa985c25d58a90771bd6be794434c5277eab1a6"
 dependencies = [
  "scroll_derive",
 ]
 
 [[package]]
 name = "scroll_derive"
-version = "0.11.1"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1db149f81d46d2deba7cd3c50772474707729550221e69588478ebf9ada425ae"
+checksum = "7f81c2fde025af7e69b1d1420531c8a8811ca898919db177141a85313b1cb932"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2179,8 +2179,9 @@ checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
 
 [[package]]
 name = "uniffi"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "935007d0071c47757c5123a5432199de25586bce196f0d9c0edd8134e514fc36"
 dependencies = [
  "anyhow",
  "camino",
@@ -2192,8 +2193,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_bindgen"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bde32a2b8f138a4a8510effba7e7b666b292055a9f0a6ee7af634f399bd10439"
 dependencies = [
  "anyhow",
  "askama",
@@ -2216,8 +2218,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_build"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f67866ba8fc0c5b20e74a20482856b5486990981ce4cef74b88599fd292e871"
 dependencies = [
  "anyhow",
  "camino",
@@ -2226,8 +2229,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_checksum_derive"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ff709037c1cefcc39c1c754de424fa8fb753607f01332e57cdcab0e90bb09dd"
 dependencies = [
  "quote",
  "syn",
@@ -2235,8 +2239,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_core"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "110b3af79cd094c4b3ed098cb2549150dd7b5585cdb106db442846d2acab38d4"
 dependencies = [
  "anyhow",
  "async-compat",
@@ -2251,8 +2256,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_macros"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee9430116412cbf98811883141aa14c004912e39e9cde1ca28c56234848b9692"
 dependencies = [
  "bincode",
  "camino",
@@ -2269,8 +2275,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_meta"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73c9ff57d4dc24717f0fa9bc01e22e030d1da252798660878b457f7e5bfdb93c"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2280,8 +2287,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_testing"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35c83d57347678c90393f879090b9c6ecbf3521061eb3caca55964508eca1663"
 dependencies = [
  "anyhow",
  "camino",
@@ -2292,8 +2300,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi_udl"
-version = "0.25.3"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "0.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e9a2e5cca029904bb8bdf48492ba61e01fd48bafff907d3bf8f09d313d869bf"
 dependencies = [
  "anyhow",
  "textwrap",
@@ -2465,8 +2474,9 @@ checksum = "1778a42e8b3b90bff8d0f5032bf22250792889a5cdc752aa0020c84abe3aaf10"
 
 [[package]]
 name = "weedle2"
-version = "4.0.0"
-source = "git+https://github.com/bendk/uniffi-rs.git?branch=foreign-trait-interfaces-opt-in#e70164e10c123104864347329cd926ce32155fa9"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69eb0e267122e2d2eb8c8fd7e7d0d6b9d2043d3a52c6c7fb0a6653ee492d04fd"
 dependencies = [
  "nom",
 ]

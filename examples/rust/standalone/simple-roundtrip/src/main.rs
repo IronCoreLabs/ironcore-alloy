@@ -77,7 +77,7 @@ async fn main() {
         .await
         .unwrap();
 
-    // Write the enrcypted data and edek.
+    // Write the encrypted data and edek.
     std::fs::write("success.jpg.edek", encrypted_image.edek.0).expect("");
     std::fs::write(
         "success.jpg.enc",
