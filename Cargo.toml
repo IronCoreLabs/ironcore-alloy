@@ -22,8 +22,8 @@ keywords = [
 rust-version = "1.75.0"
 
 [dependencies]
-aes-gcm = { version = "0.10" }
-aes-siv = { version = "0.7" }
+aes-gcm = "0.10"
+aes-siv = "0.7"
 async-trait = "0.1.74"
 base64 = "0.21"
 base64_type = { git = "https://github.com/IronCoreLabs/base64_type", version = "0.1.2-pre.1" }
@@ -48,11 +48,7 @@ ring = "0.16.20"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
 thiserror = "1.0.50"
-# update when 0.26 (https://github.com/mozilla/uniffi-rs/issues/1911) releases
-uniffi = { git = "https://github.com/bendk/uniffi-rs.git", features = [
-    "cli",
-    "tokio",
-], branch = "foreign-trait-interfaces-opt-in" }
+uniffi = { version = "0.26.0", features = ["cli", "tokio"] }
 z85 = "3.0.5"
 
 [dev-dependencies]
@@ -68,10 +64,7 @@ hex-literal = "0.4.1"
 lazy_static = "1.4"
 proptest = "1.2.0"
 tokio = { version = "1.33", features = ["macros", "rt-multi-thread"] }
-uniffi = { git = "https://github.com/bendk/uniffi-rs.git", features = [
-    "bindgen-tests",
-], branch = "foreign-trait-interfaces-opt-in" }
-uniffi_bindgen = { git = "https://github.com/bendk/uniffi-rs.git", branch = "foreign-trait-interfaces-opt-in" }
+uniffi_bindgen = "0.26.0"
 z85 = "3.0.5"
 
 [features]
