@@ -26,12 +26,12 @@ aes-gcm = "0.10"
 aes-siv = "0.7"
 async-trait = "0.1.74"
 base64 = "0.21"
-base64_type = { git = "https://github.com/IronCoreLabs/base64_type", version = "0.1.2-pre.1" }
+base64_type = "0.2"
 bytes = { version = "1.4.0", features = ["serde"] }
 convert_case = "0.6.0"
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", rev = "5eaa74f0eb19f69ed28b37228036f1d360b43dc6" }
+ironcore-documents = "0.1"
 itertools = "0.11"
 ndarray = "0.15.6"
 ndarray-rand = "0.14.0"

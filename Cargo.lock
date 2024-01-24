@@ -262,8 +262,9 @@ dependencies = [
 
 [[package]]
 name = "base64_type"
-version = "0.1.2-pre.1"
-source = "git+https://github.com/IronCoreLabs/base64_type#da678f2e28edf676b690221bb1994ec5728e7a19"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "373f22faccfea95df3465ec76909294dd9954592b46929297ab9d0b8a6e46ad5"
 dependencies = [
  "base64",
  "base64-serde",
@@ -1078,8 +1079,9 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.1.0-pre.11"
-source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?rev=5eaa74f0eb19f69ed28b37228036f1d360b43dc6#5eaa74f0eb19f69ed28b37228036f1d360b43dc6"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd19765db5c9c4d9d1953cf161cc3d0e24230149b044ba659aa394dba70832fc"
 dependencies = [
  "aes-gcm",
  "bytes",
