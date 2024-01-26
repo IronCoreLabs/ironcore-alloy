@@ -1,3 +1,11 @@
+## 0.10.2
+
+- Added SaaS Shield security events
+- Added SaaS Shield vector rotation
+- Added support for standard attached documents
+- Added backwards compatibility with TSC and Cloaked Search libraries
+- Reworked AlloyError to allow easier matching on error responses
+
 ## 0.9.0
 
 Initial release of Alloy. This library is intended to eventually replace the Tenant Security Client libraries, and include additional functionality. Right now this includes:
