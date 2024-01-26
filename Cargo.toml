@@ -11,14 +11,7 @@ documentation = "https://docs.rs/ironcore-alloy"
 readme = "README.md"
 repository = "https://github.com/IronCoreLabs/ironcore-alloy"
 categories = ["cryptography"]
-keywords = [
-    "cryptography",
-    "saas-shield",
-    "ALE",
-    "application-layer-encryption",
-    "cloaked-ai",
-    "tenant-security-client",
-]
+keywords = ["cryptography", "saas-shield", "ALE", "cloaked-ai"]
 rust-version = "1.75.0"
 
 [dependencies]
