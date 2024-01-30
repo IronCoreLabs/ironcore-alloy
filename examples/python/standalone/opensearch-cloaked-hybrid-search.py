@@ -1,16 +1,16 @@
 # PREREQUISITE:
-#   Start up elasticsearch with cloaked search as shown in our
+#   Start up OpenSearch with cloaked search as shown in our
 #   [try-cloaked-search](https://ironcorelabs.com/docs/cloaked-search/try-cloaked-search/) example.
 #   No need to populate or create an index yet, we'll do that as part of this process.
 # DEPENDENCIES:
-#   `pip install elasticsearch sentence_transformers ironcore-alloy`
+#   `pip install opensearch-py sentence_transformers ironcore-alloy`
 # REFERENCES:
-#   This is based on the elasticsearch jupyter notebooks [quick-start](https://github.com/elastic/elasticsearch-labs/blob/main/notebooks/search/00-quick-start.ipynb)
-#   and [hybrid-search](https://colab.research.google.com/github/elastic/elasticsearch-labs/blob/main/notebooks/search/02-hybrid-search.ipynb).
+#   This uses [approximate kNN](https://opensearch.org/docs/latest/search-plugins/knn/approximate-knn/) and documentation.
+#   The `hybrid` and `neural` query types aren't supported by Cloaked Search yet (see [issue #949](https://github.com/IronCoreLabs/cloaked-search/issues/949)).
 
 # IMPORTS
 from sentence_transformers import SentenceTransformer
-from elasticsearch import Elasticsearch
+from opensearchpy import OpenSearch
 import ironcore_alloy as alloy
 import json
 from urllib.request import urlopen
@@ -71,8 +71,14 @@ async def main():
     #   }
     # }
 
-    # Initialize the Elasticsearch client
-    client = Elasticsearch(hosts=["http://localhost:8675"])
+    # Initialize the OpenSearch client
+    client = OpenSearch(
+        hosts=[{"host": "localhost", "port": 8675}],
+        use_ssl=False,
+        verify_certs=False,
+        ssl_assert_hostname=False,
+        ssl_show_warn=False,
+    )
 
     # Initialize the IronCore Cloaked AI standalone client
     tenant_id = "tenant-one"
@@ -94,25 +100,27 @@ async def main():
     )
     sdk = alloy.Standalone(config)
 
-    # Use the book_index that elasticsearch uses in their example. First make sure `book_index` doesn't exist.
+    # First make sure `book_index` doesn't exist.
     client.indices.delete(index="book_index", ignore_unavailable=True)
 
     # Define a mapping with a title embedding
-    mappings = {
-        "properties": {
-            "title_vector": {
-                "type": "dense_vector",
-                "dims": 384,
-                "index": "true",
-                "similarity": "cosine",
+    index_definition = {
+        "settings": {"index": {"knn": True, "knn.algo_param.ef_search": 100}},
+        "mappings": {
+            "properties": {
+                "title_vector": {
+                    "type": "knn_vector",
+                    "dimension": 384,
+                    "method": {"name": "hnsw"},
+                }
             }
-        }
+        },
     }
 
     # Create the book index
-    client.indices.create(index="book_index", mappings=mappings)
+    client.indices.create(index="book_index", body=index_definition)
 
-    # Index the book data
+    # Index book data
     url = "https://raw.githubusercontent.com/elastic/elasticsearch-labs/main/notebooks/search/data.json"
     response = urlopen(url)
     books = json.loads(response.read())
@@ -130,34 +138,22 @@ async def main():
         book["title_vector"] = encrypted_title_embedding.encrypted_vector
         book["tenant_id"] = tenant_id
         operations.append(book)
-    bulk_resp = client.bulk(index="book_index", operations=operations, refresh=True)
+    bulk_resp = client.bulk("\n".join(map(json.dumps, operations)))
 
     # Run a hybrid query
     title_query_embedding = model.encode("python programming").tolist()
-    # `generate_query_vectors` returns a list because the secret involved may be in rotation. In that case you should
-    # search for both resulting vectors. Elasticsearch [doesn't explicitly support multiple vectors](https://discuss.elastic.co/t/run-multi-vectors-knn-search/299958/2) yet. Two workarounds are
-    # searching for each separately and combining them in the client or boolean ANDing the knn query for the same field twice (which is what we've done here).
+    # `generate_query_vectors` returns a list because the secret involved may be in rotation.
     encrypted_title_query_embeddings = await sdk.vector().generate_query_vectors(
         {"title": alloy.PlaintextVector(title_query_embedding, "book_index", "")},
         metadata,
     )
     embedding_queries = [
-        {
-            "knn": {
-                "field": "title_vector",
-                "query_vector": title_embedding.encrypted_vector,
-                "num_candidates": 10,
-                "boost": 2.0,
-            }
-        }
+        {"knn": {"title_vector": {"vector": title_embedding.encrypted_vector, "k": 5}}}
         for title_embedding in encrypted_title_query_embeddings["title"]
     ]
-    # Better results can be attained by tweaking the `boost` on the `knn` query so the distances become more relevant to the combined search.
-    # Even better is using a top level `knn` query (as a neighbor of `knn`) with RRF ranking enabled (requires Elasticsearch Platinum or Enterprise).
-    response = client.search(
-        index="book_index",
-        size=5,
-        query={
+    search_query = {
+        "size": 5,
+        "query": {
             "bool": {
                 "filter": {"term": {"tenant_id.keyword": tenant_id}},
                 "should": [
@@ -166,17 +162,24 @@ async def main():
                 + embedding_queries,
             }
         },
-    )
+    }
+    response = client.search(index="book_index", body=search_query)
 
     # Response through Cloaked Search with all results decrypted
     pretty_response(response)
 
-    # Take a look at the elasticsearch index directly to see what an over-curious admin or someone who exfiltrated
+    # Take a look at the OpenSearch index directly to see what an over-curious admin or someone who exfiltrated
     # the index would see.
     document_ids = [r["_id"] for r in response["hits"]["hits"]]
-    bypass_client = Elasticsearch(hosts=["http://localhost:9200"])
+    bypass_client = OpenSearch(
+        hosts=[{"host": "localhost", "port": 9200}],
+        use_ssl=False,
+        verify_certs=False,
+        ssl_assert_hostname=False,
+        ssl_show_warn=False,
+    )
     bypass_response = bypass_client.search(
-        index="book_index", size=5, query={"terms": {"_id": document_ids}}
+        index="book_index", body={"size": 5, "query": {"terms": {"_id": document_ids}}}
     )
 
     pretty_encrypted_response(bypass_response)
@@ -187,33 +190,62 @@ asyncio.run(main())
 
 # Example response:
 #
-# ID: UxAnQo0BlFbaZBbWjkzE
+# ID: 7beZW40B2fCVUOIdvs_x
 # Publication date: 2019-05-03
 # Title: Python Crash Course
+# Publisher: no starch press
 # Summary: A fast-paced, no-nonsense guide to programming in Python
 
-# ID: VxAnQo0BlFbaZBbWjkzE
+# ID: 8beZW40B2fCVUOIdvs_x
 # Publication date: 2018-12-04
 # Title: Eloquent JavaScript
+# Publisher: no starch press
 # Summary: A modern introduction to programming
 
-# ID: UhAnQo0BlFbaZBbWjkzE
-# Publication date: 2019-10-29
-# Title: The Pragmatic Programmer: Your Journey to Mastery
-# Summary: A guide to pragmatic programming for software engineers and developers
-
-# ID: VhAnQo0BlFbaZBbWjkzE
+# ID: 8LeZW40B2fCVUOIdvs_x
 # Publication date: 2015-03-27
 # Title: You Don't Know JS: Up & Going
+# Publisher: oreilly
 # Summary: Introduction to JavaScript and programming as a whole
 
-# ID: WRAnQo0BlFbaZBbWjkzE
-# Publication date: 2011-05-13
-# Title: The Clean Coder: A Code of Conduct for Professional Programmers
-# Summary: A guide to professional conduct in the field of software engineering
-
-# Example bypass document
-# ID: UhAnQo0BlFbaZBbWjkzE
+# ID: 7LeZW40B2fCVUOIdvs_x
 # Publication date: 2019-10-29
-# Title: 32d4b16c 548291a5 ca8e89c7 1688797c fc7a6114 92cafafc a4acc8f1
-# Summary: 185ebb23 8f65c6f2 1efc1699 b4c8f372 e88dfce6 b6c9e8f1 315770f2 5bf4d0fa 3b07cc3 41fcf8de
+# Title: The Pragmatic Programmer: Your Journey to Mastery
+# Publisher: addison-wesley
+# Summary: A guide to pragmatic programming for software engineers and developers
+
+# ID: 9beZW40B2fCVUOIdvs_y
+# Publication date: 2012-06-27
+# Title: Introduction to the Theory of Computation
+# Publisher: cengage learning
+# Summary: Introduction to the theory of computation and complexity theory
+
+# ID: 7LeZW40B2fCVUOIdvs_x
+# Publication date: 2019-10-29
+# Title: fc7a6114 92cafafc 32d4b16c a4acc8f1 548291a5 ca8e89c7 1688797c
+# Publisher: 8c8667b3 32bf2837
+# Summary: 315770f2 8f65c6f2 b6c9e8f1 1efc1699 e88dfce6 41fcf8de 5bf4d0fa 185ebb23 3b07cc3 b4c8f372
+
+# ID: 7beZW40B2fCVUOIdvs_x
+# Publication date: 2019-05-03
+# Title: 758c4e8d dde900e4 c9231a15
+# Publisher: 854f9e52 fba4fa11 836c2d3
+# Summary: c0c32b9f b6c9e8f1 344eff27 757f5077 ad79819 1efc1699 8ddba080 8f65c6f2 b4c8f372 31d9c5e9
+
+# ID: 8LeZW40B2fCVUOIdvs_x
+# Publication date: 2015-03-27
+# Title: 3773ec4a 75629c5b 1ccac6c eb8aca2 1807fe44 cf1ad8e6
+# Publisher: 13a660aa
+# Summary: c7763222 5bf4d0fa 29f3cb15 8f65c6f2 b4c8f372 b6c9e8f1 c5e67ee4 27356f39
+
+# ID: 8beZW40B2fCVUOIdvs_x
+# Publication date: 2018-12-04
+# Title: 97da4c51 c7bfc0b1
+# Publisher: fba4fa11 854f9e52 836c2d3
+# Summary: b4c8f372 7800ad6a c7763222 8f65c6f2 b6c9e8f1
+
+# ID: 9beZW40B2fCVUOIdvs_y
+# Publication date: 2012-06-27
+# Title: 666686cf 32d4b16c ca8e89c7 5f9ae8b3 91c0a6c 418b5a90
+# Publisher: b5e919b5 a8cb2030
+# Summary: c7763222 f62f2efb 25de61e8 684bdbc7 ebf02d00 4afe5723 b4c8f372 5bf4d0fa
