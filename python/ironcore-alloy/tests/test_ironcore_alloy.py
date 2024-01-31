@@ -161,7 +161,7 @@ class TestIroncoreAlloy:
         metadata = AlloyMetadata.new_simple("tenant")
         encrypted = await self.sdk.standard_attached().encrypt(document, metadata)
         assert encrypted != document
-        decrypted = await self.sdk.standard().decrypt(encrypted, metadata)
+        decrypted = await self.sdk.standard_attached().decrypt(encrypted, metadata)
         assert decrypted == document
 
     @pytest.mark.asyncio
