@@ -14,6 +14,7 @@ pub struct SaasShieldStandardAttachedClient {
     standard_client: SaasShieldStandardClient,
 }
 
+#[uniffi::export(async_runtime = "tokio")]
 impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     /// Encrypt a field with the provided metadata.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key.

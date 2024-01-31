@@ -30,7 +30,11 @@ class TestIroncoreAlloy:
     sdk = Standalone(config)
 
     # Tests using this are skipped by default. Unskip them as needed
-    integration_sdk = SaasShield(SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", False, 1.1))
+    integration_sdk = SaasShield(
+        SaasShieldConfiguration(
+            "http://localhost:32804", "0WUaXesNgbTAuLwn", False, 1.1
+        )
+    )
 
     def test_floating_point_math(self):
         pass
@@ -71,11 +75,10 @@ class TestIroncoreAlloy:
         assert len(rotated.successes) == 1
         assert len(rotated.failures) == 0
         new_metadata = AlloyMetadata.new_simple("tenant2")
-        decrypted = await self.sdk.vector().decrypt(rotated.successes["vector"], new_metadata)
-        assert decrypted.plaintext_vector == pytest.approx(
-            [1.0, 2.0, 3.0], rel=1e-5
+        decrypted = await self.sdk.vector().decrypt(
+            rotated.successes["vector"], new_metadata
         )
-
+        assert decrypted.plaintext_vector == pytest.approx([1.0, 2.0, 3.0], rel=1e-5)
 
     @pytest.mark.asyncio
     async def test_rotate_vector_different_key(self):
@@ -89,7 +92,11 @@ class TestIroncoreAlloy:
                 ),
             )
         }
-        sdk2 = Standalone(StandaloneConfiguration(self.standard_secrets, self.deterministic_secrets, vector_secrets2))
+        sdk2 = Standalone(
+            StandaloneConfiguration(
+                self.standard_secrets, self.deterministic_secrets, vector_secrets2
+            )
+        )
         ciphertext = [5826192.0, 15508204.0, 11420345.0]
         metadata = AlloyMetadata.new_simple("tenant")
         icl_metadata = base64.b64decode(
@@ -98,7 +105,9 @@ class TestIroncoreAlloy:
         encrypted_vector = EncryptedVector(ciphertext, "", "", icl_metadata)
         vectors = {"vector": encrypted_vector}
         metadata = AlloyMetadata.new_simple("tenant")
-        rotated = await sdk2.vector().rotate_vectors(vectors, metadata, "tenant") # unchanged tenant
+        rotated = await sdk2.vector().rotate_vectors(
+            vectors, metadata, "tenant"
+        )  # unchanged tenant
         assert len(rotated.successes) == 1
         assert len(rotated.failures) == 0
         # Now that it's rotated, sometime in the future we have an SDK with only the new current
@@ -106,17 +115,16 @@ class TestIroncoreAlloy:
             "": VectorSecret(
                 self.approximation_factor,
                 # Switched current and in-rotation versus original sdk
-                RotatableSecret(
-                    StandaloneSecret(1, Secret(self.key_bytes)),
-                    None
-                ),
+                RotatableSecret(StandaloneSecret(1, Secret(self.key_bytes)), None),
             )
         }
-        sdk3 = Standalone(StandaloneConfiguration(self.standard_secrets, self.deterministic_secrets, vector_secrets3))
-        decrypted = await sdk3.vector().decrypt(rotated.successes["vector"], metadata)
-        assert decrypted.plaintext_vector == pytest.approx(
-            [1.0, 2.0, 3.0], rel=1e-5
+        sdk3 = Standalone(
+            StandaloneConfiguration(
+                self.standard_secrets, self.deterministic_secrets, vector_secrets3
+            )
         )
+        decrypted = await sdk3.vector().decrypt(rotated.successes["vector"], metadata)
+        assert decrypted.plaintext_vector == pytest.approx([1.0, 2.0, 3.0], rel=1e-5)
 
     @pytest.mark.asyncio
     async def test_encrypt_deterministic(self):
@@ -145,6 +153,15 @@ class TestIroncoreAlloy:
         assert len(encrypted.document["foo"]) == 40
         assert encrypted.document["foo"] != document["foo"]
         decrypted = await self.sdk.standard().decrypt(encrypted, metadata)
+        assert decrypted == document
+
+    @pytest.mark.asyncio
+    async def test_roundtrip_standard_attached(self):
+        document = b"My data"
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.standard_attached().encrypt(document, metadata)
+        assert encrypted != document
+        decrypted = await self.sdk.standard_attached().decrypt(encrypted, metadata)
         assert decrypted == document
 
     @pytest.mark.asyncio
@@ -178,53 +195,78 @@ class TestIroncoreAlloy:
         )
         fields = {"doc": field}
         metadata = AlloyMetadata.new_simple("tenant")
-        rotated = await self.sdk.deterministic().rotate_fields(fields, metadata, "tenant2")
+        rotated = await self.sdk.deterministic().rotate_fields(
+            fields, metadata, "tenant2"
+        )
         assert len(rotated.successes) == 1
         assert len(rotated.failures) == 0
         new_metadata = AlloyMetadata.new_simple("tenant2")
-        decrypted = await self.sdk.deterministic().decrypt(rotated.successes["doc"], new_metadata)
+        decrypted = await self.sdk.deterministic().decrypt(
+            rotated.successes["doc"], new_metadata
+        )
         expected = b"My data"
         assert decrypted.plaintext_field == expected
 
     @pytest.mark.asyncio
     async def test_rotate_deterministic_different_key(self):
         deterministic_secrets2 = {
-        "": RotatableSecret(
-            # Switched current and in-rotation versus original sdk
-            StandaloneSecret(1, Secret(self.key_bytes2)),
-            StandaloneSecret(2, Secret(self.key_bytes)),
-        )}
-        sdk2 = Standalone(StandaloneConfiguration(self.standard_secrets, deterministic_secrets2, self.vector_secrets))
+            "": RotatableSecret(
+                # Switched current and in-rotation versus original sdk
+                StandaloneSecret(1, Secret(self.key_bytes2)),
+                StandaloneSecret(2, Secret(self.key_bytes)),
+            )
+        }
+        sdk2 = Standalone(
+            StandaloneConfiguration(
+                self.standard_secrets, deterministic_secrets2, self.vector_secrets
+            )
+        )
         field = EncryptedField(
             base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "", ""
         )
         fields = {"doc": field}
         metadata = AlloyMetadata.new_simple("tenant")
-        rotated = await sdk2.deterministic().rotate_fields(fields, metadata, "tenant") # unchanged tenant
+        rotated = await sdk2.deterministic().rotate_fields(
+            fields, metadata, "tenant"
+        )  # unchanged tenant
         assert len(rotated.successes) == 1
         assert len(rotated.failures) == 0
         # Now that it's rotated, sometime in the future we have an SDK with only the new current
         deterministic_secrets3 = {
-        "": RotatableSecret(
-            StandaloneSecret(1, Secret(self.key_bytes2)),
-            None,
-        )}
-        sdk3 = Standalone(StandaloneConfiguration(self.standard_secrets, deterministic_secrets3, self.vector_secrets))
-        decrypted = await sdk3.deterministic().decrypt(rotated.successes["doc"], metadata)
+            "": RotatableSecret(
+                StandaloneSecret(1, Secret(self.key_bytes2)),
+                None,
+            )
+        }
+        sdk3 = Standalone(
+            StandaloneConfiguration(
+                self.standard_secrets, deterministic_secrets3, self.vector_secrets
+            )
+        )
+        decrypted = await sdk3.deterministic().decrypt(
+            rotated.successes["doc"], metadata
+        )
         expected = b"My data"
         assert decrypted.plaintext_field == expected
 
     @pytest.mark.asyncio
     async def test_rotate_deterministic_failures(self):
         field = EncryptedField(
-            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="), "wrong_path", "wrong_path"
+            base64.b64decode(b"AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="),
+            "wrong_path",
+            "wrong_path",
         )
         fields = {"doc": field}
         metadata = AlloyMetadata.new_simple("tenant")
-        rotated = await self.sdk.deterministic().rotate_fields(fields, metadata, "tenant2")
+        rotated = await self.sdk.deterministic().rotate_fields(
+            fields, metadata, "tenant2"
+        )
         assert len(rotated.successes) == 0
         assert len(rotated.failures) == 1
-        assert "Provided secret path `wrong_path` does not exist" in rotated.failures["doc"].msg 
+        assert (
+            "Provided secret path `wrong_path` does not exist"
+            in rotated.failures["doc"].msg
+        )
 
     @pytest.mark.skip(reason="need seeded client")
     @pytest.mark.asyncio
@@ -276,7 +318,9 @@ class TestIroncoreAlloy:
         rekeyed = await self.sdk.standard().rekey_edeks(edeks, metadata, new_tenant)
         assert len(rekeyed.failures) == 0
         assert rekeyed.successes["edek"] != encrypted.edek
-        remade_document = EncryptedDocument(rekeyed.successes["edek"], encrypted.document)
+        remade_document = EncryptedDocument(
+            rekeyed.successes["edek"], encrypted.document
+        )
         new_metadata = AlloyMetadata.new_simple(new_tenant)
         decrypted = await self.sdk.standard().decrypt(remade_document, new_metadata)
         assert decrypted["foo"] == b"My data"
@@ -332,13 +376,21 @@ class TestIroncoreAlloy:
     async def test_unknown_tenant(self):
         with pytest.raises(AlloyError.TspError) as tsp_error:
             metadata = AlloyMetadata.new_simple("fake_tenant")
-            await self.integration_sdk.vector().encrypt(PlaintextVector([1, 2, 4], "", ""), metadata)
+            await self.integration_sdk.vector().encrypt(
+                PlaintextVector([1, 2, 4], "", ""), metadata
+            )
         assert "Tenant either doesn't exist" in tsp_error.value.msg
 
     @pytest.mark.asyncio
     async def test_bad_request(self):
         with pytest.raises(AlloyError.RequestError) as request_error:
-            bad_integration_sdk = SaasShield(SaasShieldConfiguration("http://bad-url", "0WUaXesNgbTAuLwn", False, 1.1))
+            bad_integration_sdk = SaasShield(
+                SaasShieldConfiguration(
+                    "http://bad-url", "0WUaXesNgbTAuLwn", False, 1.1
+                )
+            )
             metadata = AlloyMetadata.new_simple("fake_tenant")
-            await bad_integration_sdk.vector().encrypt(PlaintextVector([1, 2, 4], "", ""), metadata)
+            await bad_integration_sdk.vector().encrypt(
+                PlaintextVector([1, 2, 4], "", ""), metadata
+            )
         assert "error sending request for url" in str(request_error.value.msg)

@@ -179,6 +179,18 @@ class IroncoreAlloyTest {
         }
     }
 
+
+    @Test
+    fun sdkStandardAttachedRoundtrip() {
+        val plaintextDocument = "My data".toByteArray()
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = sdk.standardAttached().encrypt(plaintextDocument, metadata)
+            val decrypted = sdk.standardAttached().decrypt(encrypted, metadata)
+            assertContentEquals(decrypted, plaintextDocument)
+        }
+    }
+
     @Test
     fun sdkStandardRekeyEdeks() {
         val plaintextDocument = mapOf("foo" to "My data".toByteArray())
