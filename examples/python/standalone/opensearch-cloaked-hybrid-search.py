@@ -21,9 +21,9 @@ import logging
 
 def pretty_response(response):
     if len(response["hits"]["hits"]) == 0:
-        print("Your search returned no results.")
+        print("\nYour search returned no results.")
     else:
-        print("#### Cloaked Search Response: ####")
+        print("\n#### Cloaked Search Response: ####")
         for hit in response["hits"]["hits"]:
             id = hit["_id"]
             publication_date = hit["_source"]["publish_date"]
@@ -36,9 +36,9 @@ def pretty_response(response):
 
 def pretty_encrypted_response(response):
     if len(response["hits"]["hits"]) == 0:
-        print("Your search returned no results.")
+        print("\nYour search returned no results.")
     else:
-        print("#### OpenSearch Direct Response: ####")
+        print("\n#### OpenSearch Direct Response: ####")
         for hit in response["hits"]["hits"]:
             id = hit["_id"]
             publication_date = hit["_source"]["publish_date"]
@@ -140,7 +140,7 @@ async def main():
         book["title_vector"] = encrypted_title_embedding.encrypted_vector
         book["tenant_id"] = tenant_id
         operations.append(book)
-    bulk_resp = client.bulk("\n".join(map(json.dumps, operations)))
+    bulk_resp = client.bulk("\n".join(map(json.dumps, operations)), refresh=True)
 
     # Run a hybrid query
     title_query_embedding = model.encode("python programming").tolist()
@@ -166,7 +166,6 @@ async def main():
         },
     }
     response = client.search(index="book_index", body=search_query)
-
     # Response through Cloaked Search with all results decrypted
     pretty_response(response)
 
