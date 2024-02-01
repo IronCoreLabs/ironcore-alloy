@@ -6,7 +6,7 @@
 #   `pip install opensearch-py sentence_transformers ironcore-alloy`
 # REFERENCES:
 #   This uses [approximate kNN](https://opensearch.org/docs/latest/search-plugins/knn/approximate-knn/) and documentation.
-#   The `hybrid` and `neural` query types aren't supported by Cloaked Search yet (see [issue #949](https://github.com/IronCoreLabs/cloaked-search/issues/949)).
+#   The `hybrid` and `neural` query types aren't supported by Cloaked Search yet.
 
 # IMPORTS
 from sentence_transformers import SentenceTransformer
@@ -23,6 +23,7 @@ def pretty_response(response):
     if len(response["hits"]["hits"]) == 0:
         print("Your search returned no results.")
     else:
+        print("#### Cloaked Search Response: ####")
         for hit in response["hits"]["hits"]:
             id = hit["_id"]
             publication_date = hit["_source"]["publish_date"]
@@ -37,6 +38,7 @@ def pretty_encrypted_response(response):
     if len(response["hits"]["hits"]) == 0:
         print("Your search returned no results.")
     else:
+        print("#### OpenSearch Direct Response: ####")
         for hit in response["hits"]["hits"]:
             id = hit["_id"]
             publication_date = hit["_source"]["publish_date"]
@@ -188,8 +190,7 @@ async def main():
 asyncio.run(main())
 
 
-# Example response:
-#
+#### Cloaked Search Response ####
 # ID: 7beZW40B2fCVUOIdvs_x
 # Publication date: 2019-05-03
 # Title: Python Crash Course
@@ -220,6 +221,7 @@ asyncio.run(main())
 # Publisher: cengage learning
 # Summary: Introduction to the theory of computation and complexity theory
 
+#### OpenSearch Direct Response ####
 # ID: 7LeZW40B2fCVUOIdvs_x
 # Publication date: 2019-10-29
 # Title: fc7a6114 92cafafc 32d4b16c a4acc8f1 548291a5 ca8e89c7 1688797c
