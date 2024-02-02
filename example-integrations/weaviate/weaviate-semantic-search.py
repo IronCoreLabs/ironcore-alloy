@@ -93,6 +93,10 @@ async def main():
     # Create the query embedding
     query_emb = model.encode(query).tolist()  # type: ignore
     plaintext_query = alloy.PlaintextVector(query_emb, "jeopardy", "sentence")
+    # `generate_query_vectors` returns a list because the secret involved may be in rotation. In that case you should
+    # search for both resulting vectors. Weaviate currently doesn't support searching over multiple vectors. A workaround is
+    # searching for each separately and combining them in the client.
+    # Because our secret isn't in rotation, we can just use the first entry in the list.
     query_vector = (
         await alloy_client.vector().generate_query_vectors(
             {"vec_1": plaintext_query}, tenant_id
