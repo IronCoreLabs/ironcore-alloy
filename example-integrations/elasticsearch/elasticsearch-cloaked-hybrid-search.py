@@ -1,23 +1,9 @@
-# PREREQUISITE:
-#   Start up elasticsearch with cloaked search as shown in our
-#   [try-cloaked-search](https://ironcorelabs.com/docs/cloaked-search/try-cloaked-search/) example.
-#   No need to populate or create an index yet, we'll do that as part of this process.
-# DEPENDENCIES:
-#   `pip install elasticsearch sentence_transformers ironcore-alloy`
-# REFERENCES:
-#   This is based on the elasticsearch jupyter notebooks [quick-start](https://github.com/elastic/elasticsearch-labs/blob/main/notebooks/search/00-quick-start.ipynb)
-#   and [hybrid-search](https://colab.research.google.com/github/elastic/elasticsearch-labs/blob/main/notebooks/search/02-hybrid-search.ipynb).
-
-# IMPORTS
 from sentence_transformers import SentenceTransformer
 from elasticsearch import Elasticsearch
 import ironcore_alloy as alloy
 import json
 from urllib.request import urlopen
 import asyncio
-
-import logging
-
 
 def pretty_response(response):
     if len(response["hits"]["hits"]) == 0:
@@ -50,26 +36,6 @@ def pretty_encrypted_response(response):
 async def main():
     # Setup the embedding model
     model = SentenceTransformer("all-MiniLM-L6-v2")
-
-    # In `try-cloaked-search` create an `indices/book_index.json` to this index configuration so
-    # IronCore Labs' Cloaked Search protects the text of the document.
-    # {
-    #   "tenant_id_index_field": "tenant_id",
-    #   "tenant_id_search_field": "tenant_id.keyword",
-    #   "mappings": {
-    #     "properties": {
-    #       "summary": {
-    #         "type": "text"
-    #       },
-    #       "publisher": {
-    #         "type": "text"
-    #       },
-    #       "title": {
-    #         "type": "text"
-    #       }
-    #     }
-    #   }
-    # }
 
     # Initialize the Elasticsearch client
     client = Elasticsearch(hosts=["http://localhost:8675"])
@@ -183,37 +149,3 @@ async def main():
 
 
 asyncio.run(main())
-
-
-# Example response:
-#
-# ID: UxAnQo0BlFbaZBbWjkzE
-# Publication date: 2019-05-03
-# Title: Python Crash Course
-# Summary: A fast-paced, no-nonsense guide to programming in Python
-
-# ID: VxAnQo0BlFbaZBbWjkzE
-# Publication date: 2018-12-04
-# Title: Eloquent JavaScript
-# Summary: A modern introduction to programming
-
-# ID: UhAnQo0BlFbaZBbWjkzE
-# Publication date: 2019-10-29
-# Title: The Pragmatic Programmer: Your Journey to Mastery
-# Summary: A guide to pragmatic programming for software engineers and developers
-
-# ID: VhAnQo0BlFbaZBbWjkzE
-# Publication date: 2015-03-27
-# Title: You Don't Know JS: Up & Going
-# Summary: Introduction to JavaScript and programming as a whole
-
-# ID: WRAnQo0BlFbaZBbWjkzE
-# Publication date: 2011-05-13
-# Title: The Clean Coder: A Code of Conduct for Professional Programmers
-# Summary: A guide to professional conduct in the field of software engineering
-
-# Example bypass document
-# ID: UhAnQo0BlFbaZBbWjkzE
-# Publication date: 2019-10-29
-# Title: 32d4b16c 548291a5 ca8e89c7 1688797c fc7a6114 92cafafc a4acc8f1
-# Summary: 185ebb23 8f65c6f2 1efc1699 b4c8f372 e88dfce6 b6c9e8f1 315770f2 5bf4d0fa 3b07cc3 41fcf8de
