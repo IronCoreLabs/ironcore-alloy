@@ -42,7 +42,7 @@ async def main():
     # Note: in practice this must be 32 cryptographically-secure bytes
     key_bytes = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     standalone_secret = alloy.StandaloneSecret(1, alloy.Secret(key_bytes))
-    approximation_factor = 1.5
+    approximation_factor = 2.5
     vector_secrets = {
         "jeopardy": alloy.VectorSecret(
             approximation_factor,
