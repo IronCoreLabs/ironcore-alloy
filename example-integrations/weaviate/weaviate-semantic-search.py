@@ -58,6 +58,7 @@ async def main():
 
     tenant_id = alloy.AlloyMetadata.new_simple("tenant-one")
 
+    print("Transforming questions to vectors and encrypting them...")
     question_objs = list()
     for row in data:
         question_emb = model.encode(row["Question"]).tolist()  # type: ignore
@@ -87,7 +88,7 @@ async def main():
     questions.data.insert_many(question_objs)
 
     query = "biology"
-    print(f"Query: '{query}'")
+    print(f"Querying database with input: '{query}'")
 
     # Create the query embedding
     query_emb = model.encode(query).tolist()  # type: ignore
@@ -118,17 +119,3 @@ async def main():
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
-
-# Example result:
-# ---------------
-# Inserting 981 encrypted questions.
-# Query: 'biology'
-# 0.66: The 5-kingdom system is made up of animals, bacteria, plants, protists & these
-# 0.64: A map of your blood-pumping organ
-# 0.64: Shock researcher Walter Cannon coined this word for an organism's ability to maintain internal equilibrium
-# 0.64: Paramecia & amoebas are types of this single-celled organism
-# 0.63: They're the tiny threadlike structures that carry the genes - you have 23 pairs
-# ---------------
-#
-# Note that even though none of the questions contain the word 'biology',
-# they all relate to the field in some way.
