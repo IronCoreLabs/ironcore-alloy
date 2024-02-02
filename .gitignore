@@ -20,6 +20,7 @@
 **/python/**/dist
 **/__pycache__
 **/.coverage
+**/*.egg-info
 
 # python generated foreign module
 **/ironcore_alloy.py
