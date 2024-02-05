@@ -2,7 +2,7 @@
 
 This is a port of the demo from the [README](https://github.com/qdrant/rust-client/tree/master?tab=readme-ov-file#usage) on their rust crate. It is very very simple, but I think still demonstrates that the encrypted vector still matches well based on scoring.
 
-In their example, it matches with 1.000000001 score and with the vector encrypted it matches with a .9999996 score.
+In their example, it matches with 1.000000001 score and with the vector encrypted it matches with a 0.99995 score.
 
 ## Usage
 
