@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
     let found_point = search_result.result.into_iter().next().unwrap();
     let mut payload = found_point.payload;
     let encrypted_payload = payload.remove(ENCRYPTED_DOC_KEY).unwrap();
-    // Since the payload has the encrypted, get the encrypted bytes.
+    // Since the payload is encrypted, get the encrypted bytes.
     let encrypted_bytes = base64_engine
         .decode(encrypted_payload.as_str().unwrap())
         .unwrap();
