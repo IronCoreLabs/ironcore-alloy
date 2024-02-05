@@ -1,22 +1,9 @@
-# PREREQUISITE:
-#   Start up OpenSearch with cloaked search as shown in our
-#   [try-cloaked-search](https://ironcorelabs.com/docs/cloaked-search/try-cloaked-search/) example.
-#   No need to populate or create an index yet, we'll do that as part of this process.
-# DEPENDENCIES:
-#   `pip install opensearch-py sentence_transformers ironcore-alloy`
-# REFERENCES:
-#   This uses [approximate kNN](https://opensearch.org/docs/latest/search-plugins/knn/approximate-knn/) and documentation.
-#   The `hybrid` and `neural` query types aren't supported by Cloaked Search yet.
-
-# IMPORTS
 from sentence_transformers import SentenceTransformer
 from opensearchpy import OpenSearch
 import ironcore_alloy as alloy
 import json
 from urllib.request import urlopen
 import asyncio
-
-import logging
 
 
 def pretty_response(response):
@@ -52,26 +39,6 @@ def pretty_encrypted_response(response):
 async def main():
     # Setup the embedding model
     model = SentenceTransformer("all-MiniLM-L6-v2")
-
-    # In `try-cloaked-search` create an `indices/book_index.json` to this index configuration so
-    # IronCore Labs' Cloaked Search protects the text of the document.
-    # {
-    #   "tenant_id_index_field": "tenant_id",
-    #   "tenant_id_search_field": "tenant_id.keyword",
-    #   "mappings": {
-    #     "properties": {
-    #       "summary": {
-    #         "type": "text"
-    #       },
-    #       "publisher": {
-    #         "type": "text"
-    #       },
-    #       "title": {
-    #         "type": "text"
-    #       }
-    #     }
-    #   }
-    # }
 
     # Initialize the OpenSearch client
     client = OpenSearch(
@@ -187,66 +154,3 @@ async def main():
 
 
 asyncio.run(main())
-
-
-#### Cloaked Search Response ####
-# ID: 7beZW40B2fCVUOIdvs_x
-# Publication date: 2019-05-03
-# Title: Python Crash Course
-# Publisher: no starch press
-# Summary: A fast-paced, no-nonsense guide to programming in Python
-
-# ID: 8beZW40B2fCVUOIdvs_x
-# Publication date: 2018-12-04
-# Title: Eloquent JavaScript
-# Publisher: no starch press
-# Summary: A modern introduction to programming
-
-# ID: 8LeZW40B2fCVUOIdvs_x
-# Publication date: 2015-03-27
-# Title: You Don't Know JS: Up & Going
-# Publisher: oreilly
-# Summary: Introduction to JavaScript and programming as a whole
-
-# ID: 7LeZW40B2fCVUOIdvs_x
-# Publication date: 2019-10-29
-# Title: The Pragmatic Programmer: Your Journey to Mastery
-# Publisher: addison-wesley
-# Summary: A guide to pragmatic programming for software engineers and developers
-
-# ID: 9beZW40B2fCVUOIdvs_y
-# Publication date: 2012-06-27
-# Title: Introduction to the Theory of Computation
-# Publisher: cengage learning
-# Summary: Introduction to the theory of computation and complexity theory
-
-#### OpenSearch Direct Response ####
-# ID: 7LeZW40B2fCVUOIdvs_x
-# Publication date: 2019-10-29
-# Title: fc7a6114 92cafafc 32d4b16c a4acc8f1 548291a5 ca8e89c7 1688797c
-# Publisher: 8c8667b3 32bf2837
-# Summary: 315770f2 8f65c6f2 b6c9e8f1 1efc1699 e88dfce6 41fcf8de 5bf4d0fa 185ebb23 3b07cc3 b4c8f372
-
-# ID: 7beZW40B2fCVUOIdvs_x
-# Publication date: 2019-05-03
-# Title: 758c4e8d dde900e4 c9231a15
-# Publisher: 854f9e52 fba4fa11 836c2d3
-# Summary: c0c32b9f b6c9e8f1 344eff27 757f5077 ad79819 1efc1699 8ddba080 8f65c6f2 b4c8f372 31d9c5e9
-
-# ID: 8LeZW40B2fCVUOIdvs_x
-# Publication date: 2015-03-27
-# Title: 3773ec4a 75629c5b 1ccac6c eb8aca2 1807fe44 cf1ad8e6
-# Publisher: 13a660aa
-# Summary: c7763222 5bf4d0fa 29f3cb15 8f65c6f2 b4c8f372 b6c9e8f1 c5e67ee4 27356f39
-
-# ID: 8beZW40B2fCVUOIdvs_x
-# Publication date: 2018-12-04
-# Title: 97da4c51 c7bfc0b1
-# Publisher: fba4fa11 854f9e52 836c2d3
-# Summary: b4c8f372 7800ad6a c7763222 8f65c6f2 b6c9e8f1
-
-# ID: 9beZW40B2fCVUOIdvs_y
-# Publication date: 2012-06-27
-# Title: 666686cf 32d4b16c ca8e89c7 5f9ae8b3 91c0a6c 418b5a90
-# Publisher: b5e919b5 a8cb2030
-# Summary: c7763222 f62f2efb 25de61e8 684bdbc7 ebf02d00 4afe5723 b4c8f372 5bf4d0fa
