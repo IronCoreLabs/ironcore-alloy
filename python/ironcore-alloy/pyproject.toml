@@ -1,7 +1,7 @@
 # using https://hatch.pypa.io/latest/
 # hatch build -t wheel
-# hatch run test
-# hatch run coverage
+# hatch run test:test
+# hatch run test:coverage
 # hatch shell
 [build-system]
 requires = ["hatchling"]
