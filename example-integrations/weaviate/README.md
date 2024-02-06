@@ -7,7 +7,7 @@ Starting with a dataset of Jeopardy questions, this example:
 - Transforms the questions into vector embeddings using the `all-MiniLM-L6-v2` model
 - Uses Cloaked AI to encrypt the embeddings, the text questions themselves, and the round
     - The round is encrypted deterministically so that it can be used as a query filter
-- Inserts the encrypted embeddings and encrypted questions into Weaviate
+- Inserts the encrypted embeddings and encrypted questions and rounds into Weaviate
 - Transforms a text query into a vector embedding
 - Encrypts the query embedding
 - Queries Weaviate for relevant results
