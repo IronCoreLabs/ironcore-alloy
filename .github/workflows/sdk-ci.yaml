@@ -101,7 +101,7 @@ jobs:
         if: matrix.runs-on == 'macos-14'
         run: |
           brew install pipx
-          pipx ensurepath
+          echo "/Users/runner/.local/bin" >> $GITHUB_PATH
       - name: Install hatch
         if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm'
         run: pipx install hatch
