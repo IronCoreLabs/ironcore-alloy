@@ -11,7 +11,7 @@ jobs:
   generate-cdylibs:
     uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
     with:
-      os_matrix: '["buildjet-2vcpu-ubuntu-2204", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", ["self-hosted", "macOS", "ARM64"]]'
+      os_matrix: '["buildjet-2vcpu-ubuntu-2204", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]'
       build_profile: "release"
     secrets: inherit
 
@@ -19,7 +19,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: buildjet-2vcpu-ubuntu-2204
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
@@ -28,7 +28,7 @@ jobs:
           mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
           mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
           mv macos-12- darwin-x86-64
-          mv self-hosted,macOS,ARM64- darwin-aarch64
+          mv macos-14- darwin-aarch64
         working-directory: kotlin/src/main/resources/
       - name: Decrypt GPG key and gradle.properties
         uses: IronCoreLabs/ironhide-actions/decrypt@v3
@@ -36,11 +36,9 @@ jobs:
           keys: ${{ secrets.IRONHIDE_KEYS }}
           input: .github/9FA43559.asc.iron .github/gradle.properties.iron
       - name: Move gradle properties and GPG key
-        run: |
-          mv .github/gradle.properties kotlin/gradle.properties
+        run: mv .github/gradle.properties kotlin/gradle.properties
       - name: Import GPG key
-        run: |
-          gpg --batch --import .github/9FA43559.asc
+        run: gpg --batch --import .github/9FA43559.asc
       - name: Export GPG signing key
         run: gpg --export-secret-keys > /tmp/9FA43559.asc
       - uses: Swatinem/rust-cache@v2
@@ -60,7 +58,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: buildjet-2vcpu-ubuntu-2204
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: ${{ github.workspace }}/python/ironcore-alloy
@@ -69,7 +67,7 @@ jobs:
           mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
           mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
           mv macos-12- darwin-x86-64
-          mv self-hosted,macOS,ARM64- darwin-aarch64
+          mv macos-14- darwin-aarch64
         working-directory: python/ironcore-alloy
       - uses: Swatinem/rust-cache@v2
         with:
