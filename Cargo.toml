@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.10.4-pre.8"
+version = "0.10.4-rc.8"
 description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
 authors = ["IronCore Labs <info@ironcorelabs.com>"]
 edition = "2021"
