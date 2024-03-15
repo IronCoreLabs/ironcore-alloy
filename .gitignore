@@ -24,3 +24,5 @@
 
 # python generated foreign module
 **/ironcore_alloy.py
+
+example-integrations/milvus/volumes/**
