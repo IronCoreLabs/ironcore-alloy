@@ -36,6 +36,7 @@
               pkgs.hatch
             ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin
               [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ];
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
         };
 
       });
