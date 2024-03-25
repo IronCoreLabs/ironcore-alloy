@@ -41,7 +41,10 @@ ring = "0.16.20"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
 thiserror = "1.0.50"
-uniffi = { version = "0.26.0", features = ["cli", "tokio"] }
+uniffi = { git = "https://github.com/mozilla/uniffi-rs", features = [
+    "cli",
+    "tokio",
+] }
 z85 = "3.0.5"
 
 [dev-dependencies]
@@ -57,7 +60,7 @@ hex-literal = "0.4.1"
 lazy_static = "1.4"
 proptest = "1.2.0"
 tokio = { version = "1.33", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = "0.26.0"
+uniffi_bindgen = { git = "https://github.com/mozilla/uniffi-rs" }
 z85 = "3.0.5"
 
 [features]
