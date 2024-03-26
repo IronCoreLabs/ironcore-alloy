@@ -1,7 +1,5 @@
 use crate::{
-    alloy_client_trait::AlloyClient,
-    errors::AlloyError,
-    util::{get_rng, BatchResult},
+    alloy_client_trait::AlloyClient, create_batch_result_struct, errors::AlloyError, util::get_rng,
     AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
 use ironcore_documents::{
@@ -72,20 +70,7 @@ pub struct EncryptedDocument {
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
 
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct RekeyEdeksBatchResult {
-    pub successes: HashMap<String, EdekWithKeyIdHeader>,
-    pub failures: HashMap<String, AlloyError>,
-}
-
-impl From<BatchResult<EdekWithKeyIdHeader>> for RekeyEdeksBatchResult {
-    fn from(value: BatchResult<EdekWithKeyIdHeader>) -> Self {
-        Self {
-            successes: value.successes,
-            failures: value.failures,
-        }
-    }
-}
+create_batch_result_struct!(RekeyEdeksBatchResult, EdekWithKeyIdHeader, FieldId);
 
 /// API for encrypting and decrypting documents using our standard encryption. This class of encryption is the most
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the

@@ -1,6 +1,7 @@
 use super::config::RotatableSecret;
 use crate::deterministic::{
-    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
+    decrypt_internal, encrypt_internal, DeterministicDecryptBatchResult,
+    DeterministicEncryptBatchResult, DeterministicEncryptionKey, DeterministicFieldOps,
     DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
     PlaintextField, PlaintextFields,
 };
@@ -63,8 +64,7 @@ impl StandaloneDeterministicClient {
         encrypted_field: EncryptedField,
         tenant_id: &TenantId,
     ) -> Result<PlaintextField, AlloyError> {
-        let (key_id, ciphertext) =
-            Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
+        let (key_id, ciphertext) = Self::decompose_key_id_header(encrypted_field.encrypted_field)?;
         let secret = self
             .config
             .get(&encrypted_field.secret_path)
@@ -121,6 +121,21 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         self.encrypt_sync(plaintext_field, &metadata.tenant_id)
     }
 
+    /// Deterministically encrypt the provided fields with the provided metadata.
+    /// Because the fields are encrypted deterministically with each call, the result will be the same for repeated calls.
+    /// This allows for exact matches and indexing of the encrypted field, but comes with some security considerations.
+    /// If you don't need to support these use cases, we recommend using `standard` encryption instead.
+    async fn encrypt_batch(
+        &self,
+        plaintext_fields: PlaintextFields,
+        metadata: &AlloyMetadata,
+    ) -> Result<DeterministicEncryptBatchResult, AlloyError> {
+        let encrypt_field = |plaintext_field: PlaintextField| {
+            self.encrypt_sync(plaintext_field, &metadata.tenant_id)
+        };
+        Ok(collection_to_batch_result(plaintext_fields, encrypt_field).into())
+    }
+
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
     async fn decrypt(
         &self,
@@ -128,6 +143,20 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
         self.decrypt_sync(encrypted_field, &metadata.tenant_id)
+    }
+
+    /// Decrypt each of the fields that were deterministically encrypted with the provided metadata.
+    /// Note that because the metadata is shared between the fields, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_fields: EncryptedFields,
+        metadata: &AlloyMetadata,
+    ) -> Result<DeterministicDecryptBatchResult, AlloyError> {
+        let decrypt_field = |encrypted_field: EncryptedField| {
+            self.decrypt_sync(encrypted_field, &metadata.tenant_id)
+        };
+        Ok(collection_to_batch_result(encrypted_fields, decrypt_field).into())
     }
 
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
