@@ -11,6 +11,7 @@ use std::{
     sync::Arc,
 };
 use uniffi::TargetLanguage;
+use uniffi_bindgen::BindingGeneratorDefault;
 
 pub type TestResult = Result<(), AlloyError>;
 
@@ -82,7 +83,10 @@ pub(crate) fn generate_bindings(
     uniffi_bindgen::library_mode::generate_bindings(
         &camino_lib_path,
         None,
-        &[language],
+        &BindingGeneratorDefault {
+            target_languages: vec![language],
+            try_format_code: false,
+        },
         None,
         &camino_out_dir,
         true,
