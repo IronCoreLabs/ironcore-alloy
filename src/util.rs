@@ -116,11 +116,11 @@ macro_rules! create_batch_result_struct {
         #[derive(Debug, Clone, uniffi::Record)]
         pub struct $struct_name {
             pub successes: std::collections::HashMap<$map_key_type, $success_type>,
-            pub failures: std::collections::HashMap<$map_key_type, crate::errors::AlloyError>,
+            pub failures: std::collections::HashMap<$map_key_type, $crate::errors::AlloyError>,
         }
 
-        impl From<crate::util::BatchResult<$success_type>> for $struct_name {
-            fn from(value: crate::util::BatchResult<$success_type>) -> Self {
+        impl From<$crate::util::BatchResult<$success_type>> for $struct_name {
+            fn from(value: $crate::util::BatchResult<$success_type>) -> Self {
                 Self {
                     successes: value.successes,
                     failures: value.failures,
