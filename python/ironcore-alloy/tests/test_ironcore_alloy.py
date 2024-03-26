@@ -199,6 +199,35 @@ class TestIroncoreAlloy:
         assert decrypted == document2
 
     @pytest.mark.asyncio
+    async def test_deterministic_batch_roundtrip(self):
+        plaintext_input = b"foobar"
+        field = PlaintextField(
+            plaintext_field=plaintext_input,
+            secret_path="",
+            derivation_path="",
+        )
+        bad_field = PlaintextField(
+            plaintext_field=plaintext_input,
+            secret_path="bad_path",
+            derivation_path="bad_path",
+        )
+        fields = {"doc": field, "bad_doc": bad_field}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.deterministic().encrypt_batch(fields, metadata)
+        assert len(encrypted.successes) == 1
+        assert len(encrypted.failures) == 1
+        assert (
+            encrypted.failures["bad_doc"].msg
+            == "Provided secret path `bad_path` does not exist in the deterministic configuration."
+        )
+        decrypted = await self.sdk.deterministic().decrypt_batch(
+            encrypted.successes, metadata
+        )
+        assert len(decrypted.successes) == 1
+        assert len(decrypted.failures) == 0
+        assert decrypted.successes["doc"].plaintext_field == plaintext_input
+
+    @pytest.mark.asyncio
     async def test_decrypt_deterministic_metadata(self):
         field = EncryptedField(
             encrypted_field=base64.b64decode(

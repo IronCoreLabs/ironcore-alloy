@@ -4,7 +4,8 @@ use super::{
 };
 
 use crate::deterministic::{
-    decrypt_internal, encrypt_internal, DeterministicEncryptionKey, DeterministicFieldOps,
+    decrypt_internal, encrypt_internal, DeterministicDecryptBatchResult,
+    DeterministicEncryptBatchResult, DeterministicEncryptionKey, DeterministicFieldOps,
     DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
     PlaintextField, PlaintextFields,
 };
@@ -76,14 +77,49 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         )
     }
 
+    /// Deterministically encrypt the provided fields with the provided metadata.
+    /// Because the fields are encrypted deterministically with each call, the result will be the same for repeated calls.
+    /// This allows for exact matches and indexing of the encrypted field, but comes with some security considerations.
+    /// If you don't need to support these use cases, we recommend using `standard` encryption instead.
+    async fn encrypt_batch(
+        &self,
+        plaintext_fields: PlaintextFields,
+        metadata: &AlloyMetadata,
+    ) -> Result<DeterministicEncryptBatchResult, AlloyError> {
+        let paths = plaintext_fields
+            .values()
+            .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
+            .collect_vec();
+        let all_keys = derive_keys_many_paths(
+            &self.tenant_security_client,
+            metadata,
+            paths,
+            SecretType::Deterministic,
+        )
+        .await?;
+        let encrypt_field = |plaintext_field: PlaintextField| {
+            let new_current_key = all_keys.get_key_for_path(
+                &plaintext_field.secret_path,
+                &plaintext_field.derivation_path,
+                DeriveKeyChoice::Current,
+            )?;
+            let key_id_header = Self::create_key_id_header(new_current_key.tenant_secret_id.0);
+            encrypt_internal(
+                DeterministicEncryptionKey(new_current_key.derived_key.0.clone()),
+                key_id_header,
+                plaintext_field,
+            )
+        };
+        Ok(collection_to_batch_result(plaintext_fields, encrypt_field).into())
+    }
+
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
-        let (key_id, ciphertext) =
-            Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
+        let (key_id, ciphertext) = Self::decompose_key_id_header(encrypted_field.encrypted_field)?;
         let paths = [(
             encrypted_field.secret_path.clone(),
             [encrypted_field.derivation_path.clone()].into(),
@@ -116,6 +152,43 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 encrypted_field.derivation_path,
             )
         }
+    }
+
+    /// Decrypt each of the fields that were deterministically encrypted with the provided metadata.
+    /// Note that because the metadata is shared between the fields, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_fields: EncryptedFields,
+        metadata: &AlloyMetadata,
+    ) -> Result<DeterministicDecryptBatchResult, AlloyError> {
+        let paths = encrypted_fields
+            .values()
+            .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
+            .collect_vec();
+        let all_keys = derive_keys_many_paths(
+            &self.tenant_security_client,
+            metadata,
+            paths,
+            SecretType::Deterministic,
+        )
+        .await?;
+        let decrypt_field = |encrypted_field: EncryptedField| {
+            let (original_key_id, ciphertext) =
+                Self::decompose_key_id_header(encrypted_field.encrypted_field)?;
+            let original_key = all_keys.get_key_for_path(
+                &encrypted_field.secret_path,
+                &encrypted_field.derivation_path,
+                DeriveKeyChoice::Specific(original_key_id),
+            )?;
+            decrypt_internal(
+                DeterministicEncryptionKey(original_key.derived_key.0.clone()),
+                ciphertext,
+                encrypted_field.secret_path.clone(),
+                encrypted_field.derivation_path.clone(),
+            )
+        };
+        Ok(collection_to_batch_result(encrypted_fields, decrypt_field).into())
     }
 
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
