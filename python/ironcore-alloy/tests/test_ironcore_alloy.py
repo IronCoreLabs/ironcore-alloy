@@ -217,7 +217,7 @@ class TestIroncoreAlloy:
         assert len(encrypted.successes) == 1
         assert len(encrypted.failures) == 1
         assert (
-            encrypted.failures["bad_doc"].msg
+            encrypted.failures["bad_doc"].msg  # type: ignore
             == "Provided secret path `bad_path` does not exist in the deterministic configuration."
         )
         decrypted = await self.sdk.deterministic().decrypt_batch(
@@ -328,7 +328,7 @@ class TestIroncoreAlloy:
         assert len(rotated.failures) == 1
         assert (
             "Provided secret path `wrong_path` does not exist"
-            in rotated.failures["doc"].msg
+            in rotated.failures["doc"].msg  # type: ignore
         )
 
     @pytest.mark.skip(reason="need seeded client")
