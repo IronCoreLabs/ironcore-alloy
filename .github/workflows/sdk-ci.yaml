@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   generate-cdylibs:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-change
+    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
     with:
       # This should stay in sync with the `runs-on` from the other jobs in this file
       os_matrix: '["buildjet-2vcpu-ubuntu-2204", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]'
