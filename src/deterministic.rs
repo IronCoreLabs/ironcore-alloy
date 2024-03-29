@@ -1,15 +1,12 @@
 use crate::{
-    errors::AlloyError,
-    util::{self, BatchResult},
-    AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath,
-    TenantId,
+    create_batch_result_struct, errors::AlloyError, util, AlloyMetadata, DerivationPath,
+    EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath, TenantId,
 };
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
 use ironcore_documents::v5::key_id_header::KeyIdHeader;
 use std::collections::HashMap;
-use uniffi::custom_newtype;
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct EncryptedField {
@@ -27,26 +24,13 @@ pub struct PlaintextField {
 pub type PlaintextFields = HashMap<FieldId, PlaintextField>;
 pub type EncryptedFields = HashMap<FieldId, EncryptedField>;
 pub type GenerateQueryResult = HashMap<FieldId, Vec<EncryptedField>>;
-
-#[derive(Debug, Clone, uniffi::Record)]
-pub struct DeterministicRotateResult {
-    pub successes: HashMap<FieldId, EncryptedField>,
-    pub failures: HashMap<FieldId, AlloyError>,
-}
-
-impl From<BatchResult<EncryptedField>> for DeterministicRotateResult {
-    fn from(value: BatchResult<EncryptedField>) -> Self {
-        Self {
-            successes: value.successes,
-            failures: value.failures,
-        }
-    }
-}
+create_batch_result_struct!(DeterministicRotateResult, EncryptedField, FieldId);
+create_batch_result_struct!(DeterministicEncryptBatchResult, EncryptedField, FieldId);
+create_batch_result_struct!(DeterministicDecryptBatchResult, PlaintextField, FieldId);
 
 /// Key used for deterministic operations.
 #[derive(Debug, Clone)]
-pub struct DeterministicEncryptionKey(pub Vec<u8>);
-custom_newtype!(DeterministicEncryptionKey, Vec<u8>);
+pub(crate) struct DeterministicEncryptionKey(pub Vec<u8>);
 
 impl DeterministicEncryptionKey {
     /// A way to generate a key from the secret, tenant_id and derivation_path. This is done in the context of
@@ -74,12 +58,29 @@ pub trait DeterministicFieldOps {
         plaintext_field: PlaintextField,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedField, AlloyError>;
+    /// Deterministically encrypt the provided fields with the provided metadata.
+    /// Because the fields are encrypted deterministically with each call, the result will be the same for repeated calls.
+    /// This allows for exact matches and indexing of the encrypted field, but comes with some security considerations.
+    /// If you don't need to support these use cases, we recommend using `standard` encryption instead.
+    async fn encrypt_batch(
+        &self,
+        fields: PlaintextFields,
+        metadata: &AlloyMetadata,
+    ) -> Result<DeterministicEncryptBatchResult, AlloyError>;
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
     async fn decrypt(
         &self,
         encrypted_field: EncryptedField,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError>;
+    /// Decrypt each of the fields that were deterministically encrypted with the provided metadata.
+    /// Note that because the metadata is shared between the fields, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_fields: EncryptedFields,
+        metadata: &AlloyMetadata,
+    ) -> Result<DeterministicDecryptBatchResult, AlloyError>;
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
     /// The resulting encrypted fields should be used in tandem when querying the data store.
     async fn generate_query_field_values(
