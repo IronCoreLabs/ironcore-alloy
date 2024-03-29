@@ -5,10 +5,11 @@ mod tests {
     use crate::common::{get_client, TestResult};
     use approx::assert_ulps_eq;
     use ironcore_alloy::{
+        errors::AlloyError,
         vector::{EncryptedVector, PlaintextVector, VectorOps},
         AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
-    use std::sync::Arc;
+    use std::{iter, sync::Arc};
 
     fn assert_ulps_vec_eq(vec1: Vec<f32>, vec2: Vec<f32>) -> () {
         if vec1.len() != vec2.len() {
@@ -46,7 +47,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn standard_encrypt_works() -> TestResult {
+    async fn vector_encrypt_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
         let encrypted = get_client().vector().encrypt(plaintext, &metadata).await?;
@@ -58,7 +59,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn standard_decrypt_known() -> TestResult {
+    async fn vector_decrypt_known() -> TestResult {
         let encrypted = get_ciphertext();
         let metadata = get_metadata();
         let decrypted = get_client().vector().decrypt(encrypted, &metadata).await?;
@@ -68,7 +69,56 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn standard_encrypt_with_existing_edek_works() -> TestResult {
+    async fn vector_batch_roundtrip_works() -> TestResult {
+        let plaintext = get_plaintext();
+        let plaintext_2 = PlaintextVector {
+            plaintext_vector: vec![1.0, 2.0, 3.0],
+            secret_path: SecretPath("different_path".to_string()),
+            derivation_path: DerivationPath("different_path".to_string()),
+        };
+        let metadata = get_metadata();
+        let vectors = [
+            ("vector".to_string(), plaintext),
+            ("vector_2".to_string(), plaintext_2),
+        ]
+        .into();
+        let encrypted = get_client()
+            .vector()
+            .encrypt_batch(vectors, &metadata)
+            .await?;
+        assert_eq!(encrypted.successes.len(), 2);
+        assert_eq!(encrypted.failures.len(), 0);
+        let bad_encrypted = EncryptedVector {
+            encrypted_vector: vec![1.0, 1.0, 1.0],
+            secret_path: SecretPath("secret".to_string()),
+            derivation_path: DerivationPath("deriv".to_string()),
+            paired_icl_info: vec![0],
+        };
+        let encrypted_vectors = iter::once(("bad_vector".to_string(), bad_encrypted))
+            .chain(encrypted.successes)
+            .collect();
+        let decrypted = get_client()
+            .vector()
+            .decrypt_batch(encrypted_vectors, &metadata)
+            .await?;
+        assert_eq!(decrypted.successes.len(), 2);
+        assert_eq!(decrypted.failures.len(), 1);
+        assert!(matches!(
+            decrypted.failures.get("bad_vector").unwrap(),
+            AlloyError::InvalidInput { .. }
+        ));
+        let result = decrypted
+            .successes
+            .get("vector")
+            .unwrap()
+            .plaintext_vector
+            .clone();
+        assert_ulps_vec_eq(result, get_plaintext().plaintext_vector);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn vector_generate_query_vectors_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
         let vectors_to_query = [("vector".to_string(), plaintext.clone())].into();
@@ -86,7 +136,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn standard_get_searchable_edek_prefix_no_rotation() -> TestResult {
+    async fn vector_get_in_rotation_prefix_no_key() -> TestResult {
         let metadata = get_metadata();
         let prefix_err = get_client()
             .vector()

@@ -40,6 +40,8 @@ pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
 pub type EncryptedVectors = HashMap<VectorId, EncryptedVector>;
 pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
 
+create_batch_result_struct!(VectorEncryptBatchResult, EncryptedVector, VectorId);
+create_batch_result_struct!(VectorDecryptBatchResult, PlaintextVector, VectorId);
 create_batch_result_struct!(VectorRotateResult, EncryptedVector, VectorId);
 
 /// Key used to for vector encryption.
@@ -104,6 +106,15 @@ pub trait VectorOps {
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError>;
 
+    /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
+    /// and their values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embeddings.
+    async fn encrypt_batch(
+        &self,
+        plaintext_vectors: PlaintextVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorEncryptBatchResult, AlloyError>;
+
     /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
     /// be unshuffled to their original positions during decryption.
     async fn decrypt(
@@ -111,6 +122,16 @@ pub trait VectorOps {
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError>;
+
+    /// Decrypt multiple vector embeddings that were encrypted with the provided metadata. The values of the embeddings
+    /// will be unshuffled to their original positions during decryption.
+    /// Note that because the metadata is shared between the vectors, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorDecryptBatchResult, AlloyError>;
 
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
     /// The resulting encrypted vectors should be used in tandem when querying the vector database.
@@ -138,7 +159,7 @@ pub trait VectorOps {
     ///
     /// WARNINGS:
     ///     * this involves decrypting then encrypting vectors. Since the vectors are full of floating point numbers,
-    ///       this process is lossy, which will cause some drift over time. If you need perfectly preserved accuracy
+    ///       this process is lossy, which will cause some drift over time. If you need perfectly preserved accuracy,
     ///       store the source vector encrypted with `standard` next to the encrypted vector. `standard` decrypt
     ///       that, `vector` encrypt it again, and replace the encrypted vector with the result.
     ///     * only one metadata and new tenant ID argument means each call to this needs to have one tenant's vectors.
@@ -219,5 +240,11 @@ pub(crate) fn decrypt_internal(
         plaintext_vector: dec,
         secret_path: encrypted_vector.secret_path,
         derivation_path: encrypted_vector.derivation_path,
+    })
+}
+
+pub(crate) fn get_approximation_factor(maybe_approx: Option<f32>) -> Result<f32, AlloyError> {
+    maybe_approx.ok_or_else(|| AlloyError::InvalidConfiguration {
+        msg: "`approximation_factor` was not set in the vector configuration.".to_string(),
     })
 }

@@ -1,5 +1,5 @@
 import base64
-from ironcore_alloy import *
+from ironcore_alloy import *  # pyright: ignore[reportWildcardImportFromLibrary]
 import pytest
 
 
@@ -66,6 +66,33 @@ class TestIroncoreAlloy:
         )
         decrypted = await self.sdk.vector().decrypt(encrypted_value, metadata)
         assert decrypted.plaintext_vector == [1.0, 2.0, 3.0]
+
+    @pytest.mark.asyncio
+    async def test_vector_batch_roundtrip(self):
+        plaintext_input = [0.1, 0.2, 0.3]
+        vector = PlaintextVector(
+            plaintext_vector=plaintext_input, secret_path="", derivation_path=""
+        )
+        bad_vector = PlaintextVector(
+            plaintext_vector=plaintext_input,
+            secret_path="bad_path",
+            derivation_path="bad_path",
+        )
+        vectors = {"vec": vector, "bad_vec": bad_vector}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.vector().encrypt_batch(vectors, metadata)
+        assert len(encrypted.successes) == 1
+        assert len(encrypted.failures) == 1
+        assert (
+            encrypted.failures["bad_vec"].msg  # type: ignore
+            == "Provided secret path `bad_path` does not exist in the vector configuration."
+        )
+        decrypted = await self.sdk.vector().decrypt_batch(encrypted.successes, metadata)
+        assert len(decrypted.successes) == 1
+        assert len(decrypted.failures) == 0
+        assert decrypted.successes["vec"].plaintext_vector == pytest.approx(
+            plaintext_input, rel=1e-5
+        )
 
     @pytest.mark.asyncio
     async def test_rotate_vector_different_tenant(self):
