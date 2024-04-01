@@ -190,7 +190,7 @@ criterion_group! {
 
 criterion_group! {
     name = tsp_benchmarks;
-    config = Criterion::default().measurement_time(Duration::from_secs(10));
+    config = Criterion::default().sample_size(10);
     targets = tsp_benches
 }
 criterion_main!(standalone_benchmarks, tsp_benchmarks);
