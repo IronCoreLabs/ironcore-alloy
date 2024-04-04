@@ -34,6 +34,7 @@
               pkgs.python310
               # used when building python distributions
               pkgs.hatch
+              (pkgs.google-cloud-sdk.withExtraComponents [ pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin ])
             ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin
               [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
