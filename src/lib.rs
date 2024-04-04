@@ -35,6 +35,7 @@ pub mod vector;
 uniffi::setup_scaffolding!();
 
 type FieldId = String;
+type DocumentId = String;
 type EncryptedBytes = Vec<u8>;
 type PlaintextBytes = Vec<u8>;
 

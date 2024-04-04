@@ -1,6 +1,6 @@
 use crate::{
     alloy_client_trait::AlloyClient, create_batch_result_struct, errors::AlloyError, util::get_rng,
-    AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
 use ironcore_documents::{
     aes::{decrypt_document_with_attached_iv, EncryptionKey, IvAndCiphertext},
@@ -38,6 +38,8 @@ impl PlaintextDocumentWithEdek {
     }
 }
 
+pub type PlaintextDocumentsWithEdeks = HashMap<DocumentId, PlaintextDocumentWithEdek>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 // Key ID header followed by V4DocumentHeader containing the EDEK.
 // Note that in the case of SaaS Shield Standard, users could create this with a
@@ -70,7 +72,12 @@ pub struct EncryptedDocument {
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
 
-create_batch_result_struct!(RekeyEdeksBatchResult, EdekWithKeyIdHeader, FieldId);
+pub type EncryptedDocuments = HashMap<DocumentId, EncryptedDocument>;
+pub type PlaintextDocuments = HashMap<DocumentId, PlaintextDocument>;
+
+create_batch_result_struct!(RekeyEdeksBatchResult, EdekWithKeyIdHeader, DocumentId);
+create_batch_result_struct!(StandardEncryptBatchResult, EncryptedDocument, DocumentId);
+create_batch_result_struct!(StandardDecryptBatchResult, PlaintextDocument, DocumentId);
 
 /// API for encrypting and decrypting documents using our standard encryption. This class of encryption is the most
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
@@ -91,6 +98,13 @@ pub trait StandardDocumentOps: AlloyClient {
         plaintext_document: PlaintextDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError>;
+    /// Encrypt each of the provided documents with the provided metadata.
+    /// Note that because only a single metadata value is passed, each document will be encrypted to the same tenant.
+    async fn encrypt_batch(
+        &self,
+        plaintext_documents: PlaintextDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError>;
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
     /// of the `StandardDocumentOps.encrypt` functions. The result contains a map from field identifiers to decrypted
     /// bytes.
@@ -99,12 +113,20 @@ pub trait StandardDocumentOps: AlloyClient {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError>;
+    /// Decrypt each of the provided documents with the provided metadata.
+    /// Note that because the metadata is shared between the documents, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_documents: EncryptedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardDecryptBatchResult, AlloyError>;
     /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
     /// the EDEK will be encrypted to the original tenant. Because the underlying DEK does not change, a document
     /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
     async fn rekey_edeks(
         &self,
-        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        edeks: HashMap<DocumentId, EdekWithKeyIdHeader>,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyEdeksBatchResult, AlloyError>;
@@ -130,6 +152,12 @@ pub trait StandardDocumentOps: AlloyClient {
         plaintext_document: PlaintextDocumentWithEdek,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError>;
+    /// TODO
+    async fn encrypt_with_existing_edek_batch(
+        &self,
+        plaintext_documents: PlaintextDocumentsWithEdeks,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError>;
 }
 
 pub(crate) fn verify_sig(

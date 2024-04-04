@@ -1,24 +1,24 @@
 // Standard standalone works for V4 and V5 documents. There is no suport for V3 since Standalone wasn't
 // available in V3.
+use super::config::{StandaloneConfiguration, StandardSecrets};
 use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, RekeyEdeksBatchResult,
-    StandardDocumentOps,
+    EncryptedDocument, EncryptedDocuments, PlaintextDocument, PlaintextDocumentWithEdek,
+    PlaintextDocuments, PlaintextDocumentsWithEdeks, RekeyEdeksBatchResult,
+    StandardDecryptBatchResult, StandardDocumentOps, StandardEncryptBatchResult,
 };
 use crate::util::{collection_to_batch_result, get_rng, hash256, OurReseedingRng};
+use crate::DocumentId;
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, Secret, TenantId};
 use ironcore_documents::aes::EncryptionKey;
-use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
-use rand::{CryptoRng, RngCore};
 use ring::digest::SHA256_OUTPUT_LEN;
 use ring::hkdf;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-
-use super::config::{StandaloneConfiguration, StandardSecrets};
 
 #[derive(uniffi::Object)]
 pub struct StandaloneStandardClient {
@@ -51,27 +51,40 @@ impl StandaloneStandardClient {
 
     /// Encrypt all the fields from the document using a single `key`. A DEK will be generated and encrypted using a derived key.
     /// Each field of the document will be encrypted separately using a random iv and this single generated dek.
-    pub(crate) fn encrypt_document<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-        incoming_key: &[u8],
-        document: HashMap<String, U>,
-        key_id: KeyId,
-        rng: Arc<Mutex<R>>,
-        tenant_id: &TenantId,
+    fn encrypt_sync(
+        &self,
+        plaintext_document: PlaintextDocument,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let per_tenant_kek = derive_aes_encryption_key(&incoming_key, tenant_id);
+        let (secret_id, secret) = self.get_current_secret_and_id()?;
+        let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
         let (aes_dek, v4_doc) = v5::aes::generate_aes_edek_and_sign(
-            &mut *get_rng(&rng),
+            &mut *get_rng(&self.rng),
             per_tenant_kek,
             None,
-            key_id.0.to_string().as_str(),
+            secret_id.to_string().as_str(),
         )?;
         encrypt_document_core(
-            document,
-            rng,
+            plaintext_document,
+            self.rng.clone(),
             aes_dek,
-            Self::create_key_id_header(key_id.0),
+            Self::create_key_id_header(secret_id),
             v4_doc,
         )
+    }
+
+    /// Decrypt the document DEK, then use it to decrypt the document.
+    fn decrypt_sync(
+        &self,
+        encrypted_document: EncryptedDocument,
+        metadata: &AlloyMetadata,
+    ) -> Result<PlaintextDocument, AlloyError> {
+        let dek = Self::decrypt_document_dek(
+            encrypted_document.edek,
+            &self.config.secrets,
+            &metadata.tenant_id,
+        )?;
+        decrypt_document_core(encrypted_document.document, dek)
     }
 
     /// Given the edek, the secrets and the metadata, try to decrypt the per tenant_kek using the secret.
@@ -123,6 +136,29 @@ impl StandaloneStandardClient {
                 msg: "No secret could be found to decrypt".to_string(),
             }))
     }
+
+    /// Synchronous helper function for `encrypt_with_existing_edek`.
+    /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
+    /// bytes, and the same metadata must be provided when decrypting the document.
+    /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
+    /// of the document.
+    fn encrypt_with_existing_edek_sync(
+        &self,
+        plaintext_document: PlaintextDocumentWithEdek,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedDocument, AlloyError> {
+        let dek = Self::decrypt_document_dek(
+            plaintext_document.edek.clone(),
+            &self.config.secrets,
+            &metadata.tenant_id,
+        )?;
+        let encrypted_document: HashMap<_, _> =
+            encrypt_map(plaintext_document.document, self.rng.clone(), dek)?;
+        Ok(EncryptedDocument {
+            edek: plaintext_document.edek,
+            document: encrypted_document,
+        })
+    }
 }
 
 impl AlloyClient for StandaloneStandardClient {
@@ -151,15 +187,18 @@ impl StandardDocumentOps for StandaloneStandardClient {
         plaintext_document: PlaintextDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let (secret_id, secret) = self.get_current_secret_and_id()?;
-        let encrypted_doc = Self::encrypt_document(
-            &secret.secret,
-            plaintext_document,
-            KeyId(secret_id),
-            self.rng.clone(),
-            &metadata.tenant_id,
-        )?;
-        Ok(encrypted_doc)
+        self.encrypt_sync(plaintext_document, metadata)
+    }
+
+    /// Encrypt each of the provided documents with the provided metadata.
+    /// Note that because only a single metadata value is passed, each document will be encrypted to the same tenant.
+    async fn encrypt_batch(
+        &self,
+        plaintext_documents: PlaintextDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError> {
+        let encrypt_document = |plaintext_document| self.encrypt_sync(plaintext_document, metadata);
+        Ok(collection_to_batch_result(plaintext_documents, encrypt_document).into())
     }
 
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
@@ -170,12 +209,19 @@ impl StandardDocumentOps for StandaloneStandardClient {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
-        let dek = Self::decrypt_document_dek(
-            encrypted_document.edek,
-            &self.config.secrets,
-            &metadata.tenant_id,
-        )?;
-        decrypt_document_core(encrypted_document.document, dek)
+        self.decrypt_sync(encrypted_document, metadata)
+    }
+
+    /// Decrypt each of the provided documents with the provided metadata.
+    /// Note that because the metadata is shared between the documents, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_documents: EncryptedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardDecryptBatchResult, AlloyError> {
+        let decrypt_document = |encrypted_document| self.decrypt_sync(encrypted_document, metadata);
+        Ok(collection_to_batch_result(encrypted_documents, decrypt_document).into())
     }
 
     /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
@@ -183,7 +229,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
     /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
     async fn rekey_edeks(
         &self,
-        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        edeks: HashMap<DocumentId, EdekWithKeyIdHeader>,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyEdeksBatchResult, AlloyError> {
@@ -216,19 +262,20 @@ impl StandardDocumentOps for StandaloneStandardClient {
         plaintext_document: PlaintextDocumentWithEdek,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let dek = Self::decrypt_document_dek(
-            plaintext_document.edek.clone(),
-            &self.config.secrets,
-            &metadata.tenant_id,
-        )?;
+        self.encrypt_with_existing_edek_sync(plaintext_document, metadata)
+    }
 
-        let encrypted_document: HashMap<_, _> =
-            encrypt_map(plaintext_document.document, self.rng.clone(), dek)?;
-
-        Ok(EncryptedDocument {
-            edek: plaintext_document.edek,
-            document: encrypted_document,
-        })
+    /// Encrypt multiple documents with the provided metadata.
+    /// The provided EDEKs will be decrypted and used to encrypt each corresponding document's fields.
+    /// This is useful when updating some fields of the document.
+    async fn encrypt_with_existing_edek_batch(
+        &self,
+        plaintext_documents: PlaintextDocumentsWithEdeks,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError> {
+        let encrypt =
+            |plaintext_document| self.encrypt_with_existing_edek_sync(plaintext_document, metadata);
+        Ok(collection_to_batch_result(plaintext_documents, encrypt).into())
     }
 }
 

@@ -1,15 +1,18 @@
+use super::{SaasShieldSecurityEventOps, SecurityEvent};
 use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, RekeyEdeksBatchResult,
-    StandardDocumentOps,
+    EncryptedDocument, EncryptedDocuments, PlaintextDocument, PlaintextDocumentWithEdek,
+    PlaintextDocuments, PlaintextDocumentsWithEdeks, RekeyEdeksBatchResult,
+    StandardDecryptBatchResult, StandardDocumentOps, StandardEncryptBatchResult,
 };
 use crate::tenant_security_client::{
-    RequestMetadata, TenantSecurityClient, UnwrapKeyResponse, WrapKeyResponse,
+    BatchUnwrapKeyResponse, BatchWrapKeyResponse, RequestMetadata, TenantSecurityClient,
+    UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{collection_to_batch_result, v4_proto_from_bytes, OurReseedingRng};
-use crate::TenantId;
+use crate::util::{collection_to_batch_result, v4_proto_from_bytes, BatchResult, OurReseedingRng};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
+use crate::{DocumentId, TenantId};
 use bytes::Bytes;
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
@@ -25,8 +28,6 @@ use rand::{CryptoRng, RngCore};
 use std::collections::HashMap;
 use std::convert::identity;
 use std::sync::{Arc, Mutex};
-
-use super::{SaasShieldSecurityEventOps, SecurityEvent};
 
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardClient {
@@ -84,7 +85,7 @@ impl SaasShieldStandardClient {
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,
         dek: EncryptionKey,
-        tenant_id: TenantId,
+        tenant_id: &TenantId,
         document: HashMap<String, Vec<u8>>,
     ) -> Result<EncryptedDocument, AlloyError> {
         let pb_edeks: ironcore_documents::cmk_edek::EncryptedDeks =
@@ -125,7 +126,7 @@ impl SaasShieldStandardClient {
             self.rng.clone(), // this isn't actually used because of the empty document
             tsp_resp.edek.0,
             dek,
-            parsed_new_tenant_id.clone(),
+            parsed_new_tenant_id,
             HashMap::new(), // empty document. We only care about the EDEK part and there's no wasted work
         )
         .map(|doc| doc.edek)
@@ -169,6 +170,36 @@ impl SaasShieldStandardClient {
             }
         }
     }
+
+    /// Decompose EDEKs with headers and make a request to the TSP to unwrap them.
+    /// Returns the TSP's unwrap response and a map from document IDs to EDEK failures.
+    async fn batch_unwrap_edeks<'a, T>(
+        &self,
+        edeks_with_headers: T,
+        metadata: &AlloyMetadata,
+    ) -> Result<(BatchUnwrapKeyResponse, HashMap<String, AlloyError>), AlloyError>
+    where
+        T: IntoIterator<Item = (&'a str, EdekWithKeyIdHeader)>,
+    {
+        let request_metadata = metadata.clone().try_into()?;
+        let decompose_edek = |edek_with_header: EdekWithKeyIdHeader| {
+            let edek_parts = Self::decompose_edek_header(edek_with_header)?;
+            edek_parts.get_edek_bytes()
+        };
+        let BatchResult {
+            successes: edeks,
+            failures: edek_failures_str,
+        } = collection_to_batch_result(edeks_with_headers, decompose_edek);
+        let edek_failures = edek_failures_str
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+        let batch_unwrap_response = self
+            .tenant_security_client
+            .batch_unwrap_keys(edeks, &request_metadata)
+            .await?;
+        Ok((batch_unwrap_response, edek_failures))
+    }
 }
 
 impl AlloyClient for SaasShieldStandardClient {
@@ -210,9 +241,59 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             self.rng.clone(),
             tsc_edek.0,
             enc_key,
-            metadata.tenant_id.clone(),
+            &metadata.tenant_id,
             plaintext_document,
         )
+    }
+
+    /// Encrypt each of the provided documents with the provided metadata.
+    /// Note that because only a single metadata value is passed, each document will be encrypted to the same tenant.
+    async fn encrypt_batch(
+        &self,
+        plaintext_documents: PlaintextDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError> {
+        let request_metadata = metadata.clone().try_into()?;
+        let document_ids = plaintext_documents.keys().map(String::as_str).collect();
+        let BatchWrapKeyResponse {
+            mut keys,
+            failures: tsp_failures,
+        } = self
+            .tenant_security_client
+            .batch_wrap_keys(document_ids, &request_metadata)
+            .await?;
+        let docs_and_keys = plaintext_documents
+            .into_iter()
+            .map(|(document_id, document)| {
+                let maybe_keys = keys.remove(&document_id);
+                (document_id, (document, maybe_keys))
+            });
+        let encrypt_document =
+            |(plaintext_document, maybe_keys): (PlaintextDocument, Option<WrapKeyResponse>)| {
+                let WrapKeyResponse { dek, edek } =
+                    maybe_keys.ok_or_else(|| AlloyError::EncryptError {
+                        msg: "TSP failed to wrap key for document.".to_string(),
+                    })?;
+                let enc_key = tsc_dek_to_encryption_key(dek.0)?;
+                Self::encrypt_document(
+                    self.rng.clone(),
+                    edek.0,
+                    enc_key,
+                    &metadata.tenant_id,
+                    plaintext_document,
+                )
+            };
+        let encryption_result = collection_to_batch_result(docs_and_keys, encrypt_document);
+        let combined_failures = tsp_failures
+            .into_iter()
+            .map(|(k, err)| (k, err.into()))
+            .chain(encryption_result.failures)
+            .collect();
+        Ok(BatchResult {
+            successes: encryption_result.successes,
+            failures: combined_failures,
+        }
+        .into())
     }
 
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
@@ -235,12 +316,58 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         decrypt_document_core(encrypted_document.document, enc_key)
     }
 
+    /// Decrypt each of the provided documents with the provided metadata.
+    /// Note that because the metadata is shared between the documents, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_documents: EncryptedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardDecryptBatchResult, AlloyError> {
+        let edeks_with_headers = encrypted_documents
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.edek.clone()));
+        let (mut batch_unwrap_response, edek_failures) = self
+            .batch_unwrap_edeks(edeks_with_headers, metadata)
+            .await?;
+        let docs_and_keys = encrypted_documents
+            .into_iter()
+            .map(|(document_id, document)| {
+                let maybe_keys = batch_unwrap_response.keys.remove(&document_id);
+                (document_id, (document, maybe_keys))
+            });
+        let decrypt_document =
+            |(encrypted_document, maybe_keys): (EncryptedDocument, Option<UnwrapKeyResponse>)| {
+                let UnwrapKeyResponse { dek } =
+                    maybe_keys.ok_or_else(|| AlloyError::DecryptError {
+                        msg: "TSP failed to wrap key for document.".to_string(),
+                    })?;
+                let edek_parts = Self::decompose_edek_header(encrypted_document.edek)?;
+                let enc_key = tsc_dek_to_encryption_key(dek.0)?;
+                edek_parts.validate_signature(enc_key)?;
+                decrypt_document_core(encrypted_document.document, enc_key)
+            };
+        let decryption_result = collection_to_batch_result(docs_and_keys, decrypt_document);
+        let combined_failures = batch_unwrap_response
+            .failures
+            .into_iter()
+            .map(|(k, err)| (k, err.into()))
+            .chain(edek_failures)
+            .chain(decryption_result.failures)
+            .collect();
+        Ok(BatchResult {
+            successes: decryption_result.successes,
+            failures: combined_failures,
+        }
+        .into())
+    }
+
     /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
     /// the EDEK will be encrypted to the original tenant. Because the underlying DEK does not change, a document
     /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
     async fn rekey_edeks(
         &self,
-        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        edeks: HashMap<DocumentId, EdekWithKeyIdHeader>,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyEdeksBatchResult, AlloyError> {
@@ -276,6 +403,59 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             document: encrypt_map(plaintext_document.document, self.rng.clone(), enc_key)?,
             edek: plaintext_document.edek,
         })
+    }
+
+    /// Encrypt multiple documents with the provided metadata.
+    /// The provided EDEKs will be decrypted and used to encrypt each corresponding document's fields.
+    /// This is useful when updating some fields of the document.
+    async fn encrypt_with_existing_edek_batch(
+        &self,
+        plaintext_documents: PlaintextDocumentsWithEdeks,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError> {
+        let edeks_with_headers = plaintext_documents
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.edek.clone()));
+        let (mut batch_unwrap_response, edek_failures) = self
+            .batch_unwrap_edeks(edeks_with_headers, metadata)
+            .await?;
+        let docs_and_keys = plaintext_documents
+            .into_iter()
+            .map(|(document_id, document)| {
+                let maybe_keys = batch_unwrap_response.keys.remove(&document_id);
+                (document_id, (document, maybe_keys))
+            });
+        let encrypt_document = |(plaintext_document, maybe_keys): (
+            PlaintextDocumentWithEdek,
+            Option<UnwrapKeyResponse>,
+        )| {
+            let UnwrapKeyResponse { dek } = maybe_keys.ok_or_else(|| AlloyError::DecryptError {
+                msg: "TSP failed to wrap key for document.".to_string(),
+            })?;
+            let edek_parts = Self::decompose_edek_header(plaintext_document.edek)?;
+            let enc_key = tsc_dek_to_encryption_key(dek.0)?;
+            edek_parts.validate_signature(enc_key)?;
+            Self::encrypt_document(
+                self.rng.clone(),
+                edek_parts.get_edek_bytes()?,
+                enc_key,
+                &metadata.tenant_id,
+                plaintext_document.document,
+            )
+        };
+        let decryption_result = collection_to_batch_result(docs_and_keys, encrypt_document);
+        let combined_failures = batch_unwrap_response
+            .failures
+            .into_iter()
+            .map(|(k, err)| (k, err.into()))
+            .chain(edek_failures)
+            .chain(decryption_result.failures)
+            .collect();
+        Ok(BatchResult {
+            successes: decryption_result.successes,
+            failures: combined_failures,
+        }
+        .into())
     }
 }
 
@@ -345,7 +525,7 @@ fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, AlloyError> 
 pub fn generate_cmk_v4_doc_and_sign(
     edeks: Vec<EncryptedDek>,
     dek: EncryptionKey,
-    tenant_id: TenantId,
+    tenant_id: &TenantId,
 ) -> Result<V4DocumentHeader, AlloyError> {
     let edek_wrappers = edeks
         .into_iter()
@@ -409,7 +589,7 @@ mod test {
         let v4_doc = generate_cmk_v4_doc_and_sign(
             vec![edek],
             EncryptionKey([1; 32]),
-            TenantId("tenant".to_string()),
+            &TenantId("tenant".to_string()),
         )
         .unwrap();
         let doc_bytes = v4_doc.write_to_bytes().unwrap();

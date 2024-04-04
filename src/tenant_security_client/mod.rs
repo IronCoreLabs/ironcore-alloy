@@ -1,3 +1,5 @@
+use self::rest::RekeyResponse;
+use crate::errors::AlloyError;
 use crate::saas_shield::SecurityEvent;
 use crate::TenantId;
 use crate::{DerivationPath, SecretPath};
@@ -5,8 +7,8 @@ use base64_type::Base64;
 use request::{TenantSecurityRequest, TspRequest};
 use reqwest::Client;
 pub use rest::{
-    BatchUnwrapKeyResponse, DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse,
-    SecretType, UnwrapKeyResponse, WrapKeyResponse,
+    BatchUnwrapKeyResponse, BatchWrapKeyResponse, DerivationType, DeriveKeyChoice, DerivedKey,
+    KeyDeriveResponse, SecretType, UnwrapKeyResponse, WrapKeyResponse,
 };
 use serde::Serialize;
 use std::{
@@ -16,8 +18,6 @@ use std::{
     sync::Arc,
 };
 
-use self::rest::RekeyResponse;
-use crate::errors::AlloyError;
 #[cfg(test)]
 pub use rest::TenantSecretAssignmentId;
 
@@ -76,8 +76,15 @@ impl TenantSecurityClient {
         self.request.unwrap_key(&base64, metadata).await
     }
 
-    #[allow(dead_code)]
-    pub async fn batch_unwrap_key(
+    pub async fn batch_wrap_keys(
+        &self,
+        document_ids: Vec<&str>,
+        metadata: &RequestMetadata,
+    ) -> Result<BatchWrapKeyResponse, AlloyError> {
+        self.request.batch_wrap_keys(document_ids, metadata).await
+    }
+
+    pub async fn batch_unwrap_keys(
         &self,
         edeks: HashMap<&str, Vec<u8>>,
         metadata: &RequestMetadata,
@@ -86,7 +93,7 @@ impl TenantSecurityClient {
             .into_iter()
             .map(|(key, edek)| (key, Base64(edek)))
             .collect();
-        self.request.batch_unwrap_key(base64_edeks, metadata).await
+        self.request.batch_unwrap_keys(base64_edeks, metadata).await
     }
 
     pub async fn rekey_edek(

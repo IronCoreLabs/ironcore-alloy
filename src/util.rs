@@ -1,4 +1,4 @@
-use crate::{errors::AlloyError, AlloyMetadata, FieldId, TenantId, VectorEncryptionKey};
+use crate::{errors::AlloyError, AlloyMetadata, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::KeyId;
 use itertools::Itertools;
 use protobuf::Message;
@@ -8,6 +8,7 @@ use rand::{
 };
 use rand_chacha::{ChaCha20Core, ChaCha20Rng};
 use ring::hmac::{Key as HMACKey, HMAC_SHA256, HMAC_SHA512};
+use std::hash::Hash;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex, MutexGuard},
@@ -101,9 +102,9 @@ pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T
     ChaCha20Rng::from_seed(hash256(key, hash_payload))
 }
 
-pub(crate) struct BatchResult<U> {
-    pub successes: HashMap<FieldId, U>,
-    pub failures: HashMap<FieldId, AlloyError>,
+pub(crate) struct BatchResult<K: Hash, U> {
+    pub successes: HashMap<K, U>,
+    pub failures: HashMap<K, AlloyError>,
 }
 
 /// Creates a batch result struct named after the first parameter.
@@ -119,8 +120,8 @@ macro_rules! create_batch_result_struct {
             pub failures: std::collections::HashMap<$map_key_type, $crate::errors::AlloyError>,
         }
 
-        impl From<$crate::util::BatchResult<$success_type>> for $struct_name {
-            fn from(value: $crate::util::BatchResult<$success_type>) -> Self {
+        impl From<$crate::util::BatchResult<$map_key_type, $success_type>> for $struct_name {
+            fn from(value: $crate::util::BatchResult<$map_key_type, $success_type>) -> Self {
                 Self {
                     successes: value.successes,
                     failures: value.failures,
@@ -131,12 +132,14 @@ macro_rules! create_batch_result_struct {
 }
 
 /// Applies the function `func` to all the values of `collection`, then partitions them into
-/// success and failure hashmaps. Note that the value type for failures is currently `String`
-/// because of an issue with uniffi exporting errors.
-pub(crate) fn collection_to_batch_result<T, U, F, I>(collection: I, func: F) -> BatchResult<U>
+/// success and failure hashmaps.
+pub(crate) fn collection_to_batch_result<T, U, F, I, K>(collection: I, func: F) -> BatchResult<K, U>
 where
     F: Fn(T) -> Result<U, AlloyError>,
-    I: IntoIterator<Item = (FieldId, T)>,
+    I: IntoIterator<Item = (K, T)>,
+    K: Hash + Eq,
+    HashMap<K, U>: Extend<(K, U)>,
+    HashMap<K, AlloyError>: Extend<(K, AlloyError)>,
 {
     let (successes, failures) = collection
         .into_iter()

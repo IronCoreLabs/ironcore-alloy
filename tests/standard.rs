@@ -15,6 +15,7 @@ mod tests {
     };
     use std::{
         collections::HashMap,
+        str::from_utf8,
         sync::Arc,
         time::{SystemTime, UNIX_EPOCH},
     };
@@ -60,6 +61,24 @@ mod tests {
         }
     }
 
+    fn get_v3_ciphertext() -> EncryptedDocument {
+        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
+        let edek_bytes = STANDARD.decode(edek).unwrap();
+        let doc = vec![
+            3, 73, 82, 79, 78, 0, 46, 10, 28, 101, 22, 60, 138, 170, 207, 86, 19, 19, 80, 220, 33,
+            207, 60, 229, 7, 199, 67, 192, 206, 5, 184, 244, 26, 25, 152, 187, 219, 26, 14, 10, 12,
+            116, 101, 110, 97, 110, 116, 45, 103, 99, 112, 45, 108, 125, 137, 60, 34, 63, 241, 194,
+            170, 25, 76, 63, 201, 94, 4, 42, 96, 60, 43, 166, 21, 23, 241, 84, 167, 65, 83, 176, 7,
+            98, 227, 95, 197, 56, 207, 118, 75, 48, 64, 65, 92, 96, 163, 227, 114, 108, 183, 222,
+            154,
+        ];
+        let doc_bytes = [("doc".to_string(), doc)].into();
+        EncryptedDocument {
+            edek: EdekWithKeyIdHeader(edek_bytes),
+            document: doc_bytes,
+        }
+    }
+
     #[tokio::test]
     async fn standard_encrypt_works() -> TestResult {
         let plaintext = get_plaintext();
@@ -87,21 +106,7 @@ mod tests {
 
     #[tokio::test]
     async fn standard_decrypt_v3_document() -> TestResult {
-        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
-        let edek_bytes = STANDARD.decode(edek).unwrap();
-        let doc = vec![
-            3, 73, 82, 79, 78, 0, 46, 10, 28, 101, 22, 60, 138, 170, 207, 86, 19, 19, 80, 220, 33,
-            207, 60, 229, 7, 199, 67, 192, 206, 5, 184, 244, 26, 25, 152, 187, 219, 26, 14, 10, 12,
-            116, 101, 110, 97, 110, 116, 45, 103, 99, 112, 45, 108, 125, 137, 60, 34, 63, 241, 194,
-            170, 25, 76, 63, 201, 94, 4, 42, 96, 60, 43, 166, 21, 23, 241, 84, 167, 65, 83, 176, 7,
-            98, 227, 95, 197, 56, 207, 118, 75, 48, 64, 65, 92, 96, 163, 227, 114, 108, 183, 222,
-            154,
-        ];
-        let doc_bytes = [("doc".to_string(), doc)].into();
-        let document = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(edek_bytes),
-            document: doc_bytes,
-        };
+        let document = get_v3_ciphertext();
         let metadata = get_metadata();
         let decrypted = get_client()
             .standard()
@@ -110,6 +115,54 @@ mod tests {
             .unwrap();
         let decrypted_string = std::str::from_utf8(decrypted.get("doc").unwrap()).unwrap();
         assert_eq!(decrypted_string, "Encrypt these bytes!");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_batch_roundtrip() -> TestResult {
+        let plaintext = get_plaintext();
+        let metadata = get_metadata();
+        let documents = [("doc".to_string(), plaintext)].into();
+        let encrypted = get_client()
+            .standard()
+            .encrypt_batch(documents, &metadata)
+            .await?;
+        assert_eq!(encrypted.successes.len(), 1);
+        assert_eq!(encrypted.failures.len(), 0);
+        let second_document = get_v3_ciphertext();
+        let bad_document = EncryptedDocument {
+            edek: EdekWithKeyIdHeader(vec![1]),
+            document: HashMap::new(),
+        };
+        let new_encrypted = encrypted
+            .successes
+            .into_iter()
+            .chain([
+                ("v3_doc".to_string(), second_document),
+                ("bad_doc".to_string(), bad_document),
+            ])
+            .collect();
+        let decrypted = get_client()
+            .standard()
+            .decrypt_batch(new_encrypted, &metadata)
+            .await?;
+        assert_eq!(decrypted.successes.len(), 2);
+        assert_eq!(decrypted.failures.len(), 1);
+        assert_eq!(decrypted.successes.get("doc").unwrap(), &get_plaintext());
+        let decrypted_v3 = from_utf8(
+            decrypted
+                .successes
+                .get("v3_doc")
+                .unwrap()
+                .get("doc")
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(decrypted_v3, "Encrypt these bytes!");
+        assert!(matches!(
+            decrypted.failures.get("bad_doc").unwrap(),
+            AlloyError::DecryptError { .. }
+        ));
         Ok(())
     }
 
@@ -123,16 +176,45 @@ mod tests {
             .await?;
         let plaintext2: HashMap<_, _> = [("field2".to_string(), vec![1, 2, 3, 4])].into();
         let plaintext_with_edek = PlaintextDocumentWithEdek {
-            edek: encrypted.edek,
+            edek: encrypted.edek.clone(),
             document: plaintext2.clone(),
         };
         let second_encrypted = get_client()
             .standard()
             .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
             .await?;
+        assert_eq!(&encrypted.edek, &second_encrypted.edek);
         let decrypted = get_client()
             .standard()
             .decrypt(second_encrypted, &metadata)
+            .await?;
+        assert_eq!(decrypted, plaintext2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_encrypt_with_existing_edek_batch_works() -> TestResult {
+        let plaintext = get_plaintext();
+        let metadata = get_metadata();
+        let encrypted = get_client()
+            .standard()
+            .encrypt(plaintext, &metadata)
+            .await?;
+        let plaintext2: HashMap<_, _> = [("field2".to_string(), vec![1, 2, 3, 4])].into();
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: encrypted.edek,
+            document: plaintext2.clone(),
+        };
+        let plaintexts = [("doc".to_string(), plaintext_with_edek)].into();
+        let mut batch_encrypted = get_client()
+            .standard()
+            .encrypt_with_existing_edek_batch(plaintexts, &metadata)
+            .await?;
+        assert_eq!(batch_encrypted.successes.len(), 1);
+        assert_eq!(batch_encrypted.failures.len(), 0);
+        let decrypted = get_client()
+            .standard()
+            .decrypt(batch_encrypted.successes.remove("doc").unwrap(), &metadata)
             .await?;
         assert_eq!(decrypted, plaintext2);
         Ok(())
