@@ -1015,7 +1015,6 @@ dependencies = [
  "ascii85",
  "assertables",
  "async-trait",
- "base64 0.21.7",
  "base64 0.22.0",
  "base64_type",
  "base85",
