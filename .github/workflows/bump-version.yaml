@@ -12,6 +12,7 @@ on:
     inputs:
       version:
         description: New semver release version.
+  pull_request: # Only runs a check
 
 jobs:
   bump:
