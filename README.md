@@ -55,7 +55,7 @@ There are benchmarks that use the TSP as well as standalone. To run the TSP benc
 
 ```bash
 docker compose up -d
-TENANT_ID=tenant-gcp-l cargo bench
+cargo bench
 ```
 
 If you'd like to only run the benchmarks for standalone mode, which do not require a TSP, you can execute them by running:
