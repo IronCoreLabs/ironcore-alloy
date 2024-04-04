@@ -12,10 +12,11 @@ on:
     inputs:
       version:
         description: New semver release version.
+  pull_request: # Only runs a check
 
 jobs:
   bump:
-    uses: IronCoreLabs/workflows/.github/workflows/bump-version.yaml@bump-version-v1
+    uses: IronCoreLabs/workflows/.github/workflows/bump-version.yaml@bump-version-check
     with:
       version: ${{ inputs.version }}
       release_mode: prerelease
