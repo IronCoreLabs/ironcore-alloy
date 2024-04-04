@@ -5,9 +5,10 @@ mod tests {
     use crate::common::{get_client, TestResult};
     use ironcore_alloy::{
         deterministic::{DeterministicFieldOps, EncryptedField, PlaintextField},
+        errors::AlloyError,
         AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
-    use std::sync::Arc;
+    use std::{iter, sync::Arc};
 
     fn get_metadata() -> Arc<AlloyMetadata> {
         AlloyMetadata::new_simple(TenantId("tenant-gcp-l".to_string()))
@@ -59,6 +60,65 @@ mod tests {
         assert_eq!(decrypted.plaintext_field, expected);
         assert_eq!(decrypted.secret_path.0, "secret");
         assert_eq!(decrypted.derivation_path.0, "deriv");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deterministic_batch_roundtrip() -> TestResult {
+        let plaintext = get_plaintext();
+        let plaintext_2 = PlaintextField {
+            plaintext_field: vec![1, 2, 3],
+            secret_path: SecretPath("bad_path".to_string()),
+            derivation_path: DerivationPath("bad_path".to_string()),
+        };
+        let metadata = get_metadata();
+        let fields = [
+            ("field".to_string(), plaintext),
+            ("field_2".to_string(), plaintext_2),
+        ]
+        .into();
+        let encrypted = get_client()
+            .deterministic()
+            .encrypt_batch(fields, &metadata)
+            .await?;
+        assert_eq!(encrypted.successes.len(), 2);
+        assert_eq!(encrypted.failures.len(), 0);
+        let bad_encrypted = EncryptedField {
+            encrypted_field: vec![1, 1, 1],
+            secret_path: SecretPath("secret".to_string()),
+            derivation_path: DerivationPath("deriv".to_string()),
+        };
+        let encrypted_fields = iter::once(("bad_doc".to_string(), bad_encrypted))
+            .chain(encrypted.successes)
+            .collect();
+        let decrypted = get_client()
+            .deterministic()
+            .decrypt_batch(encrypted_fields, &metadata)
+            .await?;
+        assert_eq!(decrypted.successes.len(), 2);
+        assert_eq!(decrypted.failures.len(), 1);
+        assert!(matches!(
+            decrypted.failures.get("bad_doc").unwrap(),
+            AlloyError::InvalidInput { .. }
+        ));
+        assert_eq!(
+            decrypted.successes.get("field").unwrap().plaintext_field,
+            get_plaintext().plaintext_field
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn deterministic_batch_failure() -> TestResult {
+        let plaintext = get_plaintext();
+        let metadata = AlloyMetadata::new_simple(TenantId("bad-tenant".to_string()));
+        let fields = [("field".to_string(), plaintext)].into();
+        let err = get_client()
+            .deterministic()
+            .encrypt_batch(fields, &metadata)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlloyError::TspError { .. }));
         Ok(())
     }
 

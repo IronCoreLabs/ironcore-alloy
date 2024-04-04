@@ -109,11 +109,11 @@ jobs:
           brew install pipx
           echo "/Users/runner/.local/bin" >> $GITHUB_PATH
       - name: Install hatch
-        if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm'
+        if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm' && matrix.runs-on != 'macos-14'
         run: pipx install hatch
-      - name: Install hatch (buildjet-4vcpu-ubuntu-2204-arm)
-        if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm'
-        # The buildjet arm machine has a permissions error if we don't use sudo
+      - name: Install hatch (ARM)
+        if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm' || matrix.runs-on == 'macos-14'
+        # The arm machines have a permissions error if we don't use sudo
         run: sudo pipx install hatch
       - name: Run Python tests
         run: hatch run test:test

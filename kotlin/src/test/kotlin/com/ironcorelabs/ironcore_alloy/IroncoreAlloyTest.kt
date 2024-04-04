@@ -179,7 +179,6 @@ class IroncoreAlloyTest {
         }
     }
 
-
     @Test
     fun sdkStandardAttachedRoundtrip() {
         val plaintextDocument = "My data".toByteArray()
@@ -240,6 +239,28 @@ class IroncoreAlloyTest {
             val decrypted = sdk.deterministic().decrypt(encryptedField, metadata)
             val expected = "My data".toByteArray()
             assertContentEquals(expected, decrypted.plaintextField)
+        }
+    }
+
+    @Test
+    fun sdkBatchRoundtripDeterministic() {
+        val plaintextInput = "My data".toByteArray()
+        val field = PlaintextField(plaintextInput, "", "")
+        val badField = PlaintextField("My data".toByteArray(), "bad_path", "bad_path")
+        val metadata = AlloyMetadata.newSimple("tenant")
+        val plaintextFields = mapOf("doc" to field, "badDoc" to badField)
+        runBlocking {
+            val encrypted = sdk.deterministic().encryptBatch(plaintextFields, metadata)
+            assertEquals(encrypted.successes.size, 1)
+            assertEquals(encrypted.failures.size, 1)
+            assertEquals(
+                    encrypted.failures.get("badDoc")?.message,
+                    "msg=Provided secret path `bad_path` does not exist in the deterministic configuration."
+            )
+            val decrypted = sdk.deterministic().decryptBatch(encrypted.successes, metadata)
+            assertEquals(decrypted.successes.size, 1)
+            assertEquals(decrypted.failures.size, 0)
+            assertContentEquals(decrypted.successes.get("doc")?.plaintextField, plaintextInput)
         }
     }
 
