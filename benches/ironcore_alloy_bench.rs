@@ -119,7 +119,7 @@ fn tsp_benches(c: &mut Criterion) {
     let rng = rand::thread_rng();
     let tsp_uri = env::var("TSP_ADDRESS").unwrap_or("http://localhost".to_string());
     let tsp_port = env::var("TSP_PORT").unwrap_or("32804".to_string());
-    let tenant_id = env::var("TENANT_ID").unwrap_or("tenant-gcp".to_string());
+    let tenant_id = env::var("TENANT_ID").unwrap_or("tenant-gcp-l".to_string());
     let api_key = env::var("API_KEY").unwrap_or("0WUaXesNgbTAuLwn".to_string());
 
     let config =
