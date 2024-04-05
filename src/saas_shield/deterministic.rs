@@ -27,6 +27,10 @@ impl SaasShieldDeterministicClient {
             tenant_security_client: tenant_security_client.clone(),
         }
     }
+
+    fn get_secret_type() -> SecretType {
+        SecretType::Deterministic
+    }
 }
 
 impl AlloyClient for SaasShieldDeterministicClient {
@@ -61,7 +65,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 paths,
                 &metadata.clone().try_into()?,
                 DerivationType::Sha512,
-                SecretType::Deterministic,
+                Self::get_secret_type(),
             )
             .await?;
         let derived_key = derived_keys.get_key_for_path(
@@ -94,7 +98,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             &self.tenant_security_client,
             metadata,
             paths,
-            SecretType::Deterministic,
+            Self::get_secret_type(),
         )
         .await?;
         let encrypt_field = |plaintext_field: PlaintextField| {
@@ -131,7 +135,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 paths,
                 &metadata.clone().try_into()?,
                 DerivationType::Sha512,
-                SecretType::Deterministic,
+                Self::get_secret_type(),
             )
             .await?;
         let derived_key = derived_keys.get_key_for_path(
@@ -170,7 +174,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             &self.tenant_security_client,
             metadata,
             paths,
-            SecretType::Deterministic,
+            Self::get_secret_type(),
         )
         .await?;
         let decrypt_field = |encrypted_field: EncryptedField| {
@@ -206,7 +210,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             &self.tenant_security_client,
             metadata,
             paths,
-            SecretType::Deterministic,
+            Self::get_secret_type(),
         )
         .await?
         .derived_keys;
@@ -257,7 +261,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             parsed_new_tenant_id,
             paths,
             &self.tenant_security_client,
-            SecretType::Deterministic,
+            Self::get_secret_type(),
         )
         .await?;
         let reencrypt_field = |encrypted_field: EncryptedField| {
@@ -322,7 +326,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 paths,
                 &metadata.clone().try_into()?,
                 DerivationType::Sha512,
-                SecretType::Deterministic,
+                Self::get_secret_type(),
             )
             .await?;
         get_in_rotation_prefix_internal(
