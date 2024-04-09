@@ -4,8 +4,8 @@ use crate::standalone::config::RotatableSecret;
 use crate::util::{get_rng, perform_batch_action};
 use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
-    GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorEncryptionKey, VectorOps,
-    VectorRotateResult,
+    GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorDecryptBatchResult,
+    VectorEncryptBatchResult, VectorEncryptionKey, VectorId, VectorOps, VectorRotateResult,
 };
 use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
@@ -122,6 +122,24 @@ impl VectorOps for StandaloneVectorClient {
         )
     }
 
+    /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
+    /// and their values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embeddings.
+    async fn encrypt_batch(
+        &self,
+        plaintext_vectors: PlaintextVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorEncryptBatchResult, AlloyError> {
+        let attempts = join_all(plaintext_vectors.0.into_iter().map(
+            |(vector_id, plaintext_vector)| {
+                self.encrypt(plaintext_vector, metadata)
+                    .map(|encrypted_vector| (VectorId(vector_id), encrypted_vector))
+            },
+        ))
+        .await;
+        Ok(perform_batch_action(attempts, identity).into())
+    }
+
     /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
     /// be unshuffled to their original positions during decryption.
     async fn decrypt(
@@ -160,6 +178,25 @@ impl VectorOps for StandaloneVectorClient {
             encrypted_vector,
             icl_metadata_bytes,
         )
+    }
+
+    /// Decrypt multiple vector embeddings that were encrypted with the provided metadata. The values of the embeddings
+    /// will be unshuffled to their original positions during decryption.
+    /// Note that because the metadata is shared between the vectors, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorDecryptBatchResult, AlloyError> {
+        let attempts = join_all(encrypted_vectors.0.into_iter().map(
+            |(vector_id, encrypted_vector)| {
+                self.decrypt(encrypted_vector, metadata)
+                    .map(|decrypted_vector| (VectorId(vector_id), decrypted_vector))
+            },
+        ))
+        .await;
+        Ok(perform_batch_action(attempts, identity).into())
     }
 
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.

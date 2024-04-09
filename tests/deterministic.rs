@@ -70,8 +70,8 @@ mod tests {
         let plaintext = get_plaintext();
         let plaintext_2 = PlaintextField {
             plaintext_field: vec![1, 2, 3].into(),
-            secret_path: SecretPath("bad_path".to_string()),
-            derivation_path: DerivationPath("bad_path".to_string()),
+            secret_path: SecretPath("different_path".to_string()),
+            derivation_path: DerivationPath("different_path".to_string()),
         };
         let metadata = get_metadata();
         let fields = PlaintextFields(

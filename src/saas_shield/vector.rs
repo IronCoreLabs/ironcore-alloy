@@ -8,8 +8,9 @@ use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::{check_rotation_no_op, get_rng, perform_batch_action, OurReseedingRng};
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
-    GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
+    decrypt_internal, encrypt_internal, get_approximation_factor, EncryptedVector,
+    EncryptedVectors, GenerateVectorQueryResult, PlaintextVector, PlaintextVectors,
+    VectorDecryptBatchResult, VectorEncryptBatchResult, VectorId, VectorOps, VectorRotateResult,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
@@ -36,6 +37,10 @@ impl SaasShieldVectorClient {
         }
     }
 
+    fn get_secret_type() -> SecretType {
+        SecretType::Vector
+    }
+
     /// Encrypts a plaintext vector with the provided key/ID
     fn encrypt_core(
         &self,
@@ -43,12 +48,7 @@ impl SaasShieldVectorClient {
         key_id: KeyId,
         plaintext_vector: PlaintextVector,
     ) -> Result<EncryptedVector, AlloyError> {
-        let approximation_factor =
-            self.approximation_factor
-                .ok_or_else(|| AlloyError::InvalidConfiguration {
-                    msg: "`approximation_factor` was not set in the vector configuration."
-                        .to_string(),
-                })?;
+        let approximation_factor = get_approximation_factor(self.approximation_factor)?;
         encrypt_internal(
             approximation_factor,
             key,
@@ -107,7 +107,7 @@ impl VectorOps for SaasShieldVectorClient {
                 paths,
                 &metadata.clone().try_into()?,
                 DerivationType::Sha512,
-                SecretType::Vector,
+                Self::get_secret_type(),
             )
             .await?;
         let derived_key = derived_keys.get_key_for_path(
@@ -119,6 +119,55 @@ impl VectorOps for SaasShieldVectorClient {
         self.encrypt_core(&key, key_id, plaintext_vector)
     }
 
+    /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
+    /// and their values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embeddings.
+    async fn encrypt_batch(
+        &self,
+        plaintext_vectors: PlaintextVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorEncryptBatchResult, AlloyError> {
+        let approximation_factor = get_approximation_factor(self.approximation_factor)?;
+        let paths = plaintext_vectors
+            .0
+            .values()
+            .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
+            .collect_vec();
+        let all_keys = derive_keys_many_paths(
+            &self.tenant_security_client,
+            metadata,
+            paths,
+            Self::get_secret_type(),
+        )
+        .await?;
+
+        let encrypt_vector = |plaintext_vector: PlaintextVector| {
+            let new_derived_key = all_keys.get_key_for_path(
+                &plaintext_vector.secret_path,
+                &plaintext_vector.derivation_path,
+                DeriveKeyChoice::Current,
+            )?;
+            let (new_key_id, new_vector_key) =
+                derived_key_to_vector_encryption_key(new_derived_key)?;
+            encrypt_internal(
+                approximation_factor,
+                &new_vector_key,
+                new_key_id,
+                Self::get_edek_type(),
+                plaintext_vector,
+                &mut *get_rng(&self.rng),
+            )
+        };
+        Ok(perform_batch_action(
+            plaintext_vectors
+                .0
+                .into_iter()
+                .map(|(k, v)| (VectorId(k), v)),
+            encrypt_vector,
+        )
+        .into())
+    }
+
     /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
     /// be unshuffled to their original positions during decryption.
     async fn decrypt(
@@ -126,12 +175,7 @@ impl VectorOps for SaasShieldVectorClient {
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
-        let approximation_factor =
-            self.approximation_factor
-                .ok_or_else(|| AlloyError::InvalidConfiguration {
-                    msg: "`approximation_factor` was not set in the vector configuration."
-                        .to_string(),
-                })?;
+        let approximation_factor = get_approximation_factor(self.approximation_factor)?;
         let (key_id, icl_metadata_bytes) =
             Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
@@ -146,7 +190,7 @@ impl VectorOps for SaasShieldVectorClient {
                 paths,
                 &metadata.clone().try_into()?,
                 DerivationType::Sha512,
-                SecretType::Vector,
+                Self::get_secret_type(),
             )
             .await?;
         let derived_key = derived_keys.get_key_for_path(
@@ -170,6 +214,55 @@ impl VectorOps for SaasShieldVectorClient {
         }
     }
 
+    /// Decrypt multiple vector embeddings that were encrypted with the provided metadata. The values of the embeddings
+    /// will be unshuffled to their original positions during decryption.
+    /// Note that because the metadata is shared between the vectors, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_vectors: EncryptedVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorDecryptBatchResult, AlloyError> {
+        let approximation_factor = get_approximation_factor(self.approximation_factor)?;
+        let paths = encrypted_vectors
+            .0
+            .values()
+            .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
+            .collect_vec();
+        let all_keys = derive_keys_many_paths(
+            &self.tenant_security_client,
+            metadata,
+            paths,
+            Self::get_secret_type(),
+        )
+        .await?;
+
+        let decrypt_vector = |encrypted_vector: EncryptedVector| {
+            let (original_key_id, icl_metadata_bytes) =
+                Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+            let original_key = all_keys.get_key_for_path(
+                &encrypted_vector.secret_path,
+                &encrypted_vector.derivation_path,
+                DeriveKeyChoice::Specific(original_key_id),
+            )?;
+            let (_, original_vector_key) = derived_key_to_vector_encryption_key(original_key)?;
+            decrypt_internal(
+                approximation_factor,
+                &original_vector_key,
+                encrypted_vector,
+                icl_metadata_bytes,
+            )
+        };
+        Ok(perform_batch_action(
+            encrypted_vectors
+                .0
+                .into_iter()
+                .map(|(k, v)| (VectorId(k), v)),
+            decrypt_vector,
+        )
+        .into())
+    }
+
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
     /// The resulting encrypted vectors should be used in tandem when querying the vector database.
     async fn generate_query_vectors(
@@ -186,7 +279,7 @@ impl VectorOps for SaasShieldVectorClient {
             &self.tenant_security_client,
             metadata,
             paths,
-            SecretType::Vector,
+            Self::get_secret_type(),
         )
         .await?
         .derived_keys;
@@ -218,12 +311,7 @@ impl VectorOps for SaasShieldVectorClient {
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
     ) -> Result<VectorRotateResult, AlloyError> {
-        let approximation_factor =
-            self.approximation_factor
-                .ok_or_else(|| AlloyError::InvalidConfiguration {
-                    msg: "`approximation_factor` was not set in the vector configuration."
-                        .to_string(),
-                })?;
+        let approximation_factor = get_approximation_factor(self.approximation_factor)?;
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let paths = encrypted_vectors
             .0
@@ -238,7 +326,7 @@ impl VectorOps for SaasShieldVectorClient {
             parsed_new_tenant_id,
             paths,
             &self.tenant_security_client,
-            SecretType::Vector,
+            Self::get_secret_type(),
         )
         .await?;
         let reencrypt_vector = |encrypted_vector: EncryptedVector| {
@@ -307,7 +395,7 @@ impl VectorOps for SaasShieldVectorClient {
                 paths,
                 &metadata.clone().try_into()?,
                 DerivationType::Sha512,
-                SecretType::Vector,
+                Self::get_secret_type(),
             )
             .await?;
         get_in_rotation_prefix_internal(

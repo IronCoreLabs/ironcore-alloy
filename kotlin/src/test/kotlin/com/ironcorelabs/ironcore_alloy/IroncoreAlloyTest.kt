@@ -83,6 +83,30 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun sdkBatchRoundtripVector() {
+        val data = listOf(1.0f, 2.0f, 3.0f)
+        val plaintext = PlaintextVector(data, "", "")
+        val badVector = PlaintextVector(data, "bad_path", "bad_path")
+        val metadata = AlloyMetadata.newSimple("tenant")
+        val plaintextVectors = mapOf("vec" to plaintext, "badVec" to badVector)
+        runBlocking {
+            val encrypted = sdk.vector().encryptBatch(plaintextVectors, metadata)
+            assertEquals(encrypted.successes.size, 1)
+            assertEquals(encrypted.failures.size, 1)
+            assertEquals(
+                    encrypted.failures.get("badVec")?.message,
+                    "msg=Provided secret path `bad_path` does not exist in the vector configuration."
+            )
+            val decrypted = sdk.vector().decryptBatch(encrypted.successes, metadata)
+            assertEquals(decrypted.successes.size, 1)
+            assertEquals(decrypted.failures.size, 0)
+            for (i in 0..(data.size - 1)) {
+                data.get(i).sameValueAs(decrypted.successes.get("vec")!!.plaintextVector.get(i))
+            }
+        }
+    }
+
+    @Test
     fun sdkVectorRotateDifferentTenant() {
         val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
         val iclMetadata =
