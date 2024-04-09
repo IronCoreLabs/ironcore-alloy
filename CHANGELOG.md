@@ -1,3 +1,14 @@
+## 0.11.0 (Unreleased)
+
+Breaking changes:
+
+- Dropped support for Python 3.8
+- Reworked several type aliases into newtype structs. In Rust this will require creating structs, but Python and Kotlin are unaffected.
+
+Other changes:
+
+- Added batch functionality to all SDK traits.
+
 ## 0.10.2
 
 - Added SaaS Shield security events
@@ -11,12 +22,13 @@
 Initial release of Alloy. This library is intended to eventually replace the Tenant Security Client libraries, and include additional functionality. Right now this includes:
 
 - our standard (probabilistic, fully random) encryption
-- deterministic encryption 
+- deterministic encryption
 - Cloaked AI vector encryption
 
 All three of these support standalone and SaaS Shield modes in this SDK.
 
 Notable features coming soon:
+
 - SaaS Shield security events
 - backwards compatibility with TSC libraries
 - batch APIs
@@ -24,4 +36,4 @@ Notable features coming soon:
 
 ### Compatibility
 
-Requires TSP 4.12.0+. 
+Requires TSP 4.12.0+.
