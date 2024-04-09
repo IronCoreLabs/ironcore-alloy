@@ -109,7 +109,7 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(result, vec![100u8; 400]);
+        assert_eq!(result, vec![100u8; 400].into());
     }
 
     #[tokio::test]
@@ -162,8 +162,11 @@ mod test {
         let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
 
         let client = default_client();
-        let encrypted = client.encrypt(plaintext.to_vec(), &metadata).await.unwrap();
+        let encrypted = client
+            .encrypt(plaintext.to_vec().into(), &metadata)
+            .await
+            .unwrap();
         let result = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(result, plaintext);
+        assert_eq!(result.0, plaintext);
     }
 }

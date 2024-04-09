@@ -1,10 +1,11 @@
 use super::config::VectorSecret;
 use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
-use crate::util::{collection_to_batch_result, get_rng};
+use crate::util::{get_rng, perform_batch_action};
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
-    PlaintextVector, PlaintextVectors, VectorEncryptionKey, VectorOps, VectorRotateResult,
+    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
+    GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorEncryptionKey, VectorOps,
+    VectorRotateResult,
 };
 use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
@@ -167,8 +168,9 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         vectors_to_query: PlaintextVectors,
         metadata: &AlloyMetadata,
-    ) -> Result<GenerateQueryResult, AlloyError> {
+    ) -> Result<GenerateVectorQueryResult, AlloyError> {
         vectors_to_query
+            .0
             .into_iter()
             .map(|(vector_id, plaintext_vector)| {
                 let vector_secret =
@@ -214,6 +216,7 @@ impl VectorOps for StandaloneVectorClient {
                     .map(|enc| (vector_id, enc))
             })
             .try_collect()
+            .map(GenerateVectorQueryResult)
     }
 
     // TODO: Discuss if we want to make this function less consistent to avoid passing useless values.
@@ -273,14 +276,14 @@ impl VectorOps for StandaloneVectorClient {
                 ..metadata.clone()
             },
         };
-        let attempts: Vec<_> = join_all(encrypted_vectors.into_iter().map(
+        let attempts: Vec<_> = join_all(encrypted_vectors.0.into_iter().map(
             |(vector_id, encrypted_vector)| {
                 self.rotate_vector(encrypted_vector, metadata, &new_metadata)
                     .map(|rotated_vector| (vector_id, rotated_vector))
             },
         ))
         .await;
-        Ok(collection_to_batch_result(attempts, identity).into())
+        Ok(perform_batch_action(attempts, identity).into())
     }
 }
 
@@ -390,7 +393,7 @@ mod test {
             vec![13681085.0, 42081104.0, 82401560.0, 19847844.0, 60127316.0]
         );
         assert_eq!(
-            result.paired_icl_info,
+            result.paired_icl_info.0,
             [
                 0, 0, 0, 1, 129, 0, 10, 12, 154, 55, 68, 80, 69, 96, 99, 158, 198, 112, 183, 161,
                 18, 32, 125, 78, 5, 108, 187, 19, 103, 206, 124, 199, 184, 212, 208, 35, 61, 45, 6,
@@ -435,7 +438,9 @@ mod test {
         let alloy_rotated_secret = get_in_rotation_client();
         let mut rotated_result = alloy_rotated_secret
             .rotate_vectors(
-                HashMap::from_iter(vec![("one".to_string(), encrypt_result)].into_iter()),
+                EncryptedVectors(HashMap::from_iter(
+                    vec![("one".to_string(), encrypt_result)].into_iter(),
+                )),
                 &get_metadata(),
                 Some(new_tenant_id.clone()),
             )

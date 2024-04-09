@@ -4,10 +4,10 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ironcore_alloy::standalone::config::{
     RotatableSecret, StandaloneConfiguration, StandaloneSecret, StandardSecrets, VectorSecret,
 };
-use ironcore_alloy::standard::StandardDocumentOps;
+use ironcore_alloy::standard::{PlaintextDocument, StandardDocumentOps};
 use ironcore_alloy::vector::{PlaintextVector, VectorOps};
-use ironcore_alloy::DerivationPath;
 use ironcore_alloy::{AlloyMetadata, Secret, SecretPath, Standalone, TenantId};
+use ironcore_alloy::{DerivationPath, FieldId};
 use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use rand::{Rng, RngCore};
@@ -89,7 +89,10 @@ fn benches(c: &mut Criterion) {
     let roundtrip = |value: Vec<u8>| async {
         let encrypted = sdk
             .standard()
-            .encrypt([("foo".to_string(), value)].into(), &metadata)
+            .encrypt(
+                PlaintextDocument([(FieldId("foo".to_string()), value.into())].into()),
+                &metadata,
+            )
             .await
             .unwrap();
         sdk.standard().decrypt(encrypted, &metadata).await.unwrap();

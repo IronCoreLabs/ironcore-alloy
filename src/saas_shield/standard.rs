@@ -10,9 +10,9 @@ use crate::tenant_security_client::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, RequestMetadata, TenantSecurityClient,
     UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{collection_to_batch_result, v4_proto_from_bytes, BatchResult, OurReseedingRng};
+use crate::util::{perform_batch_action, v4_proto_from_bytes, BatchResult, OurReseedingRng};
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
-use crate::{DocumentId, TenantId};
+use crate::{DocumentId, FieldId, PlaintextBytes, TenantId};
 use bytes::Bytes;
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
@@ -86,7 +86,7 @@ impl SaasShieldStandardClient {
         tsc_edek: Vec<u8>,
         dek: EncryptionKey,
         tenant_id: &TenantId,
-        document: HashMap<String, Vec<u8>>,
+        document: HashMap<FieldId, PlaintextBytes>,
     ) -> Result<EncryptedDocument, AlloyError> {
         let pb_edeks: ironcore_documents::cmk_edek::EncryptedDeks =
             protobuf::Message::parse_from_bytes(&tsc_edek)?;
@@ -177,7 +177,7 @@ impl SaasShieldStandardClient {
         &self,
         edeks_with_headers: T,
         metadata: &AlloyMetadata,
-    ) -> Result<(BatchUnwrapKeyResponse, HashMap<String, AlloyError>), AlloyError>
+    ) -> Result<(BatchUnwrapKeyResponse, HashMap<DocumentId, AlloyError>), AlloyError>
     where
         T: IntoIterator<Item = (&'a str, EdekWithKeyIdHeader)>,
     {
@@ -189,10 +189,10 @@ impl SaasShieldStandardClient {
         let BatchResult {
             successes: edeks,
             failures: edek_failures_str,
-        } = collection_to_batch_result(edeks_with_headers, decompose_edek);
+        } = perform_batch_action(edeks_with_headers, decompose_edek);
         let edek_failures = edek_failures_str
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (DocumentId(k.to_string()), v))
             .collect();
         let batch_unwrap_response = self
             .tenant_security_client
@@ -242,7 +242,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             tsc_edek.0,
             enc_key,
             &metadata.tenant_id,
-            plaintext_document,
+            plaintext_document.0,
         )
     }
 
@@ -254,7 +254,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<StandardEncryptBatchResult, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
-        let document_ids = plaintext_documents.keys().map(String::as_str).collect();
+        let document_ids = plaintext_documents.0.keys().map(|d| d.0.as_str()).collect();
         let BatchWrapKeyResponse {
             mut keys,
             failures: tsp_failures,
@@ -263,9 +263,10 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             .batch_wrap_keys(document_ids, &request_metadata)
             .await?;
         let docs_and_keys = plaintext_documents
+            .0
             .into_iter()
             .map(|(document_id, document)| {
-                let maybe_keys = keys.remove(&document_id);
+                let maybe_keys = keys.remove(&document_id.0);
                 (document_id, (document, maybe_keys))
             });
         let encrypt_document =
@@ -280,13 +281,13 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                     edek.0,
                     enc_key,
                     &metadata.tenant_id,
-                    plaintext_document,
+                    plaintext_document.0,
                 )
             };
-        let encryption_result = collection_to_batch_result(docs_and_keys, encrypt_document);
+        let encryption_result = perform_batch_action(docs_and_keys, encrypt_document);
         let combined_failures = tsp_failures
             .into_iter()
-            .map(|(k, err)| (k, err.into()))
+            .map(|(k, err)| (DocumentId(k), err.into()))
             .chain(encryption_result.failures)
             .collect();
         Ok(BatchResult {
@@ -313,7 +314,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             .await?;
         let enc_key = tsc_dek_to_encryption_key(dek.0)?;
         edek_parts.validate_signature(enc_key)?;
-        decrypt_document_core(encrypted_document.document, enc_key)
+        decrypt_document_core(encrypted_document.document, enc_key).map(PlaintextDocument)
     }
 
     /// Decrypt each of the provided documents with the provided metadata.
@@ -325,15 +326,17 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<StandardDecryptBatchResult, AlloyError> {
         let edeks_with_headers = encrypted_documents
+            .0
             .iter()
-            .map(|(k, v)| (k.as_str(), v.edek.clone()));
+            .map(|(k, v)| (k.0.as_str(), v.edek.clone()));
         let (mut batch_unwrap_response, edek_failures) = self
             .batch_unwrap_edeks(edeks_with_headers, metadata)
             .await?;
         let docs_and_keys = encrypted_documents
+            .0
             .into_iter()
             .map(|(document_id, document)| {
-                let maybe_keys = batch_unwrap_response.keys.remove(&document_id);
+                let maybe_keys = batch_unwrap_response.keys.remove(&document_id.0);
                 (document_id, (document, maybe_keys))
             });
         let decrypt_document =
@@ -345,13 +348,13 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                 let edek_parts = Self::decompose_edek_header(encrypted_document.edek)?;
                 let enc_key = tsc_dek_to_encryption_key(dek.0)?;
                 edek_parts.validate_signature(enc_key)?;
-                decrypt_document_core(encrypted_document.document, enc_key)
+                decrypt_document_core(encrypted_document.document, enc_key).map(PlaintextDocument)
             };
-        let decryption_result = collection_to_batch_result(docs_and_keys, decrypt_document);
+        let decryption_result = perform_batch_action(docs_and_keys, decrypt_document);
         let combined_failures = batch_unwrap_response
             .failures
             .into_iter()
-            .map(|(k, err)| (k, err.into()))
+            .map(|(k, err)| (DocumentId(k), err.into()))
             .chain(edek_failures)
             .chain(decryption_result.failures)
             .collect();
@@ -378,7 +381,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                 .map(|res| (id, res))
         }))
         .await;
-        Ok(collection_to_batch_result(tsp_responses, identity).into())
+        Ok(perform_batch_action(tsp_responses, identity).into())
     }
 
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
@@ -400,7 +403,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let enc_key = tsc_dek_to_encryption_key(dek.0)?;
         edek_parts.validate_signature(enc_key)?;
         Ok(EncryptedDocument {
-            document: encrypt_map(plaintext_document.document, self.rng.clone(), enc_key)?,
+            document: encrypt_map(plaintext_document.document.0, self.rng.clone(), enc_key)?,
             edek: plaintext_document.edek,
         })
     }
@@ -414,15 +417,17 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<StandardEncryptBatchResult, AlloyError> {
         let edeks_with_headers = plaintext_documents
+            .0
             .iter()
-            .map(|(k, v)| (k.as_str(), v.edek.clone()));
+            .map(|(k, v)| (k.0.as_str(), v.edek.clone()));
         let (mut batch_unwrap_response, edek_failures) = self
             .batch_unwrap_edeks(edeks_with_headers, metadata)
             .await?;
         let docs_and_keys = plaintext_documents
+            .0
             .into_iter()
             .map(|(document_id, document)| {
-                let maybe_keys = batch_unwrap_response.keys.remove(&document_id);
+                let maybe_keys = batch_unwrap_response.keys.remove(&document_id.0);
                 (document_id, (document, maybe_keys))
             });
         let encrypt_document = |(plaintext_document, maybe_keys): (
@@ -440,14 +445,14 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                 edek_parts.get_edek_bytes()?,
                 enc_key,
                 &metadata.tenant_id,
-                plaintext_document.document,
+                plaintext_document.document.0,
             )
         };
-        let decryption_result = collection_to_batch_result(docs_and_keys, encrypt_document);
+        let decryption_result = perform_batch_action(docs_and_keys, encrypt_document);
         let combined_failures = batch_unwrap_response
             .failures
             .into_iter()
-            .map(|(k, err)| (k, err.into()))
+            .map(|(k, err)| (DocumentId(k), err.into()))
             .chain(edek_failures)
             .chain(decryption_result.failures)
             .collect();

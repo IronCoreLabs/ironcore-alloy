@@ -5,7 +5,7 @@ mod tests {
     use crate::common::{get_client, TestResult};
     use approx::assert_ulps_eq;
     use ironcore_alloy::{
-        vector::{EncryptedVector, PlaintextVector, VectorOps},
+        vector::{EncryptedVector, EncryptedVectors, PlaintextVector, PlaintextVectors, VectorOps},
         AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
     use std::sync::Arc;
@@ -41,7 +41,8 @@ mod tests {
                 0, 0, 20, 0, 1, 0, 10, 12, 93, 90, 137, 229, 59, 92, 49, 169, 195, 149, 119, 254,
                 18, 32, 89, 97, 57, 184, 245, 149, 102, 216, 193, 211, 108, 152, 133, 173, 42, 183,
                 134, 13, 200, 254, 170, 233, 12, 54, 187, 169, 191, 177, 33, 22, 195, 110,
-            ],
+            ]
+            .into(),
         }
     }
 
@@ -51,7 +52,7 @@ mod tests {
         let metadata = get_metadata();
         let encrypted = get_client().vector().encrypt(plaintext, &metadata).await?;
         assert_eq!(encrypted.encrypted_vector.len(), 3);
-        assert_eq!(encrypted.paired_icl_info.len(), 54);
+        assert_eq!(encrypted.paired_icl_info.0.len(), 54);
         assert_eq!(encrypted.secret_path.0, "secret");
         assert_eq!(encrypted.derivation_path.0, "deriv");
         Ok(())
@@ -71,13 +72,13 @@ mod tests {
     async fn standard_encrypt_with_existing_edek_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let vectors_to_query = [("vector".to_string(), plaintext.clone())].into();
+        let vectors_to_query = PlaintextVectors([("vector".to_string(), plaintext.clone())].into());
         let mut all_queries = get_client()
             .vector()
             .generate_query_vectors(vectors_to_query, &metadata)
             .await?;
-        assert!(all_queries.contains_key("vector"));
-        let mut queries = all_queries.remove("vector").unwrap();
+        assert!(all_queries.0.contains_key("vector"));
+        let mut queries = all_queries.0.remove("vector").unwrap();
         assert_eq!(queries.len(), 1);
         let query = queries.remove(0);
         let decrypted = get_client().vector().decrypt(query, &metadata).await?;
@@ -106,7 +107,7 @@ mod tests {
     #[tokio::test]
     async fn vector_rotate_fields_no_op() -> TestResult {
         let ciphertext = get_ciphertext();
-        let vectors = [("vector".to_string(), ciphertext)].into();
+        let vectors = EncryptedVectors([("vector".to_string(), ciphertext)].into());
         let metadata = get_metadata();
         let mut resp = get_client()
             .vector()
@@ -126,7 +127,7 @@ mod tests {
     #[tokio::test]
     async fn vector_rotate_fields_new_tenant() -> TestResult {
         let ciphertext = get_ciphertext();
-        let vectors = [("vector".to_string(), ciphertext)].into();
+        let vectors = EncryptedVectors([("vector".to_string(), ciphertext)].into());
         let metadata = get_metadata();
         let new_tenant_id = TenantId("tenant-aws-l".to_string());
         let mut resp = get_client()

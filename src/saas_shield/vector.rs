@@ -6,14 +6,15 @@ use super::{
 use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::{check_rotation_no_op, collection_to_batch_result, get_rng, OurReseedingRng};
+use crate::util::{check_rotation_no_op, get_rng, perform_batch_action, OurReseedingRng};
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors, GenerateQueryResult,
-    PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
+    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
+    GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorOps, VectorRotateResult,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(uniffi::Object)]
@@ -175,8 +176,9 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         vectors_to_query: PlaintextVectors,
         metadata: &AlloyMetadata,
-    ) -> Result<GenerateQueryResult, AlloyError> {
+    ) -> Result<GenerateVectorQueryResult, AlloyError> {
         let paths = vectors_to_query
+            .0
             .values()
             .map(|vector| (vector.secret_path.clone(), vector.derivation_path.clone()))
             .collect_vec();
@@ -189,6 +191,7 @@ impl VectorOps for SaasShieldVectorClient {
         .await?
         .derived_keys;
         vectors_to_query
+            .0
             .into_iter()
             .map(|(vector_id, plaintext_vector)| {
                 let keys = all_keys
@@ -205,7 +208,8 @@ impl VectorOps for SaasShieldVectorClient {
                     .try_collect()
                     .map(|enc| (vector_id, enc))
             })
-            .collect()
+            .collect::<Result<HashMap<_, _>, _>>()
+            .map(GenerateVectorQueryResult)
     }
 
     async fn rotate_vectors(
@@ -222,6 +226,7 @@ impl VectorOps for SaasShieldVectorClient {
                 })?;
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let paths = encrypted_vectors
+            .0
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
             .collect_vec();
@@ -283,7 +288,7 @@ impl VectorOps for SaasShieldVectorClient {
                 )
             }
         };
-        Ok(collection_to_batch_result(encrypted_vectors, reencrypt_vector).into())
+        Ok(perform_batch_action(encrypted_vectors.0, reencrypt_vector).into())
     }
 
     /// Get the byte prefix for the InRotation secret corresponding to this secret_path/derivation_path.

@@ -34,10 +34,49 @@ pub mod vector;
 // proc macro defined
 uniffi::setup_scaffolding!();
 
-type FieldId = String;
-type DocumentId = String;
-type EncryptedBytes = Vec<u8>;
-type PlaintextBytes = Vec<u8>;
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct FieldId(pub String);
+custom_newtype!(FieldId, String);
+impl From<String> for FieldId {
+    fn from(value: String) -> Self {
+        FieldId(value)
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct DocumentId(pub String);
+custom_newtype!(DocumentId, String);
+impl From<String> for DocumentId {
+    fn from(value: String) -> Self {
+        DocumentId(value)
+    }
+}
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct EncryptedBytes(pub Vec<u8>);
+custom_newtype!(EncryptedBytes, Vec<u8>);
+impl From<Vec<u8>> for EncryptedBytes {
+    fn from(value: Vec<u8>) -> Self {
+        EncryptedBytes(value)
+    }
+}
+impl AsRef<[u8]> for EncryptedBytes {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct PlaintextBytes(pub Vec<u8>);
+custom_newtype!(PlaintextBytes, Vec<u8>);
+impl From<Vec<u8>> for PlaintextBytes {
+    fn from(value: Vec<u8>) -> Self {
+        PlaintextBytes(value)
+    }
+}
+impl AsRef<[u8]> for PlaintextBytes {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SecretPath(pub String);
@@ -248,7 +287,9 @@ pub(crate) mod alloy_client_trait {
         /// Decodes the header from the encrypted bytes, returning an error if the
         /// decoded EdekType or PayloadType is incorrect for this AlloyClient.
         /// Returns the decoded key ID and remaining non-header bytes.
-        fn decompose_key_id_header(encrypted_bytes: Vec<u8>) -> Result<(KeyId, Bytes), AlloyError> {
+        fn decompose_key_id_header(
+            encrypted_bytes: EncryptedBytes,
+        ) -> Result<(KeyId, Bytes), AlloyError> {
             let (
                 KeyIdHeader {
                     key_id,
@@ -257,7 +298,7 @@ pub(crate) mod alloy_client_trait {
                 },
                 remaining_bytes,
             ) = ironcore_documents::v5::key_id_header::decode_version_prefixed_value(
-                encrypted_bytes.into(),
+                encrypted_bytes.0.into(),
             )
             .map_err(|_| AlloyError::InvalidInput {
                 msg: "Encrypted header was invalid.".to_string(),

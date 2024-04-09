@@ -133,7 +133,7 @@ macro_rules! create_batch_result_struct {
 
 /// Applies the function `func` to all the values of `collection`, then partitions them into
 /// success and failure hashmaps.
-pub(crate) fn collection_to_batch_result<T, U, F, I, K>(collection: I, func: F) -> BatchResult<K, U>
+pub(crate) fn perform_batch_action<T, U, F, I, K>(collection: I, func: F) -> BatchResult<K, U>
 where
     F: Fn(T) -> Result<U, AlloyError>,
     I: IntoIterator<Item = (K, T)>,
