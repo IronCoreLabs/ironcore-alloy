@@ -3,7 +3,7 @@ use crate::{
     create_batch_result_struct,
     errors::AlloyError,
     util::{self, AuthHash},
-    AlloyMetadata, DerivationPath, Secret, SecretPath, TenantId,
+    AlloyMetadata, DerivationPath, EncryptedBytes, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
 use ironcore_documents::{
@@ -17,17 +17,20 @@ use itertools::Itertools;
 use rand::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::collections::HashMap;
+use uniffi::custom_newtype;
 
 pub(crate) mod crypto;
 
-pub type VectorId = String;
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct VectorId(pub String);
+custom_newtype!(VectorId, String);
 
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct EncryptedVector {
     pub encrypted_vector: Vec<f32>,
     pub secret_path: SecretPath,
     pub derivation_path: DerivationPath,
-    pub paired_icl_info: Vec<u8>,
+    pub paired_icl_info: EncryptedBytes,
 }
 
 #[derive(Clone, Debug, uniffi::Record)]
@@ -36,13 +39,19 @@ pub struct PlaintextVector {
     pub secret_path: SecretPath,
     pub derivation_path: DerivationPath,
 }
-pub type PlaintextVectors = HashMap<VectorId, PlaintextVector>;
-pub type EncryptedVectors = HashMap<VectorId, EncryptedVector>;
-pub type GenerateQueryResult = HashMap<VectorId, Vec<EncryptedVector>>;
+
+// TODO: These newtype can't include VectorId because of a bug with generated Python
+// not using forward references. If this is addressed, we can change it.
+pub struct PlaintextVectors(pub HashMap<String, PlaintextVector>);
+custom_newtype!(PlaintextVectors, HashMap<String, PlaintextVector>);
+pub struct EncryptedVectors(pub HashMap<String, EncryptedVector>);
+custom_newtype!(EncryptedVectors, HashMap<String, EncryptedVector>);
+pub struct GenerateVectorQueryResult(pub HashMap<String, Vec<EncryptedVector>>);
+custom_newtype!(GenerateVectorQueryResult, HashMap<String, Vec<EncryptedVector>>);
+create_batch_result_struct!(VectorRotateResult, EncryptedVector, String);
 
 create_batch_result_struct!(VectorEncryptBatchResult, EncryptedVector, VectorId);
 create_batch_result_struct!(VectorDecryptBatchResult, PlaintextVector, VectorId);
-create_batch_result_struct!(VectorRotateResult, EncryptedVector, VectorId);
 
 /// Key used to for vector encryption.
 #[derive(Debug, Serialize, Clone)]
@@ -139,7 +148,7 @@ pub trait VectorOps {
         &self,
         vectors_to_query: PlaintextVectors,
         metadata: &AlloyMetadata,
-    ) -> Result<GenerateQueryResult, AlloyError>;
+    ) -> Result<GenerateVectorQueryResult, AlloyError>;
 
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
@@ -214,8 +223,9 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
         encrypted_vector: result.ciphertext.to_vec(),
         secret_path: plaintext_vector.secret_path,
         derivation_path: plaintext_vector.derivation_path,
-        paired_icl_info: v5::key_id_header::encode_vector_metadata(header, vector_metadata)
-            .to_vec(),
+        paired_icl_info: EncryptedBytes(
+            v5::key_id_header::encode_vector_metadata(header, vector_metadata).to_vec(),
+        ),
     })
 }
 

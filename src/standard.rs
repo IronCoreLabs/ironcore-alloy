@@ -1,6 +1,6 @@
 use crate::{
     alloy_client_trait::AlloyClient, create_batch_result_struct, errors::AlloyError, util::get_rng,
-    AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
 use ironcore_documents::{
     aes::{decrypt_document_with_attached_iv, EncryptionKey, IvAndCiphertext},
@@ -20,7 +20,9 @@ use std::{
 };
 use uniffi::custom_newtype;
 
-pub type PlaintextDocument = HashMap<FieldId, PlaintextBytes>;
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PlaintextDocument(pub HashMap<FieldId, PlaintextBytes>);
+custom_newtype!(PlaintextDocument, HashMap<FieldId, PlaintextBytes>);
 
 #[derive(Debug, uniffi::Record)]
 pub struct PlaintextDocumentWithEdek {
@@ -38,7 +40,12 @@ impl PlaintextDocumentWithEdek {
     }
 }
 
+pub struct PlaintextDocumentsWithEdeks(pub HashMap<DocumentId, PlaintextDocumentWithEdek>);
+custom_newtype!(PlaintextDocumentsWithEdeks, HashMap<DocumentId, PlaintextDocumentWithEdek>);
+
 #[derive(Debug, Clone, PartialEq, Eq)]
+// TODO: This newtype can't include EncryptedBytes because of a bug with generated Python
+// not using forward references. If this is addressed, we can change it.
 // Key ID header followed by V4DocumentHeader containing the EDEK.
 // Note that in the case of SaaS Shield Standard, users could create this with a
 // legacy V3 EDEK, which is just the EDEK. This has to be handled manually on decrypts.
@@ -70,7 +77,14 @@ pub struct EncryptedDocument {
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
 
-create_batch_result_struct!(RekeyEdeksBatchResult, EdekWithKeyIdHeader, FieldId);
+pub struct EncryptedDocuments(pub HashMap<DocumentId, EncryptedDocument>);
+custom_newtype!(EncryptedDocuments, HashMap<DocumentId, EncryptedDocument>);
+pub struct PlaintextDocuments(pub HashMap<DocumentId, PlaintextDocument>);
+custom_newtype!(PlaintextDocuments, HashMap<DocumentId, PlaintextDocument>);
+
+create_batch_result_struct!(RekeyEdeksBatchResult, EdekWithKeyIdHeader, DocumentId);
+create_batch_result_struct!(StandardEncryptBatchResult, EncryptedDocument, DocumentId);
+create_batch_result_struct!(StandardDecryptBatchResult, PlaintextDocument, DocumentId);
 
 /// API for encrypting and decrypting documents using our standard encryption. This class of encryption is the most
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
@@ -91,6 +105,13 @@ pub trait StandardDocumentOps: AlloyClient {
         plaintext_document: PlaintextDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError>;
+    /// Encrypt each of the provided documents with the provided metadata.
+    /// Note that because only a single metadata value is passed, each document will be encrypted to the same tenant.
+    async fn encrypt_batch(
+        &self,
+        plaintext_documents: PlaintextDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError>;
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
     /// of the `StandardDocumentOps.encrypt` functions. The result contains a map from field identifiers to decrypted
     /// bytes.
@@ -99,12 +120,20 @@ pub trait StandardDocumentOps: AlloyClient {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError>;
+    /// Decrypt each of the provided documents with the provided metadata.
+    /// Note that because the metadata is shared between the documents, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_documents: EncryptedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardDecryptBatchResult, AlloyError>;
     /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
     /// the EDEK will be encrypted to the original tenant. Because the underlying DEK does not change, a document
     /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
     async fn rekey_edeks(
         &self,
-        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        edeks: HashMap<DocumentId, EdekWithKeyIdHeader>,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyEdeksBatchResult, AlloyError>;
@@ -130,6 +159,14 @@ pub trait StandardDocumentOps: AlloyClient {
         plaintext_document: PlaintextDocumentWithEdek,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError>;
+    /// Encrypt multiple documents with the provided metadata.
+    /// The provided EDEKs will be decrypted and used to encrypt each corresponding document's fields.
+    /// This is useful when updating some fields of the document.
+    async fn encrypt_with_existing_edek_batch(
+        &self,
+        plaintext_documents: PlaintextDocumentsWithEdeks,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError>;
 }
 
 pub(crate) fn verify_sig(
@@ -147,7 +184,7 @@ pub(crate) fn verify_sig(
 
 /// Encrypt each of the fields of the document using the aes_dek
 pub(crate) fn encrypt_document_core<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-    document: HashMap<String, U>,
+    document: HashMap<FieldId, U>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
     key_id_header: KeyIdHeader,
@@ -161,10 +198,10 @@ pub(crate) fn encrypt_document_core<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
 }
 
 pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-    document: HashMap<String, U>,
+    document: HashMap<FieldId, U>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
-) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
+) -> Result<HashMap<FieldId, EncryptedBytes>, AlloyError> {
     let encrypted_document = document
         .into_iter()
         .map(|(label, plaintext)| {
@@ -173,7 +210,12 @@ pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
                 aes_dek,
                 ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec()),
             )
-            .map(|c| (label, v5::EncryptedPayload::from(c).write_to_bytes()))
+            .map(|c| {
+                (
+                    label,
+                    EncryptedBytes(v5::EncryptedPayload::from(c).write_to_bytes()),
+                )
+            })
         })
         .try_collect()?;
     Ok(encrypted_document)
@@ -182,22 +224,22 @@ pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
 pub(crate) fn decrypt_document_core(
     document: HashMap<FieldId, EncryptedBytes>,
     dek: EncryptionKey,
-) -> Result<HashMap<String, Vec<u8>>, AlloyError> {
+) -> Result<HashMap<FieldId, PlaintextBytes>, AlloyError> {
     Ok(document
         .into_iter()
         .map(|(label, ciphertext)| {
             // Further validation of the IronCore MAGIC will be done inside the function
-            if ciphertext.starts_with(&v3::VERSION_AND_MAGIC) {
-                let encrypted_payload: v3::EncryptedPayload = ciphertext.try_into()?;
+            if ciphertext.0.starts_with(&v3::VERSION_AND_MAGIC) {
+                let encrypted_payload: v3::EncryptedPayload = ciphertext.0.try_into()?;
                 encrypted_payload.decrypt(&dek)
-            } else if ciphertext.starts_with(&v5::VERSION_AND_MAGIC) {
-                let encrypted_payload: v5::EncryptedPayload = ciphertext.try_into()?;
+            } else if ciphertext.0.starts_with(&v5::VERSION_AND_MAGIC) {
+                let encrypted_payload: v5::EncryptedPayload = ciphertext.0.try_into()?;
                 encrypted_payload.decrypt(&dek)
             } else {
                 // The version 4 edoc doesn't have any special bytes on the front.
-                decrypt_document_with_attached_iv(&dek, &IvAndCiphertext(ciphertext.into()))
+                decrypt_document_with_attached_iv(&dek, &IvAndCiphertext(ciphertext.0.into()))
             }
-            .map(|c| (label, c.0))
+            .map(|c| (label, PlaintextBytes(c.0)))
         })
         .try_collect()?)
 }
@@ -217,7 +259,7 @@ mod test {
     fn encrypt_document_core_works() {
         let rng = create_rng();
         let result = encrypt_document_core(
-            [("foo".to_string(), vec![100u8])].into(),
+            [(FieldId("foo".to_string()), vec![100u8])].into(),
             Arc::new(Mutex::new(rng)),
             EncryptionKey([0u8; 32]),
             KeyIdHeader::new(EdekType::SaasShield, PayloadType::StandardEdek, KeyId(1)),
@@ -226,8 +268,8 @@ mod test {
         .unwrap();
         assert_eq!(result.edek.0, vec![0, 0, 0, 1, 2, 0]);
         assert_eq!(
-            result.document.get("foo").unwrap(),
-            &vec![
+            result.document.get(&FieldId("foo".to_string())).unwrap().0,
+            vec![
                 0, 73, 82, 79, 78, 154, 55, 68, 80, 69, 96, 99, 158, 198, 112, 183, 161, 178, 165,
                 36, 21, 83, 179, 38, 34, 142, 237, 59, 8, 62, 249, 67, 36, 252
             ]

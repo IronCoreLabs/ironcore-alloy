@@ -1,8 +1,8 @@
 use crate::{
     errors::AlloyError,
-    standard::{EdekWithKeyIdHeader, EncryptedDocument, StandardDocumentOps},
+    standard::{EdekWithKeyIdHeader, EncryptedDocument, PlaintextDocument, StandardDocumentOps},
     util::v4_proto_from_bytes,
-    AlloyMetadata, PlaintextBytes,
+    AlloyMetadata, EncryptedBytes, FieldId, PlaintextBytes,
 };
 use bytes::Bytes;
 use ironcore_documents::{
@@ -47,21 +47,23 @@ pub trait StandardAttachedDocumentOps {
 
 pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
     standard_client: &T,
-    plaintext_field: Vec<u8>,
+    plaintext_bytes: PlaintextBytes,
     metadata: &AlloyMetadata,
 ) -> Result<EncryptedAttachedDocument, AlloyError> {
     // In order to call the encrypt on standard, we need a map. This is just a hardcoded string we will
     // use to encrypt.
-    let hardcoded_id = "".to_string();
+    let hardcoded_id = FieldId("".to_string());
     let EncryptedDocument {
         edek: edek_with_key_id_bytes,
         // Mutable so we can removed the hardcoded key below.
         mut document,
     } = standard_client
         .encrypt(
-            [(hardcoded_id.clone(), plaintext_field)]
-                .into_iter()
-                .collect(),
+            PlaintextDocument(
+                [(hardcoded_id.clone(), plaintext_bytes)]
+                    .into_iter()
+                    .collect(),
+            ),
             metadata,
         )
         .await?;
@@ -81,7 +83,7 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
         AttachedDocument {
             key_id_header,
             edek,
-            edoc: v5::EncryptedPayload::try_from(edoc)?.to_aes_value_with_attached_iv(),
+            edoc: v5::EncryptedPayload::try_from(edoc.0)?.to_aes_value_with_attached_iv(),
         }
         .write_to_bytes()?
         .to_vec(),
@@ -111,14 +113,14 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
         .or_else(|_| attached_field_bytes.try_into())?;
     // In order to call the decrypt on standard, we need a map. This is just a hardcoded string we will
     // use to decrypt.
-    let hardcoded_id = "".to_string();
+    let hardcoded_id = FieldId("".to_string());
     let mut decrypted_value = standard_client
         .decrypt(
             EncryptedDocument {
                 edek: EdekWithKeyIdHeader::new(key_id_header, edek),
                 document: [(
                     hardcoded_id.clone(),
-                    v5::EncryptedPayload::from(edoc).write_to_bytes(),
+                    EncryptedBytes(v5::EncryptedPayload::from(edoc).write_to_bytes()),
                 )]
                 .into_iter()
                 .collect(),
@@ -128,6 +130,7 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
         .await?;
 
     let plaintext = decrypted_value
+        .0
         .remove(&hardcoded_id)
         .expect("Decryption doesn't change the structure of the fields.");
     Ok(plaintext)

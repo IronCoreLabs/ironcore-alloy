@@ -6,7 +6,10 @@ mod tests {
     use approx::assert_ulps_eq;
     use ironcore_alloy::{
         errors::AlloyError,
-        vector::{EncryptedVector, PlaintextVector, VectorOps},
+        vector::{
+            EncryptedVector, EncryptedVectors, PlaintextVector, PlaintextVectors, VectorId,
+            VectorOps,
+        },
         AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
     use std::{iter, sync::Arc};
@@ -42,7 +45,8 @@ mod tests {
                 0, 0, 20, 0, 1, 0, 10, 12, 93, 90, 137, 229, 59, 92, 49, 169, 195, 149, 119, 254,
                 18, 32, 89, 97, 57, 184, 245, 149, 102, 216, 193, 211, 108, 152, 133, 173, 42, 183,
                 134, 13, 200, 254, 170, 233, 12, 54, 187, 169, 191, 177, 33, 22, 195, 110,
-            ],
+            ]
+            .into(),
         }
     }
 
@@ -52,7 +56,7 @@ mod tests {
         let metadata = get_metadata();
         let encrypted = get_client().vector().encrypt(plaintext, &metadata).await?;
         assert_eq!(encrypted.encrypted_vector.len(), 3);
-        assert_eq!(encrypted.paired_icl_info.len(), 54);
+        assert_eq!(encrypted.paired_icl_info.0.len(), 54);
         assert_eq!(encrypted.secret_path.0, "secret");
         assert_eq!(encrypted.derivation_path.0, "deriv");
         Ok(())
@@ -77,11 +81,13 @@ mod tests {
             derivation_path: DerivationPath("different_path".to_string()),
         };
         let metadata = get_metadata();
-        let vectors = [
-            ("vector".to_string(), plaintext),
-            ("vector_2".to_string(), plaintext_2),
-        ]
-        .into();
+        let vectors = PlaintextVectors(
+            [
+                ("vector".to_string(), plaintext),
+                ("vector_2".to_string(), plaintext_2),
+            ]
+            .into(),
+        );
         let encrypted = get_client()
             .vector()
             .encrypt_batch(vectors, &metadata)
@@ -92,11 +98,13 @@ mod tests {
             encrypted_vector: vec![1.0, 1.0, 1.0],
             secret_path: SecretPath("secret".to_string()),
             derivation_path: DerivationPath("deriv".to_string()),
-            paired_icl_info: vec![0],
+            paired_icl_info: vec![0].into(),
         };
-        let encrypted_vectors = iter::once(("bad_vector".to_string(), bad_encrypted))
-            .chain(encrypted.successes)
-            .collect();
+        let encrypted_vectors = EncryptedVectors(
+            iter::once(("bad_vector".to_string(), bad_encrypted))
+                .chain(encrypted.successes.into_iter().map(|(k, v)| (k.0, v)))
+                .collect(),
+        );
         let decrypted = get_client()
             .vector()
             .decrypt_batch(encrypted_vectors, &metadata)
@@ -104,12 +112,15 @@ mod tests {
         assert_eq!(decrypted.successes.len(), 2);
         assert_eq!(decrypted.failures.len(), 1);
         assert!(matches!(
-            decrypted.failures.get("bad_vector").unwrap(),
+            decrypted
+                .failures
+                .get(&VectorId("bad_vector".to_string()))
+                .unwrap(),
             AlloyError::InvalidInput { .. }
         ));
         let result = decrypted
             .successes
-            .get("vector")
+            .get(&VectorId("vector".to_string()))
             .unwrap()
             .plaintext_vector
             .clone();
@@ -121,13 +132,13 @@ mod tests {
     async fn vector_generate_query_vectors_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let vectors_to_query = [("vector".to_string(), plaintext.clone())].into();
+        let vectors_to_query = PlaintextVectors([("vector".to_string(), plaintext.clone())].into());
         let mut all_queries = get_client()
             .vector()
             .generate_query_vectors(vectors_to_query, &metadata)
             .await?;
-        assert!(all_queries.contains_key("vector"));
-        let mut queries = all_queries.remove("vector").unwrap();
+        assert!(all_queries.0.contains_key("vector"));
+        let mut queries = all_queries.0.remove("vector").unwrap();
         assert_eq!(queries.len(), 1);
         let query = queries.remove(0);
         let decrypted = get_client().vector().decrypt(query, &metadata).await?;
@@ -156,7 +167,7 @@ mod tests {
     #[tokio::test]
     async fn vector_rotate_fields_no_op() -> TestResult {
         let ciphertext = get_ciphertext();
-        let vectors = [("vector".to_string(), ciphertext)].into();
+        let vectors = EncryptedVectors([("vector".to_string(), ciphertext)].into());
         let metadata = get_metadata();
         let mut resp = get_client()
             .vector()
@@ -176,7 +187,7 @@ mod tests {
     #[tokio::test]
     async fn vector_rotate_fields_new_tenant() -> TestResult {
         let ciphertext = get_ciphertext();
-        let vectors = [("vector".to_string(), ciphertext)].into();
+        let vectors = EncryptedVectors([("vector".to_string(), ciphertext)].into());
         let metadata = get_metadata();
         let new_tenant_id = TenantId("tenant-aws-l".to_string());
         let mut resp = get_client()

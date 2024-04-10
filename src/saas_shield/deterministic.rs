@@ -6,15 +6,17 @@ use super::{
 use crate::deterministic::{
     decrypt_internal, encrypt_internal, DeterministicDecryptBatchResult,
     DeterministicEncryptBatchResult, DeterministicEncryptionKey, DeterministicFieldOps,
-    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
+    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateFieldQueryResult,
     PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::{check_rotation_no_op, collection_to_batch_result};
+use crate::util::{check_rotation_no_op, perform_batch_action};
+use crate::FieldId;
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(uniffi::Object)]
@@ -91,6 +93,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         metadata: &AlloyMetadata,
     ) -> Result<DeterministicEncryptBatchResult, AlloyError> {
         let paths = plaintext_fields
+            .0
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
             .collect_vec();
@@ -114,7 +117,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 plaintext_field,
             )
         };
-        Ok(collection_to_batch_result(plaintext_fields, encrypt_field).into())
+        Ok(perform_batch_action(plaintext_fields.0, encrypt_field).into())
     }
 
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
@@ -167,6 +170,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         metadata: &AlloyMetadata,
     ) -> Result<DeterministicDecryptBatchResult, AlloyError> {
         let paths = encrypted_fields
+            .0
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
             .collect_vec();
@@ -192,7 +196,11 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 encrypted_field.derivation_path.clone(),
             )
         };
-        Ok(collection_to_batch_result(encrypted_fields, decrypt_field).into())
+        Ok(perform_batch_action(
+            encrypted_fields.0.into_iter().map(|(k, v)| (FieldId(k), v)),
+            decrypt_field,
+        )
+        .into())
     }
 
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
@@ -201,8 +209,9 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         &self,
         fields_to_query: PlaintextFields,
         metadata: &AlloyMetadata,
-    ) -> Result<GenerateQueryResult, AlloyError> {
+    ) -> Result<GenerateFieldQueryResult, AlloyError> {
         let paths = fields_to_query
+            .0
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
             .collect_vec();
@@ -215,6 +224,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         .await?
         .derived_keys;
         fields_to_query
+            .0
             .into_iter()
             .map(|(field_id, plaintext_field)| {
                 let keys = all_keys
@@ -236,7 +246,8 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                     .try_collect()
                     .map(|enc| (field_id, enc))
             })
-            .collect()
+            .collect::<Result<HashMap<_, _>, _>>()
+            .map(GenerateFieldQueryResult)
     }
 
     /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
@@ -250,6 +261,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
     ) -> Result<DeterministicRotateResult, AlloyError> {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let paths = encrypted_fields
+            .0
             .values()
             .map(|field| (field.secret_path.clone(), field.derivation_path.clone()))
             .collect_vec();
@@ -305,7 +317,11 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 )
             }
         };
-        Ok(collection_to_batch_result(encrypted_fields, reencrypt_field).into())
+        Ok(perform_batch_action(
+            encrypted_fields.0.into_iter().map(|(k, v)| (FieldId(k), v)),
+            reencrypt_field,
+        )
+        .into())
     }
 
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
@@ -361,7 +377,7 @@ mod test {
     use super::*;
     use crate::{
         tenant_security_client::{DerivedKey, KeyDeriveResponse, TenantSecretAssignmentId},
-        DerivationPath, SecretPath,
+        DerivationPath, EncryptedBytes, SecretPath,
     };
     use base64_type::Base64;
     use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
@@ -390,7 +406,7 @@ mod test {
             .get_key_for_path(&secret_path, &derivation_path, DeriveKeyChoice::Current)
             .unwrap();
         let field = PlaintextField {
-            plaintext_field: vec![1, 2, 3],
+            plaintext_field: vec![1, 2, 3].into(),
             secret_path: secret_path.clone(),
             derivation_path: derivation_path.clone(),
         };
@@ -408,7 +424,7 @@ mod test {
         assert_eq!(result.derivation_path, derivation_path);
         assert_eq!(result.secret_path, secret_path);
         assert_eq!(
-            result.encrypted_field,
+            result.encrypted_field.0,
             vec![
                 0, 0, 0, 1, 0, 0, 97, 192, 69, 142, 203, 183, 170, 80, 234, 235, 186, 41, 175, 153,
                 67, 145, 31, 97, 254
@@ -446,10 +462,10 @@ mod test {
         let field = EncryptedField {
             derivation_path: derivation_path.clone(),
             secret_path: secret_path.clone(),
-            encrypted_field: vec![
+            encrypted_field: EncryptedBytes(vec![
                 0, 0, 0, 1, 0, 0, 97, 192, 69, 142, 203, 183, 170, 80, 234, 235, 186, 41, 175, 153,
                 67, 145, 31, 97, 254,
-            ],
+            ]),
         };
         let (
             KeyIdHeader {
@@ -459,7 +475,7 @@ mod test {
             },
             ciphertext,
         ) = ironcore_documents::v5::key_id_header::decode_version_prefixed_value(
-            field.encrypted_field.into(),
+            field.encrypted_field.0.into(),
         )
         .unwrap();
         let result = decrypt_internal(
@@ -471,7 +487,7 @@ mod test {
         .unwrap();
         assert_eq!(result.derivation_path, derivation_path);
         assert_eq!(result.secret_path, secret_path);
-        assert_eq!(result.plaintext_field, vec![1, 2, 3]);
+        assert_eq!(result.plaintext_field, vec![1, 2, 3].into());
         assert_eq!(edek_type, EdekType::SaasShield);
         assert_eq!(payload_type, PayloadType::DeterministicField);
     }

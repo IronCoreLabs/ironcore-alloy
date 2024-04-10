@@ -2,11 +2,12 @@ use super::config::RotatableSecret;
 use crate::deterministic::{
     decrypt_internal, encrypt_internal, DeterministicDecryptBatchResult,
     DeterministicEncryptBatchResult, DeterministicEncryptionKey, DeterministicFieldOps,
-    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateQueryResult,
+    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateFieldQueryResult,
     PlaintextField, PlaintextFields,
 };
 use crate::errors::AlloyError;
-use crate::util::{check_rotation_no_op, collection_to_batch_result};
+use crate::util::{check_rotation_no_op, perform_batch_action};
+use crate::FieldId;
 use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
     StandaloneConfiguration, TenantId,
@@ -133,7 +134,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         let encrypt_field = |plaintext_field: PlaintextField| {
             self.encrypt_sync(plaintext_field, &metadata.tenant_id)
         };
-        Ok(collection_to_batch_result(plaintext_fields, encrypt_field).into())
+        Ok(perform_batch_action(plaintext_fields.0, encrypt_field).into())
     }
 
     /// Decrypt a field that was deterministically encrypted with the provided metadata.
@@ -156,7 +157,11 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         let decrypt_field = |encrypted_field: EncryptedField| {
             self.decrypt_sync(encrypted_field, &metadata.tenant_id)
         };
-        Ok(collection_to_batch_result(encrypted_fields, decrypt_field).into())
+        Ok(perform_batch_action(
+            encrypted_fields.0.into_iter().map(|(k, v)| (FieldId(k), v)),
+            decrypt_field,
+        )
+        .into())
     }
 
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
@@ -165,8 +170,8 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         &self,
         fields_to_query: PlaintextFields,
         metadata: &AlloyMetadata,
-    ) -> Result<GenerateQueryResult, AlloyError> {
-        fields_to_query
+    ) -> Result<GenerateFieldQueryResult, AlloyError> {
+        fields_to_query.0
             .into_iter()
             .map(|(field_id, plaintext_field)| {
                 let secret = self
@@ -207,7 +212,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     .try_collect()
                     .map(|enc| (field_id, enc))
             })
-            .try_collect()
+            .try_collect().map(GenerateFieldQueryResult)
     }
 
     /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
@@ -246,7 +251,11 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     })
             }
         };
-        Ok(collection_to_batch_result(encrypted_fields, reencrypt_field).into())
+        Ok(perform_batch_action(
+            encrypted_fields.0.into_iter().map(|(k, v)| (FieldId(k), v)),
+            reencrypt_field,
+        )
+        .into())
     }
 
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS
@@ -291,7 +300,8 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
 mod test {
     use super::*;
     use crate::{
-        standalone::config::StandaloneSecret, tests::get_metadata, DerivationPath, Secret,
+        standalone::config::StandaloneSecret, tests::get_metadata, DerivationPath, EncryptedBytes,
+        Secret,
     };
     use assertables::*;
     use hex_literal::hex;
@@ -327,7 +337,7 @@ mod test {
     async fn encrypt_document_deterministic_roundtrip() {
         let client = get_default_client();
         let field = PlaintextField {
-            plaintext_field: vec![1, 2, 3],
+            plaintext_field: vec![1, 2, 3].into(),
             secret_path: SecretPath("secret_path".to_string()),
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
@@ -344,22 +354,24 @@ mod test {
         let client = get_default_client();
         let expected = vec![1, 2, 3];
         let encrypted = EncryptedField {
-            encrypted_field: vec![
+            encrypted_field: EncryptedBytes(vec![
                 0, 0, 0, 1, 128, 0, 44, 194, 55, 224, 251, 64, 34, 109, 10, 77, 197, 32, 11, 224,
                 51, 154, 218, 130, 209,
-            ],
+            ]),
             secret_path: SecretPath("secret_path".to_string()),
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
         let decrypted = client.decrypt(encrypted, &get_metadata()).await.unwrap();
-        assert_eq!(decrypted.plaintext_field, expected);
+        assert_eq!(decrypted.plaintext_field.0, expected);
     }
 
     #[tokio::test]
     async fn document_deterministic_decrypt_fails_on_invalid_header() {
         let client = get_default_client();
         let encrypted = EncryptedField {
-            encrypted_field: hex!("00000000009b5a29b8c370b42ded7b8926265d07adb50f2d").to_vec(),
+            encrypted_field: EncryptedBytes(
+                hex!("00000000009b5a29b8c370b42ded7b8926265d07adb50f2d").to_vec(),
+            ),
             secret_path: SecretPath("secret_path".to_string()),
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
@@ -374,7 +386,7 @@ mod test {
     async fn document_deterministic_decrypt_fails_on_too_short() {
         let client = get_default_client();
         let encrypted = EncryptedField {
-            encrypted_field: hex!("00").to_vec(),
+            encrypted_field: EncryptedBytes(hex!("00").to_vec()),
             secret_path: SecretPath("secret_path".to_string()),
             derivation_path: DerivationPath("deriv_path".to_string()),
         };

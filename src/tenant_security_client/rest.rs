@@ -1,4 +1,4 @@
-use super::{DerivationPath, RequestMetadata, SecretPath};
+use super::{errors::TenantSecurityProxyError, DerivationPath, RequestMetadata, SecretPath};
 use crate::errors::AlloyError;
 use base64_type::Base64;
 use ironcore_documents::v5::key_id_header::KeyId;
@@ -19,6 +19,14 @@ pub(crate) struct LogSecurityEventRequest<'a> {
 #[serde(rename_all(serialize = "camelCase"))]
 pub(crate) struct UnwrapKeyRequest<'a> {
     pub encrypted_document_key: &'a Base64,
+    #[serde(flatten)]
+    pub metadata: &'a RequestMetadata,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct BatchWrapKeyRequest<'a> {
+    pub document_ids: Vec<&'a str>,
     #[serde(flatten)]
     pub metadata: &'a RequestMetadata,
 }
@@ -88,6 +96,18 @@ impl TspErrorResponse {
     }
 }
 
+impl From<TspErrorResponse> for AlloyError {
+    fn from(value: TspErrorResponse) -> Self {
+        let error_variant = TenantSecurityProxyError::code_to_error(value.code);
+        AlloyError::TspError {
+            msg: error_variant.to_string(),
+            error: error_variant,
+            http_code: 0, // this impl is for the `failures` half of batch responses from the TSP, and the TSP doesn't send a status
+            tsp_code: value.code,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct WrapKeyResponse {
     pub dek: Base64,
@@ -105,8 +125,8 @@ pub struct BatchResponse<T> {
     pub failures: HashMap<String, TspErrorResponse>,
 }
 
+pub type BatchWrapKeyResponse = BatchResponse<WrapKeyResponse>;
 pub type BatchUnwrapKeyResponse = BatchResponse<UnwrapKeyResponse>;
-
 pub type RekeyResponse = WrapKeyResponse;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Copy, Clone, Hash)]

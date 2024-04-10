@@ -204,6 +204,21 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun sdkStandardBatchRoundtrip() {
+        val plaintextDocument = mapOf("foo" to "My data".toByteArray())
+        val plaintextDocuments = mapOf("doc" to plaintextDocument)
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = sdk.standard().encryptBatch(plaintextDocuments, metadata)
+            assertEquals(encrypted.successes.size, 1)
+            assertEquals(encrypted.failures.size, 0)
+            val decrypted = sdk.standard().decryptBatch(encrypted.successes, metadata)
+            assertEquals(decrypted.successes.size, 1)
+            assertEquals(decrypted.failures.size, 0)
+        }
+    }
+
+    @Test
     fun sdkStandardAttachedRoundtrip() {
         val plaintextDocument = "My data".toByteArray()
         val metadata = AlloyMetadata.newSimple("tenant")
@@ -248,6 +263,26 @@ class IroncoreAlloyTest {
                                     PlaintextDocumentWithEdek(encrypted.edek, plaintextDocument2),
                                     metadata
                             )
+            val decrypted = sdk.standard().decrypt(encrypted2, metadata)
+            assertContentEquals(encrypted.edek, encrypted2.edek)
+            assertContentEquals(decrypted.get("foo"), plaintextDocument2.get("foo"))
+        }
+    }
+
+    @Test
+    fun sdkStandardEncryptWithExistingEdekBatch() {
+        val plaintextDocument = mapOf("foo" to "My data".toByteArray())
+        val plaintextDocument2 = mapOf("foo" to "My data2".toByteArray())
+
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = sdk.standard().encrypt(plaintextDocument, metadata)
+            val plaintexts =
+                    mapOf("doc" to PlaintextDocumentWithEdek(encrypted.edek, plaintextDocument2))
+            val batchEncrypted = sdk.standard().encryptWithExistingEdekBatch(plaintexts, metadata)
+            assertEquals(batchEncrypted.successes.size, 1)
+            assertEquals(batchEncrypted.failures.size, 0)
+            val encrypted2 = batchEncrypted.successes.get("doc")!!
             val decrypted = sdk.standard().decrypt(encrypted2, metadata)
             assertContentEquals(encrypted.edek, encrypted2.edek)
             assertContentEquals(decrypted.get("foo"), plaintextDocument2.get("foo"))

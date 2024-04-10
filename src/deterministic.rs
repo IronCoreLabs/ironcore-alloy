@@ -7,6 +7,7 @@ use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
 use ironcore_documents::v5::key_id_header::KeyIdHeader;
 use std::collections::HashMap;
+use uniffi::custom_newtype;
 
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct EncryptedField {
@@ -21,9 +22,15 @@ pub struct PlaintextField {
     pub secret_path: SecretPath,
     pub derivation_path: DerivationPath,
 }
-pub type PlaintextFields = HashMap<FieldId, PlaintextField>;
-pub type EncryptedFields = HashMap<FieldId, EncryptedField>;
-pub type GenerateQueryResult = HashMap<FieldId, Vec<EncryptedField>>;
+pub struct PlaintextFields(pub HashMap<FieldId, PlaintextField>);
+custom_newtype!(PlaintextFields, HashMap<FieldId, PlaintextField>);
+
+// TODO: These newtype can't include FieldId because of a bug with generated Python
+// not using forward references. If this is addressed, we can change it.
+pub struct EncryptedFields(pub HashMap<String, EncryptedField>);
+custom_newtype!(EncryptedFields, HashMap<String, EncryptedField>);
+pub struct GenerateFieldQueryResult(pub HashMap<FieldId, Vec<EncryptedField>>);
+custom_newtype!(GenerateFieldQueryResult, HashMap<FieldId, Vec<EncryptedField>>);
 create_batch_result_struct!(DeterministicRotateResult, EncryptedField, FieldId);
 create_batch_result_struct!(DeterministicEncryptBatchResult, EncryptedField, FieldId);
 create_batch_result_struct!(DeterministicDecryptBatchResult, PlaintextField, FieldId);
@@ -87,7 +94,7 @@ pub trait DeterministicFieldOps {
         &self,
         fields_to_query: PlaintextFields,
         metadata: &AlloyMetadata,
-    ) -> Result<GenerateQueryResult, AlloyError>;
+    ) -> Result<GenerateFieldQueryResult, AlloyError>;
     /// Re-encrypt already encrypted fields with the Current key for the provided tenant. The `metadata` passed
     /// must contain the tenant ID that the fields were originally encrypted to. If `new_tenant_id` is empty,
     /// the fields will simply be encrypted with the same tenant's current secret.
@@ -121,11 +128,11 @@ pub(crate) fn encrypt_internal(
         })?;
     let encrypted_bytes = deterministic_encrypt(
         current_derived_key_sized,
-        plaintext_field.plaintext_field.as_slice(),
+        plaintext_field.plaintext_field.0.as_slice(),
     )?;
     let encrypted_field = key_id_header.put_header_on_document(encrypted_bytes);
     Ok(EncryptedField {
-        encrypted_field: encrypted_field.into(),
+        encrypted_field: EncryptedBytes(encrypted_field.into()),
         secret_path: plaintext_field.secret_path,
         derivation_path: plaintext_field.derivation_path,
     })
@@ -162,7 +169,7 @@ fn deterministic_encrypt_core(
         .map_err(|e| AlloyError::EncryptError { msg: e.to_string() })
 }
 
-fn deterministic_decrypt(key: [u8; 64], ciphertext: &[u8]) -> Result<Vec<u8>, AlloyError> {
+fn deterministic_decrypt(key: [u8; 64], ciphertext: &[u8]) -> Result<PlaintextBytes, AlloyError> {
     deterministic_decrypt_core(key, ciphertext, &[])
 }
 
@@ -170,10 +177,11 @@ fn deterministic_decrypt_core(
     key: [u8; 64],
     ciphertext: &[u8],
     associated_data: &[u8],
-) -> Result<Vec<u8>, AlloyError> {
+) -> Result<PlaintextBytes, AlloyError> {
     let mut cipher = Aes256Siv::new(&key.into());
     cipher
         .decrypt([associated_data], ciphertext)
+        .map(PlaintextBytes)
         .map_err(|_| AlloyError::DecryptError {
             msg: "Failed deterministic decryption. Ensure the data and tenant ID are correct"
                 .to_string(),
@@ -197,6 +205,6 @@ mod test {
         let expected_encrypt = hex!("f125274c598065cfc26b0e71575029088b035217e380cac8919ee800c126");
         assert_eq!(encrypt_result.clone(), expected_encrypt);
         let decrypt_result = deterministic_decrypt_core(key, &encrypt_result, &ad).unwrap();
-        assert_eq!(decrypt_result, plaintext);
+        assert_eq!(decrypt_result.0, plaintext);
     }
 }

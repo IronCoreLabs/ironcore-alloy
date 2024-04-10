@@ -8,8 +8,10 @@ use ironcore_alloy::standalone::config::{
 };
 use ironcore_alloy::standard::{EncryptedDocument, PlaintextDocument, StandardDocumentOps};
 use ironcore_alloy::vector::{PlaintextVector, VectorOps};
-use ironcore_alloy::{AlloyMetadata, Secret, SecretPath, Standalone, TenantId};
-use ironcore_alloy::{DerivationPath, SaasShield};
+use ironcore_alloy::{
+    AlloyMetadata, PlaintextBytes, SaasShield, Secret, SecretPath, Standalone, TenantId,
+};
+use ironcore_alloy::{DerivationPath, FieldId};
 use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use rand::{Rng, RngCore};
@@ -68,7 +70,10 @@ fn benches(c: &mut Criterion) {
     let roundtrip = |value: Vec<u8>| async {
         let encrypted = sdk
             .standard()
-            .encrypt([("foo".to_string(), value)].into(), &metadata)
+            .encrypt(
+                PlaintextDocument([(FieldId("foo".to_string()), value.into())].into()),
+                &metadata,
+            )
             .await
             .unwrap();
         sdk.standard().decrypt(encrypted, &metadata).await.unwrap();
@@ -140,12 +145,14 @@ fn tsp_benches(c: &mut Criterion) {
         decrypt(encrypted).await
     };
 
-    fn random_word(rng: ThreadRng, length: usize) -> Vec<u8> {
-        rng.sample_iter(&Alphanumeric)
-            .take(length)
-            .map(char::from)
-            .collect::<String>()
-            .into_bytes()
+    fn random_word(rng: ThreadRng, length: usize) -> PlaintextBytes {
+        PlaintextBytes(
+            rng.sample_iter(&Alphanumeric)
+                .take(length)
+                .map(char::from)
+                .collect::<String>()
+                .into_bytes(),
+        )
     }
 
     c.bench_function(
@@ -153,11 +160,13 @@ fn tsp_benches(c: &mut Criterion) {
         |b| {
             b.to_async(Runtime::new().unwrap()).iter_batched(
                 || {
-                    [(
-                        "doc1".to_string(),
-                        "Encrypt these bytes!".as_bytes().to_vec(),
-                    )]
-                    .into()
+                    PlaintextDocument(
+                        [(
+                            FieldId("doc1".to_string()),
+                            PlaintextBytes("Encrypt these bytes!".as_bytes().to_vec()),
+                        )]
+                        .into(),
+                    )
                 },
                 roundtrip,
                 BatchSize::SmallInput,
@@ -167,7 +176,15 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function(format!("TSP - encrypt 10KB").as_str(), |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || [("doc1".to_string(), random_word(rng.clone(), 10_000))].into(),
+            || {
+                PlaintextDocument(
+                    [(
+                        FieldId("doc1".to_string()),
+                        random_word(rng.clone(), 10_000),
+                    )]
+                    .into(),
+                )
+            },
             encrypt,
             BatchSize::SmallInput,
         )
@@ -175,7 +192,15 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function(format!("TSP - encrypt 100KB").as_str(), |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || [("doc1".to_string(), random_word(rng.clone(), 100_000))].into(),
+            || {
+                PlaintextDocument(
+                    [(
+                        FieldId("doc1".to_string()),
+                        random_word(rng.clone(), 100_000),
+                    )]
+                    .into(),
+                )
+            },
             encrypt,
             BatchSize::SmallInput,
         )

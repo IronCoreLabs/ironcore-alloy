@@ -203,6 +203,25 @@ class TestIroncoreAlloy:
         assert decrypted == document
 
     @pytest.mark.asyncio
+    async def test_batch_roundtrip_standard(self):
+        document = {"foo": b"My data"}
+        metadata = AlloyMetadata.new_simple("tenant")
+        documents = {"doc": document}
+        encrypted = await self.sdk.standard().encrypt_batch(documents, metadata)
+        assert len(encrypted.successes) == 1
+        assert len(encrypted.failures) == 0
+        bad_doc = EncryptedDocument(edek=b"1", document={"field": b"2"})
+        new_encrypted = {"bad_doc": bad_doc, "doc": encrypted.successes["doc"]}
+        decrypted = await self.sdk.standard().decrypt_batch(new_encrypted, metadata)
+        assert len(decrypted.successes) == 1
+        assert len(decrypted.failures) == 1
+        assert decrypted.successes["doc"] == document
+        assert (
+            decrypted.failures["bad_doc"].msg  # type: ignore
+            == "Encrypted header was invalid."
+        )
+
+    @pytest.mark.asyncio
     async def test_roundtrip_standard_attached(self):
         document = b"My data"
         metadata = AlloyMetadata.new_simple("tenant")
@@ -220,6 +239,26 @@ class TestIroncoreAlloy:
         encrypted2 = await self.sdk.standard().encrypt_with_existing_edek(
             PlaintextDocumentWithEdek(edek=encrypted.edek, document=document2), metadata
         )
+        assert encrypted.document["foo"] != encrypted2.document["foo"]
+        assert encrypted.edek == encrypted2.edek
+        decrypted = await self.sdk.standard().decrypt(encrypted2, metadata)
+        assert decrypted == document2
+
+    @pytest.mark.asyncio
+    async def test_encrypt_with_existing_edek_batch(self):
+        document = {"foo": b"My data"}
+        document2 = {"foo": b"My data2"}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.standard().encrypt(document, metadata)
+        documents = {
+            "doc": PlaintextDocumentWithEdek(edek=encrypted.edek, document=document2)
+        }
+        batch_encrypted = await self.sdk.standard().encrypt_with_existing_edek_batch(
+            documents, metadata
+        )
+        assert len(batch_encrypted.successes) == 1
+        assert len(batch_encrypted.failures) == 0
+        encrypted2 = batch_encrypted.successes["doc"]
         assert encrypted.document["foo"] != encrypted2.document["foo"]
         assert encrypted.edek == encrypted2.edek
         decrypted = await self.sdk.standard().decrypt(encrypted2, metadata)

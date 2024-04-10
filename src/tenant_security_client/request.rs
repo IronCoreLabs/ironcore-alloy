@@ -1,8 +1,9 @@
 use super::errors::TenantSecurityProxyError;
 use super::rest::{
-    BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, DerivationType, KeyDeriveResponse,
-    LogSecurityEventRequest, RekeyRequest, RekeyResponse, SecretType, TenantDeriveKeyRequest,
-    TspErrorResponse, UnwrapKeyRequest, UnwrapKeyResponse, WrapKeyResponse,
+    BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, BatchWrapKeyRequest, BatchWrapKeyResponse,
+    DerivationType, KeyDeriveResponse, LogSecurityEventRequest, RekeyRequest, RekeyResponse,
+    SecretType, TenantDeriveKeyRequest, TspErrorResponse, UnwrapKeyRequest, UnwrapKeyResponse,
+    WrapKeyResponse,
 };
 use super::{ApiKey, RequestMetadata};
 use crate::errors::AlloyError;
@@ -19,6 +20,7 @@ use std::collections::{HashMap, HashSet};
 
 const TSP_API_PREFIX: &str = "/api/1/";
 const WRAP_ENDPOINT: &str = "document/wrap";
+const BATCH_WRAP_ENDPOINT: &str = "document/batch-wrap";
 const UNWRAP_ENDPOINT: &str = "document/unwrap";
 const BATCH_UNWRAP_ENDPOINT: &str = "document/batch-unwrap";
 const REKEY_ENDPOINT: &str = "document/rekey";
@@ -102,7 +104,13 @@ pub(crate) trait DocumentKeyOps {
         metadata: &RequestMetadata,
     ) -> Result<UnwrapKeyResponse, AlloyError>;
 
-    async fn batch_unwrap_key(
+    async fn batch_wrap_keys(
+        &self,
+        document_ids: Vec<&str>,
+        metadata: &RequestMetadata,
+    ) -> Result<BatchWrapKeyResponse, AlloyError>;
+
+    async fn batch_unwrap_keys(
         &self,
         encrypted_document_keys: HashMap<&str, Base64>,
         metadata: &RequestMetadata,
@@ -151,7 +159,23 @@ impl DocumentKeyOps for TspRequest {
             .await?)
     }
 
-    async fn batch_unwrap_key(
+    async fn batch_wrap_keys(
+        &self,
+        document_ids: Vec<&str>,
+        metadata: &RequestMetadata,
+    ) -> Result<BatchWrapKeyResponse, AlloyError> {
+        let post_data = serde_json::to_value(BatchWrapKeyRequest {
+            metadata,
+            document_ids,
+        })?;
+        Ok(self
+            .make_json_request(BATCH_WRAP_ENDPOINT.to_string(), post_data)
+            .await?
+            .json::<BatchWrapKeyResponse>()
+            .await?)
+    }
+
+    async fn batch_unwrap_keys(
         &self,
         encrypted_document_keys: HashMap<&str, Base64>,
         metadata: &RequestMetadata,
@@ -280,7 +304,25 @@ pub(crate) mod tests {
             })
         }
 
-        async fn batch_unwrap_key(
+        async fn batch_wrap_keys(
+            &self,
+            _: Vec<&str>,
+            _: &RequestMetadata,
+        ) -> Result<BatchWrapKeyResponse, AlloyError> {
+            Ok(BatchWrapKeyResponse {
+                keys: [(
+                    "document".to_string(),
+                    WrapKeyResponse {
+                        dek: KNOWN_DEK.clone(),
+                        edek: KNOWN_EDEK.clone(),
+                    },
+                )]
+                .into(),
+                failures: HashMap::new(),
+            })
+        }
+
+        async fn batch_unwrap_keys(
             &self,
             encrypted_document_keys: HashMap<&str, Base64>,
             _metadata: &RequestMetadata,

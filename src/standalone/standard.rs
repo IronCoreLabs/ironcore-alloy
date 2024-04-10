@@ -1,24 +1,24 @@
 // Standard standalone works for V4 and V5 documents. There is no suport for V3 since Standalone wasn't
 // available in V3.
+use super::config::{StandaloneConfiguration, StandardSecrets};
 use crate::errors::AlloyError;
 use crate::standard::{
     decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, PlaintextDocument, PlaintextDocumentWithEdek, RekeyEdeksBatchResult,
-    StandardDocumentOps,
+    EncryptedDocument, EncryptedDocuments, PlaintextDocument, PlaintextDocumentWithEdek,
+    PlaintextDocuments, PlaintextDocumentsWithEdeks, RekeyEdeksBatchResult,
+    StandardDecryptBatchResult, StandardDocumentOps, StandardEncryptBatchResult,
 };
-use crate::util::{collection_to_batch_result, get_rng, hash256, OurReseedingRng};
+use crate::util::{get_rng, hash256, perform_batch_action, OurReseedingRng};
+use crate::DocumentId;
 use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, Secret, TenantId};
 use ironcore_documents::aes::EncryptionKey;
-use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
+use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
-use rand::{CryptoRng, RngCore};
 use ring::digest::SHA256_OUTPUT_LEN;
 use ring::hkdf;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-
-use super::config::{StandaloneConfiguration, StandardSecrets};
 
 #[derive(uniffi::Object)]
 pub struct StandaloneStandardClient {
@@ -51,27 +51,40 @@ impl StandaloneStandardClient {
 
     /// Encrypt all the fields from the document using a single `key`. A DEK will be generated and encrypted using a derived key.
     /// Each field of the document will be encrypted separately using a random iv and this single generated dek.
-    pub(crate) fn encrypt_document<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-        incoming_key: &[u8],
-        document: HashMap<String, U>,
-        key_id: KeyId,
-        rng: Arc<Mutex<R>>,
-        tenant_id: &TenantId,
+    fn encrypt_sync(
+        &self,
+        plaintext_document: PlaintextDocument,
+        metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let per_tenant_kek = derive_aes_encryption_key(&incoming_key, tenant_id);
+        let (secret_id, secret) = self.get_current_secret_and_id()?;
+        let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
         let (aes_dek, v4_doc) = v5::aes::generate_aes_edek_and_sign(
-            &mut *get_rng(&rng),
+            &mut *get_rng(&self.rng),
             per_tenant_kek,
             None,
-            key_id.0.to_string().as_str(),
+            secret_id.to_string().as_str(),
         )?;
         encrypt_document_core(
-            document,
-            rng,
+            plaintext_document.0,
+            self.rng.clone(),
             aes_dek,
-            Self::create_key_id_header(key_id.0),
+            Self::create_key_id_header(secret_id),
             v4_doc,
         )
+    }
+
+    /// Decrypt the document DEK, then use it to decrypt the document.
+    fn decrypt_sync(
+        &self,
+        encrypted_document: EncryptedDocument,
+        metadata: &AlloyMetadata,
+    ) -> Result<PlaintextDocument, AlloyError> {
+        let dek = Self::decrypt_document_dek(
+            encrypted_document.edek,
+            &self.config.secrets,
+            &metadata.tenant_id,
+        )?;
+        decrypt_document_core(encrypted_document.document, dek).map(PlaintextDocument)
     }
 
     /// Given the edek, the secrets and the metadata, try to decrypt the per tenant_kek using the secret.
@@ -81,7 +94,7 @@ impl StandaloneStandardClient {
         config_secrets: &HashMap<u32, Secret>,
         tenant_id: &TenantId,
     ) -> Result<EncryptionKey, AlloyError> {
-        let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0)?;
+        let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0.into())?;
 
         // Key id should never be 0. If it is we'll try all the keys we have.
         let secrets = if key_id.0 == 0 {
@@ -123,6 +136,29 @@ impl StandaloneStandardClient {
                 msg: "No secret could be found to decrypt".to_string(),
             }))
     }
+
+    /// Synchronous helper function for `encrypt_with_existing_edek`.
+    /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
+    /// bytes, and the same metadata must be provided when decrypting the document.
+    /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
+    /// of the document.
+    fn encrypt_with_existing_edek_sync(
+        &self,
+        plaintext_document: PlaintextDocumentWithEdek,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedDocument, AlloyError> {
+        let dek = Self::decrypt_document_dek(
+            plaintext_document.edek.clone(),
+            &self.config.secrets,
+            &metadata.tenant_id,
+        )?;
+        let encrypted_document: HashMap<_, _> =
+            encrypt_map(plaintext_document.document.0, self.rng.clone(), dek)?;
+        Ok(EncryptedDocument {
+            edek: plaintext_document.edek,
+            document: encrypted_document,
+        })
+    }
 }
 
 impl AlloyClient for StandaloneStandardClient {
@@ -151,15 +187,18 @@ impl StandardDocumentOps for StandaloneStandardClient {
         plaintext_document: PlaintextDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let (secret_id, secret) = self.get_current_secret_and_id()?;
-        let encrypted_doc = Self::encrypt_document(
-            &secret.secret,
-            plaintext_document,
-            KeyId(secret_id),
-            self.rng.clone(),
-            &metadata.tenant_id,
-        )?;
-        Ok(encrypted_doc)
+        self.encrypt_sync(plaintext_document, metadata)
+    }
+
+    /// Encrypt each of the provided documents with the provided metadata.
+    /// Note that because only a single metadata value is passed, each document will be encrypted to the same tenant.
+    async fn encrypt_batch(
+        &self,
+        plaintext_documents: PlaintextDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError> {
+        let encrypt_document = |plaintext_document| self.encrypt_sync(plaintext_document, metadata);
+        Ok(perform_batch_action(plaintext_documents.0, encrypt_document).into())
     }
 
     /// Decrypt a document that was encrypted with the provided metadata. The document must have been encrypted with one
@@ -170,12 +209,19 @@ impl StandardDocumentOps for StandaloneStandardClient {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
-        let dek = Self::decrypt_document_dek(
-            encrypted_document.edek,
-            &self.config.secrets,
-            &metadata.tenant_id,
-        )?;
-        decrypt_document_core(encrypted_document.document, dek)
+        self.decrypt_sync(encrypted_document, metadata)
+    }
+
+    /// Decrypt each of the provided documents with the provided metadata.
+    /// Note that because the metadata is shared between the documents, they all must correspond to the
+    /// same tenant ID.
+    async fn decrypt_batch(
+        &self,
+        encrypted_documents: EncryptedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardDecryptBatchResult, AlloyError> {
+        let decrypt_document = |encrypted_document| self.decrypt_sync(encrypted_document, metadata);
+        Ok(perform_batch_action(encrypted_documents.0, decrypt_document).into())
     }
 
     /// Decrypt the provided EDEKs and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
@@ -183,7 +229,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
     /// associated with the old EDEK can be decrypted with the new EDEK without changing its document data.
     async fn rekey_edeks(
         &self,
-        edeks: HashMap<String, EdekWithKeyIdHeader>,
+        edeks: HashMap<DocumentId, EdekWithKeyIdHeader>,
         metadata: &AlloyMetadata,
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyEdeksBatchResult, AlloyError> {
@@ -204,7 +250,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
                 v4_doc,
             ))
         };
-        Ok(collection_to_batch_result(edeks, rekey_edek).into())
+        Ok(perform_batch_action(edeks, rekey_edek).into())
     }
 
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
@@ -216,19 +262,20 @@ impl StandardDocumentOps for StandaloneStandardClient {
         plaintext_document: PlaintextDocumentWithEdek,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let dek = Self::decrypt_document_dek(
-            plaintext_document.edek.clone(),
-            &self.config.secrets,
-            &metadata.tenant_id,
-        )?;
+        self.encrypt_with_existing_edek_sync(plaintext_document, metadata)
+    }
 
-        let encrypted_document: HashMap<_, _> =
-            encrypt_map(plaintext_document.document, self.rng.clone(), dek)?;
-
-        Ok(EncryptedDocument {
-            edek: plaintext_document.edek,
-            document: encrypted_document,
-        })
+    /// Encrypt multiple documents with the provided metadata.
+    /// The provided EDEKs will be decrypted and used to encrypt each corresponding document's fields.
+    /// This is useful when updating some fields of the document.
+    async fn encrypt_with_existing_edek_batch(
+        &self,
+        plaintext_documents: PlaintextDocumentsWithEdeks,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardEncryptBatchResult, AlloyError> {
+        let encrypt =
+            |plaintext_document| self.encrypt_with_existing_edek_sync(plaintext_document, metadata);
+        Ok(perform_batch_action(plaintext_documents.0, encrypt).into())
     }
 }
 
@@ -287,8 +334,8 @@ fn derive_aes_encryption_key_legacy<K: AsRef<[u8]>>(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::Secret;
     use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
+    use crate::{EncryptedBytes, FieldId, Secret};
     use ironcore_documents::v5::key_id_header::{self, EdekType, KeyId, PayloadType};
 
     fn default_client() -> StandaloneStandardClient {
@@ -329,15 +376,18 @@ pub(crate) mod test {
     async fn encrypt_decrypt_roundtrip() -> Result<(), AlloyError> {
         let client = default_client();
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
-        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
+        let encrypted = client
+            .encrypt(PlaintextDocument(document.clone()), &metadata)
+            .await
+            .unwrap();
         let (key_id_header, _) =
             key_id_header::decode_version_prefixed_value(encrypted.edek.0.clone().into()).unwrap();
         assert_eq!(key_id_header.key_id, KeyId(1));
         assert_eq!(key_id_header.edek_type, EdekType::Standalone);
         assert_eq!(key_id_header.payload_type, PayloadType::StandardEdek);
         let decrypted = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(decrypted, document);
+        assert_eq!(decrypted.0, document);
         Ok(())
     }
 
@@ -345,12 +395,18 @@ pub(crate) mod test {
     async fn encrypt_with_existing_edek_roundtrip() -> Result<(), AlloyError> {
         let client = default_client();
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
-        let document2: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 4])].into();
-        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
+        let document2: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 4].into())].into();
+        let encrypted = client
+            .encrypt(PlaintextDocument(document.clone()), &metadata)
+            .await
+            .unwrap();
         let encrypted_2 = client
             .encrypt_with_existing_edek(
-                PlaintextDocumentWithEdek::new(encrypted.edek.clone(), document2.clone()),
+                PlaintextDocumentWithEdek::new(
+                    encrypted.edek.clone(),
+                    PlaintextDocument(document2.clone()),
+                ),
                 &metadata,
             )
             .await
@@ -360,7 +416,7 @@ pub(crate) mod test {
             .await
             .unwrap();
         assert_eq!(encrypted.edek, encrypted_2.edek);
-        assert_eq!(decrypted, document2);
+        assert_eq!(decrypted.0, document2);
         Ok(())
     }
 
@@ -368,26 +424,34 @@ pub(crate) mod test {
     async fn rekey_edek_roundtrip() {
         let client = default_client();
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
-        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
+        let encrypted = client
+            .encrypt(PlaintextDocument(document.clone()), &metadata)
+            .await
+            .unwrap();
         let mut rekeyed = client
             .rekey_edeks(
-                [("foo".to_string(), encrypted.edek.clone())].into(),
+                [(DocumentId("foo".to_string()), encrypted.edek.clone())].into(),
                 &metadata,
                 None,
             )
             .await
             .unwrap();
         assert!(rekeyed.failures.is_empty());
-        assert!(rekeyed.successes.contains_key("foo"));
-        let new_edek = rekeyed.successes.remove("foo").unwrap();
+        assert!(rekeyed
+            .successes
+            .contains_key(&DocumentId("foo".to_string())));
+        let new_edek = rekeyed
+            .successes
+            .remove(&DocumentId("foo".to_string()))
+            .unwrap();
         assert_ne!(encrypted.edek, new_edek);
         let remade_document = EncryptedDocument {
             edek: new_edek,
             document: encrypted.document,
         };
         let decrypted = client.decrypt(remade_document, &metadata).await.unwrap();
-        assert_eq!(decrypted, document);
+        assert_eq!(decrypted.0, document);
     }
 
     #[tokio::test]
@@ -407,20 +471,28 @@ pub(crate) mod test {
             rng: create_test_seeded_rng(100),
         };
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
-        let encrypted = client.encrypt(document.clone(), &metadata).await.unwrap();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
+        let encrypted = client
+            .encrypt(PlaintextDocument(document.clone()), &metadata)
+            .await
+            .unwrap();
         let new_client = new_client(Some(2));
         let mut rekeyed = new_client
             .rekey_edeks(
-                [("foo".to_string(), encrypted.edek.clone())].into(),
+                [(DocumentId("foo".to_string()), encrypted.edek.clone())].into(),
                 &metadata,
                 None,
             )
             .await
             .unwrap();
         assert!(rekeyed.failures.is_empty());
-        assert!(rekeyed.successes.contains_key("foo"));
-        let new_edek = rekeyed.successes.remove("foo").unwrap();
+        assert!(rekeyed
+            .successes
+            .contains_key(&DocumentId("foo".to_string())));
+        let new_edek = rekeyed
+            .successes
+            .remove(&DocumentId("foo".to_string()))
+            .unwrap();
         assert_ne!(encrypted.edek, new_edek);
         let remade_document = EncryptedDocument {
             edek: new_edek,
@@ -437,7 +509,7 @@ pub(crate) mod test {
             .decrypt(remade_document, &metadata)
             .await
             .unwrap();
-        assert_eq!(decrypted, document);
+        assert_eq!(decrypted.0, document);
     }
 
     #[tokio::test]
@@ -464,8 +536,11 @@ pub(crate) mod test {
     async fn encrypt_missing_primary() -> Result<(), AlloyError> {
         let client = new_client(None);
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
-        let error = client.encrypt(document, &metadata).await.unwrap_err();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
+        let error = client
+            .encrypt(PlaintextDocument(document), &metadata)
+            .await
+            .unwrap_err();
         assert_eq!(
             error,
             AlloyError::InvalidConfiguration {
@@ -480,8 +555,11 @@ pub(crate) mod test {
         // This id isn't in the config map.
         let client = new_client(Some(1000));
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
-        let error = client.encrypt(document, &metadata).await.unwrap_err();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
+        let error = client
+            .encrypt(PlaintextDocument(document), &metadata)
+            .await
+            .unwrap_err();
         assert_eq!(
             error,
             AlloyError::InvalidConfiguration {
@@ -496,7 +574,7 @@ pub(crate) mod test {
         //The edek below is for key_id 1, setting primary to 2 in the sdk.
         let client = new_client(Some(2));
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
         let encrypted = EncryptedDocument {
             edek: EdekWithKeyIdHeader(vec![
                 0, 0, 0, 1, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
@@ -508,17 +586,17 @@ pub(crate) mod test {
                 1, 49,
             ]),
             document: [(
-                "hi".to_string(),
-                vec![
+                FieldId("hi".to_string()),
+                EncryptedBytes(vec![
                     0, 73, 82, 79, 78, 7, 10, 168, 250, 84, 170, 243, 140, 53, 47, 99, 212, 184,
                     119, 142, 12, 136, 196, 155, 120, 225, 188, 254, 66, 143, 227, 183, 50, 78, 0,
                     50,
-                ],
+                ]),
             )]
             .into(),
         };
         let plaintext = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(plaintext, document);
+        assert_eq!(plaintext.0, document);
         Ok(())
     }
 
@@ -527,7 +605,7 @@ pub(crate) mod test {
         //The edek below is for key_id 0, setting primary to 2 in the sdk.
         let client = new_client(Some(2));
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [("hi".to_string(), vec![1, 2, 3])].into();
+        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
         let encrypted = EncryptedDocument {
             edek: EdekWithKeyIdHeader(vec![
                 0, 0, 0, 0, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
@@ -539,17 +617,17 @@ pub(crate) mod test {
                 1, 49,
             ]),
             document: [(
-                "hi".to_string(),
-                vec![
+                FieldId("hi".to_string()),
+                EncryptedBytes(vec![
                     0, 73, 82, 79, 78, 7, 10, 168, 250, 84, 170, 243, 140, 53, 47, 99, 212, 184,
                     119, 142, 12, 136, 196, 155, 120, 225, 188, 254, 66, 143, 227, 183, 50, 78, 0,
                     50,
-                ],
+                ]),
             )]
             .into(),
         };
         let plaintext = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(plaintext, document);
+        assert_eq!(plaintext.0, document);
         Ok(())
     }
 
@@ -568,12 +646,12 @@ pub(crate) mod test {
                 59, 126, 89, 87,
             ]),
             document: [(
-                "hi".to_string(),
-                vec![
+                FieldId("hi".to_string()),
+                EncryptedBytes(vec![
                     0, 73, 82, 79, 78, 7, 10, 168, 250, 84, 170, 243, 140, 53, 47, 99, 212, 184,
                     119, 142, 12, 136, 196, 155, 120, 225, 188, 254, 66, 143, 227, 183, 50, 78, 0,
                     50,
-                ],
+                ]),
             )]
             .into(),
         };
