@@ -6,12 +6,13 @@ use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, Payloa
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
 use saas_shield::standard::SaasShieldStandardClient;
+use saas_shield::standard_attached::SaasShieldStandardAttachedClient;
 use saas_shield::vector::SaasShieldVectorClient;
 use serde::{Deserialize, Serialize};
 use standalone::config::StandaloneConfiguration;
 use standalone::deterministic::StandaloneDeterministicClient;
 use standalone::standard::StandaloneStandardClient;
-use standalone::standard_attached::StandaloneAttachedStandardClient;
+use standalone::standard_attached::StandaloneStandardAttachedClient;
 use standalone::vector::StandaloneVectorClient;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -200,7 +201,7 @@ impl TryFrom<(AlloyMetadata, Option<i64>)> for RequestMetadata {
 #[derive(uniffi::Object)]
 pub struct Standalone {
     standard: Arc<StandaloneStandardClient>,
-    standard_attached: Arc<StandaloneAttachedStandardClient>,
+    standard_attached: Arc<StandaloneStandardAttachedClient>,
     deterministic: Arc<StandaloneDeterministicClient>,
     vector: Arc<StandaloneVectorClient>,
 }
@@ -210,7 +211,7 @@ impl Standalone {
     pub fn new(config: &StandaloneConfiguration) -> Arc<Self> {
         Arc::new(Self {
             standard: Arc::new(StandaloneStandardClient::new(config.clone())),
-            standard_attached: Arc::new(StandaloneAttachedStandardClient::new(config.clone())),
+            standard_attached: Arc::new(StandaloneStandardAttachedClient::new(config.clone())),
             deterministic: Arc::new(StandaloneDeterministicClient::new(config.clone())),
             vector: Arc::new(StandaloneVectorClient::new(config.clone())),
         })
@@ -218,7 +219,7 @@ impl Standalone {
     pub fn standard(&self) -> Arc<StandaloneStandardClient> {
         self.standard.clone()
     }
-    pub fn standard_attached(&self) -> Arc<StandaloneAttachedStandardClient> {
+    pub fn standard_attached(&self) -> Arc<StandaloneStandardAttachedClient> {
         self.standard_attached.clone()
     }
     pub fn deterministic(&self) -> Arc<StandaloneDeterministicClient> {
@@ -231,6 +232,7 @@ impl Standalone {
 #[derive(uniffi::Object)]
 pub struct SaasShield {
     standard: Arc<SaasShieldStandardClient>,
+    standard_attached: Arc<SaasShieldStandardAttachedClient>,
     deterministic: Arc<SaasShieldDeterministicClient>,
     vector: Arc<SaasShieldVectorClient>,
 }
@@ -240,6 +242,9 @@ impl SaasShield {
     pub fn new(config: &SaasShieldConfiguration) -> Arc<Self> {
         Arc::new(Self {
             standard: Arc::new(SaasShieldStandardClient::new(
+                config.tenant_security_client.clone(),
+            )),
+            standard_attached: Arc::new(SaasShieldStandardAttachedClient::new(
                 config.tenant_security_client.clone(),
             )),
             deterministic: Arc::new(SaasShieldDeterministicClient::new(
@@ -253,6 +258,9 @@ impl SaasShield {
     }
     pub fn standard(&self) -> Arc<SaasShieldStandardClient> {
         self.standard.clone()
+    }
+    pub fn standard_attached(&self) -> Arc<SaasShieldStandardAttachedClient> {
+        self.standard_attached.clone()
     }
     pub fn deterministic(&self) -> Arc<SaasShieldDeterministicClient> {
         self.deterministic.clone()

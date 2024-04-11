@@ -231,6 +231,75 @@ class TestIroncoreAlloy:
         assert decrypted == document
 
     @pytest.mark.asyncio
+    async def test_decrypt_v4_standard_attached(self):
+        # Document encrypted using Cloaked Search Standalone
+        document = base64.b64decode(
+            "BElST04AdgokCiAsN4NHsRTS4bq0a6wE9QUJFbWSf67pqkIgrzHPfztA3RABEk4STBpKCgxVKAX2fYD7F4W13dwSMN6LnbYAlUgekKbpI0z9LFeoUNNJZTUDX7WqoDZSWJ+uSEOoR7U8YSnaBlTBG8tw5hoIOX50ZW5hbnRIXNdHBgvQNRD/s1lTAxgMaKrMv0CL2AwLFuNtKPpLjObeLmdAkYKpe+uwbg=="
+        )
+        metadata = AlloyMetadata.new_simple("tenant")
+        decrypted = await self.sdk.standard_attached().decrypt(document, metadata)
+        assert decrypted == b'{"title":"blah"}'
+
+    @pytest.mark.asyncio
+    async def test_roundtrip_standard_attached_batch(self):
+        document = b"My data"
+        metadata = AlloyMetadata.new_simple("tenant")
+        documents = {"doc": document}
+        encrypted = await self.sdk.standard_attached().encrypt_batch(
+            documents, metadata
+        )
+        assert len(encrypted.successes) == 1
+        assert len(encrypted.failures) == 0
+        new_encrypted = {"bad_doc": b"123", "doc": encrypted.successes["doc"]}
+        decrypted = await self.sdk.standard_attached().decrypt_batch(
+            new_encrypted, metadata
+        )
+        assert len(decrypted.successes) == 1
+        assert len(decrypted.failures) == 1
+        assert decrypted.successes["doc"] == document
+
+    @pytest.mark.asyncio
+    async def test_rekey_v4_standard_attached(self):
+        # Document encrypted using Cloaked Search Standalone
+        document = base64.b64decode(
+            "BElST04AdgokCiAsN4NHsRTS4bq0a6wE9QUJFbWSf67pqkIgrzHPfztA3RABEk4STBpKCgxVKAX2fYD7F4W13dwSMN6LnbYAlUgekKbpI0z9LFeoUNNJZTUDX7WqoDZSWJ+uSEOoR7U8YSnaBlTBG8tw5hoIOX50ZW5hbnRIXNdHBgvQNRD/s1lTAxgMaKrMv0CL2AwLFuNtKPpLjObeLmdAkYKpe+uwbg=="
+        )
+        metadata = AlloyMetadata.new_simple("tenant")
+        documents = {"doc": document}
+        rekeyed = await self.sdk.standard_attached().rekey_documents(
+            documents, metadata, None
+        )
+        assert len(rekeyed.successes) == 1
+        assert len(rekeyed.failures) == 0
+        decrypted = await self.sdk.standard_attached().decrypt(
+            rekeyed.successes["doc"], metadata
+        )
+        assert decrypted == b'{"title":"blah"}'
+
+    @pytest.mark.asyncio
+    async def test_rekey_standard_attached_new_tenant(self):
+        document = b"My data"
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await self.sdk.standard_attached().encrypt(document, metadata)
+        documents = {"doc": encrypted}
+        rekeyed = await self.sdk.standard_attached().rekey_documents(
+            documents, metadata, "new_tenant"
+        )
+        assert len(rekeyed.successes) == 1
+        assert len(rekeyed.failures) == 0
+        with pytest.raises(AlloyError.DecryptError) as tsp_error:
+            # doesn't use the new tenant ID
+            await self.sdk.standard_attached().decrypt(
+                rekeyed.successes["doc"], metadata
+            )
+        assert "Ensure the data and key are correct" in tsp_error.value.msg
+        new_metadata = AlloyMetadata.new_simple("new_tenant")
+        decrypted = await self.sdk.standard_attached().decrypt(
+            rekeyed.successes["doc"], new_metadata
+        )
+        assert decrypted == document
+
+    @pytest.mark.asyncio
     async def test_encrypt_with_existing_edek(self):
         document = {"foo": b"My data"}
         document2 = {"foo": b"My data2"}

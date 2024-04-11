@@ -77,6 +77,7 @@ pub struct EncryptedDocument {
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
 
+#[derive(Debug, Clone)]
 pub struct EncryptedDocuments(pub HashMap<DocumentId, EncryptedDocument>);
 custom_newtype!(EncryptedDocuments, HashMap<DocumentId, EncryptedDocument>);
 pub struct PlaintextDocuments(pub HashMap<DocumentId, PlaintextDocument>);

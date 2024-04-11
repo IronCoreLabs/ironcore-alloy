@@ -17,7 +17,7 @@ fun Float.sameValueAs(other: Float): Boolean {
 }
 
 class IroncoreAlloyTest {
-    val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".base64ToByteArray()
+    val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".toByteArray()
     val approximationFactor = 1.1f
     val standardSecrets = StandardSecrets(10, listOf(StandaloneSecret(10, Secret(keyByteArray))))
     val deterministicSecrets =
@@ -68,9 +68,9 @@ class IroncoreAlloyTest {
 
     @Test
     fun sdkVectorDecrypt() {
-        val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
+        val ciphertext = listOf(4422816.0f, 15091436.0f, 9409391.0f)
         val iclMetadata =
-                "AAAAAoEACgxPGmuySl4VniL/cbMSIOykrH8Xa9rVT4vtQZE73EM3G6AOrEae4tVgIpxA3lhp".base64ToByteArray()
+                "AAAAAoEACgxFUZiS8PORQubGnk8SIJKbkabplwXSyzEJvXKalrg+Os+OCyDFzMZ2Tf3rei8g".base64ToByteArray()
         val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
@@ -108,9 +108,9 @@ class IroncoreAlloyTest {
 
     @Test
     fun sdkVectorRotateDifferentTenant() {
-        val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
+        val ciphertext = listOf(4422816.0f, 15091436.0f, 9409391.0f)
         val iclMetadata =
-                "AAAAAoEACgxPGmuySl4VniL/cbMSIOykrH8Xa9rVT4vtQZE73EM3G6AOrEae4tVgIpxA3lhp".base64ToByteArray()
+                "AAAAAoEACgxFUZiS8PORQubGnk8SIJKbkabplwXSyzEJvXKalrg+Os+OCyDFzMZ2Tf3rei8g".base64ToByteArray()
         val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
         val vectors = mapOf("vector" to encrypted)
         val metadata = AlloyMetadata.newSimple("tenant")
@@ -144,9 +144,9 @@ class IroncoreAlloyTest {
                 )
         val config2 = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets2)
         val sdk2 = Standalone(config2)
-        val ciphertext = listOf(11374474.0f, 5756342.0f, 15267408.0f)
+        val ciphertext = listOf(4422816.0f, 15091436.0f, 9409391.0f)
         val iclMetadata =
-                "AAAAAoEACgxPGmuySl4VniL/cbMSIOykrH8Xa9rVT4vtQZE73EM3G6AOrEae4tVgIpxA3lhp".base64ToByteArray()
+                "AAAAAoEACgxFUZiS8PORQubGnk8SIJKbkabplwXSyzEJvXKalrg+Os+OCyDFzMZ2Tf3rei8g".base64ToByteArray()
         val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
         val vectors = mapOf("vector" to encrypted)
         val metadata = AlloyMetadata.newSimple("tenant")
@@ -186,7 +186,7 @@ class IroncoreAlloyTest {
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
             val encrypted = sdk.deterministic().encrypt(field, metadata)
-            val expected = "AAAAAoAAUvfq7IxbDEtW26wr4H8x2JCtyB4DCzk=".base64ToByteArray()
+            val expected = "AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak=".base64ToByteArray()
             assertContentEquals(expected, encrypted.encryptedField)
         }
     }
@@ -225,6 +225,82 @@ class IroncoreAlloyTest {
         runBlocking {
             val encrypted = sdk.standardAttached().encrypt(plaintextDocument, metadata)
             val decrypted = sdk.standardAttached().decrypt(encrypted, metadata)
+            assertContentEquals(decrypted, plaintextDocument)
+        }
+    }
+
+    @Test
+    fun sdkStandardAttachedRoundtripBatch() {
+        val plaintextDocument = "My data".toByteArray()
+        val metadata = AlloyMetadata.newSimple("tenant")
+        val documents = mapOf("doc" to plaintextDocument)
+        runBlocking {
+            val encrypted = sdk.standardAttached().encryptBatch(documents, metadata)
+            assertEquals(encrypted.successes.size, 1)
+            assertEquals(encrypted.failures.size, 0)
+            val newEncrypted =
+                    mapOf(
+                            "badDoc" to "bad".toByteArray(),
+                            "doc" to encrypted.successes.get("doc")!!
+                    )
+            val decrypted = sdk.standardAttached().decryptBatch(newEncrypted, metadata)
+            assertEquals(decrypted.successes.size, 1)
+            assertEquals(decrypted.failures.size, 1)
+            assertContentEquals(decrypted.successes.get("doc")!!, plaintextDocument)
+        }
+    }
+
+    @Test
+    fun sdkStandardAttachedDecryptV4() {
+        // Document encrypted using Cloaked Search Standalone
+        val encryptedDocument =
+                "BElST04AdgokCiAsN4NHsRTS4bq0a6wE9QUJFbWSf67pqkIgrzHPfztA3RABEk4STBpKCgxVKAX2fYD7F4W13dwSMN6LnbYAlUgekKbpI0z9LFeoUNNJZTUDX7WqoDZSWJ+uSEOoR7U8YSnaBlTBG8tw5hoIOX50ZW5hbnRIXNdHBgvQNRD/s1lTAxgMaKrMv0CL2AwLFuNtKPpLjObeLmdAkYKpe+uwbg==".base64ToByteArray()
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val decrypted = sdk.standardAttached().decrypt(encryptedDocument, metadata)
+            val expected = """{"title":"blah"}""".toByteArray()
+            assertContentEquals(decrypted, expected)
+        }
+    }
+
+    @Test
+    fun sdkStandardAttachedRekeyV4() {
+        // Document encrypted using Cloaked Search Standalone
+        val encryptedDocument =
+                "BElST04AdgokCiAsN4NHsRTS4bq0a6wE9QUJFbWSf67pqkIgrzHPfztA3RABEk4STBpKCgxVKAX2fYD7F4W13dwSMN6LnbYAlUgekKbpI0z9LFeoUNNJZTUDX7WqoDZSWJ+uSEOoR7U8YSnaBlTBG8tw5hoIOX50ZW5hbnRIXNdHBgvQNRD/s1lTAxgMaKrMv0CL2AwLFuNtKPpLjObeLmdAkYKpe+uwbg==".base64ToByteArray()
+        val metadata = AlloyMetadata.newSimple("tenant")
+        val documents = mapOf("doc" to encryptedDocument)
+        runBlocking {
+            val rekeyed = sdk.standardAttached().rekeyDocuments(documents, metadata, null)
+            assertEquals(rekeyed.successes.size, 1)
+            assertEquals(rekeyed.failures.size, 0)
+            val decrypted = sdk.standardAttached().decrypt(rekeyed.successes.get("doc")!!, metadata)
+            val expected = """{"title":"blah"}""".toByteArray()
+            assertContentEquals(decrypted, expected)
+        }
+    }
+
+    @Test
+    fun sdkStandardAttachedRekeyNewTenant() {
+        val plaintextDocument = "My data".toByteArray()
+        val metadata = AlloyMetadata.newSimple("tenant")
+        val documents = mapOf("doc" to plaintextDocument)
+        runBlocking {
+            val encrypted = sdk.standardAttached().encryptBatch(documents, metadata)
+            val rekeyed =
+                    sdk.standardAttached()
+                            .rekeyDocuments(encrypted.successes, metadata, "new_tenant")
+            assertEquals(rekeyed.successes.size, 1)
+            assertEquals(rekeyed.failures.size, 0)
+            // Uses wrong tenant ID
+            val err =
+                    assertFailsWith<AlloyException.DecryptException>() {
+                        sdk.standardAttached().decrypt(rekeyed.successes.get("doc")!!, metadata)
+                    }
+            assertContains(err.msg, "Ensure the data and key are correct.")
+            val newMetadata = AlloyMetadata.newSimple("new_tenant")
+            val decrypted =
+                    sdk.standardAttached().decrypt(rekeyed.successes.get("doc")!!, newMetadata)
             assertContentEquals(decrypted, plaintextDocument)
         }
     }
@@ -291,7 +367,7 @@ class IroncoreAlloyTest {
 
     @Test
     fun sdkDecryptDeterministic() {
-        val ciphertext = "AAAAAoAAUvfq7IxbDEtW26wr4H8x2JCtyB4DCzk=".base64ToByteArray()
+        val ciphertext = "AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak=".base64ToByteArray()
         val encryptedField = EncryptedField(ciphertext, "", "")
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {

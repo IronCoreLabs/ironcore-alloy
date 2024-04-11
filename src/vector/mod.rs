@@ -40,7 +40,7 @@ pub struct PlaintextVector {
     pub derivation_path: DerivationPath,
 }
 
-// TODO: These newtype can't include VectorId because of a bug with generated Python
+// TODO: These newtypes can't include VectorId because of a bug with generated Python
 // not using forward references. If this is addressed, we can change it.
 pub struct PlaintextVectors(pub HashMap<String, PlaintextVector>);
 custom_newtype!(PlaintextVectors, HashMap<String, PlaintextVector>);

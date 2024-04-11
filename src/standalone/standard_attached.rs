@@ -3,17 +3,21 @@ use crate::{
     errors::AlloyError,
     standard::StandardDocumentOps,
     standard_attached::{
-        decrypt_core, encrypt_core, EncryptedAttachedDocument, StandardAttachedDocumentOps,
+        decrypt_batch_core, decrypt_core, encrypt_batch_core, encrypt_core, rekey_core,
+        EncryptedAttachedDocument, EncryptedAttachedDocuments, PlaintextAttachedDocument,
+        PlaintextAttachedDocuments, RekeyAttachedDocumentsBatchResult,
+        StandardAttachedDecryptBatchResult, StandardAttachedDocumentOps,
+        StandardAttachedEncryptBatchResult,
     },
-    AlloyMetadata, PlaintextBytes,
+    AlloyMetadata, PlaintextBytes, TenantId,
 };
 
 #[derive(uniffi::Object)]
-pub struct StandaloneAttachedStandardClient {
+pub struct StandaloneStandardAttachedClient {
     standard_client: StandaloneStandardClient,
 }
 
-impl StandaloneAttachedStandardClient {
+impl StandaloneStandardAttachedClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {
         Self {
             standard_client: StandaloneStandardClient::new(config),
@@ -22,26 +26,70 @@ impl StandaloneAttachedStandardClient {
 }
 
 #[uniffi::export]
-impl StandardAttachedDocumentOps for StandaloneAttachedStandardClient {
-    /// Encrypt a field with the provided metadata.
+impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
+    /// Encrypt a document with the provided metadata.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key.
     /// The result is a single blob of bytes with the edek put on the front of it.
     async fn encrypt(
         &self,
-        plaintext_field: PlaintextBytes,
+        plaintext_document: PlaintextAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedAttachedDocument, AlloyError> {
-        encrypt_core(&self.standard_client, plaintext_field, metadata).await
+        encrypt_core(
+            &self.standard_client,
+            PlaintextBytes(plaintext_document.0),
+            metadata,
+        )
+        .await
     }
 
-    /// Decrypt a field that was encrypted with the provided metadata.
+    /// Encrypt multiple documents with the provided metadata.
+    /// A DEK (document encryption key) will be generated for each document and encrypted using a derived key.
+    async fn encrypt_batch(
+        &self,
+        plaintext_documents: PlaintextAttachedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardAttachedEncryptBatchResult, AlloyError> {
+        encrypt_batch_core(&self.standard_client, plaintext_documents, metadata).await
+    }
+
+    /// Decrypt a document that was encrypted with the provided metadata.
     /// The document must have been encrypted using attached encryption and not deterministic or standard encryption.
     async fn decrypt(
         &self,
-        encrypted_field: crate::standard_attached::EncryptedAttachedDocument,
-        metadata: &crate::AlloyMetadata,
-    ) -> Result<crate::PlaintextBytes, crate::errors::AlloyError> {
-        decrypt_core(&self.standard_client, encrypted_field, metadata).await
+        encrypted_document: EncryptedAttachedDocument,
+        metadata: &AlloyMetadata,
+    ) -> Result<PlaintextAttachedDocument, AlloyError> {
+        decrypt_core(&self.standard_client, encrypted_document, metadata)
+            .await
+            .map(|x| PlaintextAttachedDocument(x.0))
+    }
+
+    /// Decrypt multiple documents that were encrypted with the provided metadata.
+    /// The documents must have been encrypted using attached encryption and not deterministic or standard encryption.
+    async fn decrypt_batch(
+        &self,
+        encrypted_documents: EncryptedAttachedDocuments,
+        metadata: &AlloyMetadata,
+    ) -> Result<StandardAttachedDecryptBatchResult, AlloyError> {
+        decrypt_batch_core(&self.standard_client, encrypted_documents, metadata).await
+    }
+
+    /// Decrypt the provided documents and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
+    /// the documents will be encrypted to the original tenant.
+    async fn rekey_documents(
+        &self,
+        encrypted_documents: EncryptedAttachedDocuments,
+        metadata: &AlloyMetadata,
+        new_tenant_id: Option<TenantId>,
+    ) -> Result<RekeyAttachedDocumentsBatchResult, AlloyError> {
+        rekey_core(
+            &self.standard_client,
+            encrypted_documents,
+            metadata,
+            new_tenant_id,
+        )
+        .await
     }
 
     /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
@@ -50,7 +98,7 @@ impl StandardAttachedDocumentOps for StandaloneAttachedStandardClient {
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
     /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
-    async fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         self.standard_client.get_searchable_edek_prefix(id)
     }
 }
@@ -58,12 +106,12 @@ impl StandardAttachedDocumentOps for StandaloneAttachedStandardClient {
 #[cfg(test)]
 mod test {
     use super::*;
-    fn default_client() -> StandaloneAttachedStandardClient {
+    fn default_client() -> StandaloneStandardAttachedClient {
         new_client(Some(1))
     }
 
-    fn new_client(primary_secret_id: Option<u32>) -> StandaloneAttachedStandardClient {
-        StandaloneAttachedStandardClient {
+    fn new_client(primary_secret_id: Option<u32>) -> StandaloneStandardAttachedClient {
+        StandaloneStandardAttachedClient {
             standard_client: crate::standalone::standard::test::new_client(primary_secret_id),
         }
     }
@@ -105,11 +153,14 @@ mod test {
 
         let client = default_client();
         let result = client
-            .decrypt(EncryptedAttachedDocument(encrypted.to_vec()), &metadata)
+            .decrypt(
+                EncryptedAttachedDocument(encrypted.to_vec().into()),
+                &metadata,
+            )
             .await
             .unwrap();
 
-        assert_eq!(result, vec![100u8; 400].into());
+        assert_eq!(result.0, vec![100u8; 400]);
     }
 
     #[tokio::test]
@@ -150,7 +201,10 @@ mod test {
 
         let client = default_client();
         let err = client
-            .decrypt(EncryptedAttachedDocument(encrypted.to_vec()), &metadata)
+            .decrypt(
+                EncryptedAttachedDocument(encrypted.to_vec().into()),
+                &metadata,
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, AlloyError::DecryptError { msg: _ }))
@@ -163,7 +217,10 @@ mod test {
 
         let client = default_client();
         let encrypted = client
-            .encrypt(plaintext.to_vec().into(), &metadata)
+            .encrypt(
+                PlaintextAttachedDocument(plaintext.to_vec().into()),
+                &metadata,
+            )
             .await
             .unwrap();
         let result = client.decrypt(encrypted, &metadata).await.unwrap();
