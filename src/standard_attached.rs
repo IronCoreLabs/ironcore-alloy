@@ -257,7 +257,7 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
                     edocs.insert(document_id, attached_document.edoc);
                 }
                 Err(e) => {
-                    failures.insert(document_id, AlloyError::from(e));
+                    failures.insert(document_id, e);
                 }
             };
             Ok::<_, AlloyError>((edeks, edocs, failures))
