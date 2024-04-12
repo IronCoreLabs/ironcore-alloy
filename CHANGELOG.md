@@ -4,10 +4,14 @@ Breaking changes:
 
 - Dropped support for Python 3.8
 - Reworked several type aliases into newtype structs. In Rust this will require creating structs, but Python and Kotlin are unaffected.
+- Renamed `StandaloneAttachedStandardClient` to `StandaloneStandardAttachedClient`.
+- Changed Standard Attached `get_searchable_edek_prefix` to be synchronous.
 
 Other changes:
 
 - Added batch functionality to all SDK traits.
+- Fixed a bug where Standard Attached wasn't accessible for SaaS Shield clients.
+- Added rekey functionality for standard_attached data.
 
 ## 0.10.2
 

@@ -46,6 +46,7 @@ custom_newtype!(PlaintextDocumentsWithEdeks, HashMap<DocumentId, PlaintextDocume
 #[derive(Debug, Clone, PartialEq, Eq)]
 // TODO: This newtype can't include EncryptedBytes because of a bug with generated Python
 // not using forward references. If this is addressed, we can change it.
+// See https://github.com/mozilla/uniffi-rs/issues/2067
 // Key ID header followed by V4DocumentHeader containing the EDEK.
 // Note that in the case of SaaS Shield Standard, users could create this with a
 // legacy V3 EDEK, which is just the EDEK. This has to be handled manually on decrypts.
@@ -77,6 +78,7 @@ pub struct EncryptedDocument {
     pub document: HashMap<FieldId, EncryptedBytes>,
 }
 
+#[derive(Debug, Clone)]
 pub struct EncryptedDocuments(pub HashMap<DocumentId, EncryptedDocument>);
 custom_newtype!(EncryptedDocuments, HashMap<DocumentId, EncryptedDocument>);
 pub struct PlaintextDocuments(pub HashMap<DocumentId, PlaintextDocument>);

@@ -27,6 +27,7 @@ custom_newtype!(PlaintextFields, HashMap<FieldId, PlaintextField>);
 
 // TODO: These newtype can't include FieldId because of a bug with generated Python
 // not using forward references. If this is addressed, we can change it.
+// See https://github.com/mozilla/uniffi-rs/issues/2067
 pub struct EncryptedFields(pub HashMap<String, EncryptedField>);
 custom_newtype!(EncryptedFields, HashMap<String, EncryptedField>);
 pub struct GenerateFieldQueryResult(pub HashMap<FieldId, Vec<EncryptedField>>);
