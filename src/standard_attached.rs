@@ -21,6 +21,7 @@ use uniffi::custom_newtype;
 
 // TODO: This newtype can't include PlaintextBytes because of a bug with generated Python
 // not using forward references. If this is addressed, we can change it.
+// See https://github.com/mozilla/uniffi-rs/issues/2067
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlaintextAttachedDocument(pub Vec<u8>);
 custom_newtype!(PlaintextAttachedDocument, Vec<u8>);
@@ -28,6 +29,7 @@ pub type PlaintextAttachedDocuments = HashMap<DocumentId, PlaintextAttachedDocum
 
 // TODO: This newtype can't include EncryptedBytes because of a bug with generated Python
 // not using forward references. If this is addressed, we can change it.
+// See https://github.com/mozilla/uniffi-rs/issues/2067
 #[derive(Debug, Clone)]
 pub struct EncryptedAttachedDocument(pub Vec<u8>);
 custom_newtype!(EncryptedAttachedDocument, Vec<u8>);

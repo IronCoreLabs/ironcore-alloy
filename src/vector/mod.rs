@@ -42,6 +42,7 @@ pub struct PlaintextVector {
 
 // TODO: These newtypes can't include VectorId because of a bug with generated Python
 // not using forward references. If this is addressed, we can change it.
+// See https://github.com/mozilla/uniffi-rs/issues/2067
 pub struct PlaintextVectors(pub HashMap<String, PlaintextVector>);
 custom_newtype!(PlaintextVectors, HashMap<String, PlaintextVector>);
 pub struct EncryptedVectors(pub HashMap<String, EncryptedVector>);
