@@ -1,22 +1,30 @@
-use std::env;
-use std::time::Duration;
-
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ironcore_alloy::saas_shield::config::SaasShieldConfiguration;
 use ironcore_alloy::standalone::config::{
     RotatableSecret, StandaloneConfiguration, StandaloneSecret, StandardSecrets, VectorSecret,
 };
-use ironcore_alloy::standard::{EncryptedDocument, PlaintextDocument, StandardDocumentOps};
+use ironcore_alloy::standard::{
+    EncryptedDocument, PlaintextDocument, PlaintextDocuments, StandardDocumentOps,
+};
 use ironcore_alloy::vector::{PlaintextVector, VectorOps};
 use ironcore_alloy::{
-    AlloyMetadata, PlaintextBytes, SaasShield, Secret, SecretPath, Standalone, TenantId,
+    AlloyMetadata, DocumentId, PlaintextBytes, SaasShield, Secret, SecretPath, Standalone, TenantId,
 };
 use ironcore_alloy::{DerivationPath, FieldId};
 use itertools::Itertools;
 use rand::rngs::ThreadRng;
 use rand::{Rng, RngCore};
-use rand_distr::{Alphanumeric, Uniform};
-use tokio::runtime::Runtime;
+use rand_distr::Uniform;
+use std::collections::HashMap;
+use std::env;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::runtime::{Handle, Runtime};
+
+fn random_bytes(rng: ThreadRng, length: usize) -> PlaintextBytes {
+    let uniform = Uniform::new_inclusive(0, 255);
+    PlaintextBytes(rng.sample_iter(&uniform).take(length).collect_vec())
+}
 
 fn benches(c: &mut Criterion) {
     let mut rng = rand::thread_rng();
@@ -45,7 +53,7 @@ fn benches(c: &mut Criterion) {
     let metadata = AlloyMetadata::new_simple(TenantId("tenant".to_string()));
 
     let range = Uniform::from(-1.0..1.0);
-    c.bench_function("encrypt d=1k", |b| {
+    c.bench_function("vector_encrypt d=1k", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
             || rng.clone().sample_iter(&range).take(1000).collect_vec(),
             |values| async {
@@ -60,54 +68,40 @@ fn benches(c: &mut Criterion) {
         )
     });
 
-    fn random_word(rng: ThreadRng, length: usize) -> Vec<u8> {
-        rng.sample_iter(&Alphanumeric)
-            .take(length)
-            .map(char::from)
-            .collect::<String>()
-            .into_bytes()
-    }
-    let roundtrip = |value: Vec<u8>| async {
+    let roundtrip = |value: PlaintextBytes| async {
         let encrypted = sdk
             .standard()
             .encrypt(
-                PlaintextDocument([(FieldId("foo".to_string()), value.into())].into()),
+                PlaintextDocument([(FieldId("foo".to_string()), value)].into()),
                 &metadata,
             )
             .await
             .unwrap();
         sdk.standard().decrypt(encrypted, &metadata).await.unwrap();
     };
-    c.bench_function(
-        format!("Standalone - encrypt/decrypt roundtrip 10B").as_str(),
-        |b| {
-            b.to_async(Runtime::new().unwrap()).iter_batched(
-                || random_word(rng.clone(), 10),
-                roundtrip,
-                BatchSize::SmallInput,
-            )
-        },
-    );
-    c.bench_function(
-        format!("Standalone - encrypt/decrypt roundtrip 10KB").as_str(),
-        |b| {
-            b.to_async(Runtime::new().unwrap()).iter_batched(
-                || random_word(rng.clone(), 10_000),
-                roundtrip,
-                BatchSize::SmallInput,
-            )
-        },
-    );
-    c.bench_function(
-        format!("Standalone - encrypt/decrypt roundtrip 100KB").as_str(),
-        |b| {
-            b.to_async(Runtime::new().unwrap()).iter_batched(
-                || random_word(rng.clone(), 100_000),
-                roundtrip,
-                BatchSize::SmallInput,
-            )
-        },
-    );
+
+    c.bench_function("Standalone - roundtrip 10B", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || random_bytes(rng.clone(), 10),
+            roundtrip,
+            BatchSize::SmallInput,
+        )
+    });
+    c.bench_function("Standalone - roundtrip 10KB", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || random_bytes(rng.clone(), 10_000),
+            roundtrip,
+            BatchSize::SmallInput,
+        )
+    });
+    c.bench_function("Standalone - roundtrip 100KB", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || random_bytes(rng.clone(), 100_000),
+            roundtrip,
+            BatchSize::SmallInput,
+        )
+    });
+
     // This test requires `computer_auth_hash` to be `pub`, so only
     // briefly un-comment and test, then re-comment.
     // {
@@ -140,71 +134,123 @@ fn tsp_benches(c: &mut Criterion) {
         sdk.standard().decrypt(encrypted, &metadata).await.unwrap()
     };
 
-    let roundtrip = |plaintext: PlaintextDocument| async {
-        let encrypted = encrypt(plaintext).await;
-        decrypt(encrypted).await
-    };
-
-    fn random_word(rng: ThreadRng, length: usize) -> PlaintextBytes {
-        PlaintextBytes(
-            rng.sample_iter(&Alphanumeric)
-                .take(length)
-                .map(char::from)
-                .collect::<String>()
-                .into_bytes(),
-        )
-    }
-
-    c.bench_function(
-        format!("TSP - encrypt/decrypt roundtrip fixed document from TSC tests").as_str(),
-        |b| {
-            b.to_async(Runtime::new().unwrap()).iter_batched(
-                || {
-                    PlaintextDocument(
-                        [(
-                            FieldId("doc1".to_string()),
-                            PlaintextBytes("Encrypt these bytes!".as_bytes().to_vec()),
-                        )]
-                        .into(),
-                    )
-                },
-                roundtrip,
-                BatchSize::SmallInput,
-            )
-        },
-    );
-
-    c.bench_function(format!("TSP - encrypt 10KB").as_str(), |b| {
+    c.bench_function("TSP - encrypt 1B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || {
-                PlaintextDocument(
-                    [(
-                        FieldId("doc1".to_string()),
-                        random_word(rng.clone(), 10_000),
-                    )]
-                    .into(),
-                )
-            },
+            || generate_plaintext(1, 1, rng.clone()),
             encrypt,
             BatchSize::SmallInput,
         )
     });
 
-    c.bench_function(format!("TSP - encrypt 100KB").as_str(), |b| {
+    c.bench_function("TSP - encrypt 100B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || {
-                PlaintextDocument(
-                    [(
-                        FieldId("doc1".to_string()),
-                        random_word(rng.clone(), 100_000),
-                    )]
-                    .into(),
-                )
-            },
+            || generate_plaintext(100, 1, rng.clone()),
             encrypt,
             BatchSize::SmallInput,
         )
     });
+
+    c.bench_function("TSP - encrypt 10KB", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || generate_plaintext(10_000, 1, rng.clone()),
+            encrypt,
+            BatchSize::SmallInput,
+        )
+    });
+
+    c.bench_function("TSP - encrypt 1MB", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || generate_plaintext(1_000_000, 1, rng.clone()),
+            encrypt,
+            BatchSize::SmallInput,
+        )
+    });
+
+    c.bench_function("TSP - decrypt 1B", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || preencrypt(1, sdk.clone(), metadata.clone(), rng.clone()),
+            decrypt,
+            BatchSize::SmallInput,
+        )
+    });
+
+    c.bench_function("TSP - decrypt 100B", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || preencrypt(100, sdk.clone(), metadata.clone(), rng.clone()),
+            decrypt,
+            BatchSize::SmallInput,
+        )
+    });
+
+    c.bench_function("TSP - decrypt 10KB", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || preencrypt(10_000, sdk.clone(), metadata.clone(), rng.clone()),
+            decrypt,
+            BatchSize::LargeInput,
+        )
+    });
+
+    c.bench_function("TSP - decrypt 1MB", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || preencrypt(1_000_000, sdk.clone(), metadata.clone(), rng.clone()),
+            decrypt,
+            BatchSize::SmallInput,
+        )
+    });
+
+    c.bench_function("TSP - batch encrypt 10 documents, 10 fields, 10B", |b| {
+        b.to_async(Runtime::new().unwrap()).iter_batched(
+            || {
+                PlaintextDocuments((0..10).fold(HashMap::new(), |mut acc, i| {
+                    let doc = generate_plaintext(10, 10, rng.clone());
+                    acc.insert(DocumentId(format!("doc{}", i)), doc);
+                    acc
+                }))
+            },
+            |documents: PlaintextDocuments| async {
+                sdk.standard()
+                    .encrypt_batch(documents, &metadata)
+                    .await
+                    .unwrap()
+            },
+            BatchSize::SmallInput,
+        )
+    });
+}
+
+fn generate_plaintext(
+    bytes_per_field: usize,
+    num_fields: usize,
+    rng: ThreadRng,
+) -> PlaintextDocument {
+    PlaintextDocument((0..num_fields).fold(HashMap::new(), |mut acc, i| {
+        acc.insert(
+            FieldId(format!("field{}", i)),
+            random_bytes(rng.clone(), bytes_per_field),
+        );
+        acc
+    }))
+}
+
+/// Generate a random word of the provided size and encrypt it using the SDK/metadata.
+/// This should then be passed in to the `setup` stage of `iter_batched`.
+fn preencrypt(
+    size: usize,
+    sdk: Arc<SaasShield>,
+    metadata: Arc<AlloyMetadata>,
+    rng: ThreadRng,
+) -> EncryptedDocument {
+    let plaintext =
+        PlaintextDocument([(FieldId("doc1".to_string()), random_bytes(rng, size))].into());
+    let handle = Handle::try_current().unwrap();
+    std::thread::spawn(move || {
+        // Using Handle::block_on to run async code in the new thread.
+        handle
+            .block_on(sdk.standard().encrypt(plaintext, &metadata))
+            .unwrap()
+    })
+    .join()
+    .unwrap()
 }
 
 criterion_group! {
