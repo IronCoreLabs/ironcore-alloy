@@ -29,7 +29,7 @@ mod test {
         generate_bindings(
             dynamic_library_paths[0].clone(),
             python_module_dir,
-            uniffi::TargetLanguage::Python,
+            uniffi::PythonBindingGenerator,
         )?;
         // run the hatch test command and print the output as though it were our output
         let o = Command::new("hatch")

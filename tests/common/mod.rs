@@ -10,8 +10,7 @@ use std::{
     process::{Command, ExitStatus, Stdio},
     sync::Arc,
 };
-use uniffi::TargetLanguage;
-use uniffi_bindgen::BindingGeneratorDefault;
+use uniffi_bindgen::BindingGenerator;
 
 pub type TestResult = Result<(), AlloyError>;
 
@@ -73,20 +72,17 @@ pub(crate) fn get_dynamic_library_paths() -> Result<Vec<PathBuf>, Box<dyn Error>
     Ok(paths)
 }
 
-pub(crate) fn generate_bindings(
+pub(crate) fn generate_bindings<T: BindingGenerator>(
     library_path: PathBuf,
     out_dir: PathBuf,
-    language: TargetLanguage,
+    language: T,
 ) -> Result<(), Box<dyn Error>> {
     let camino_lib_path = camino::Utf8PathBuf::from_path_buf(library_path).unwrap();
     let camino_out_dir = camino::Utf8PathBuf::from_path_buf(out_dir).unwrap();
     uniffi_bindgen::library_mode::generate_bindings(
         &camino_lib_path,
         None,
-        &BindingGeneratorDefault {
-            target_languages: vec![language],
-            try_format_code: false,
-        },
+        &language,
         None,
         &camino_out_dir,
         true,

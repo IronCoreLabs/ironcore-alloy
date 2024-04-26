@@ -6,7 +6,7 @@ use super::{
 use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::{check_rotation_no_op, get_rng, perform_batch_action, OurReseedingRng};
+use crate::util::{check_rotation_no_op, perform_batch_action, OurReseedingRng};
 use crate::vector::{
     decrypt_internal, encrypt_internal, get_approximation_factor, EncryptedVector,
     EncryptedVectors, GenerateVectorQueryResult, PlaintextVector, PlaintextVectors,
@@ -15,6 +15,7 @@ use crate::vector::{
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -55,7 +56,7 @@ impl SaasShieldVectorClient {
             key_id,
             Self::get_edek_type(),
             plaintext_vector,
-            &mut *get_rng(&self.rng),
+            self.rng.clone(),
         )
     }
 }
@@ -155,13 +156,13 @@ impl VectorOps for SaasShieldVectorClient {
                 new_key_id,
                 Self::get_edek_type(),
                 plaintext_vector,
-                &mut *get_rng(&self.rng),
+                self.rng.clone(),
             )
         };
         Ok(perform_batch_action(
             plaintext_vectors
                 .0
-                .into_iter()
+                .into_par_iter()
                 .map(|(k, v)| (VectorId(k), v)),
             encrypt_vector,
         )
@@ -256,7 +257,7 @@ impl VectorOps for SaasShieldVectorClient {
         Ok(perform_batch_action(
             encrypted_vectors
                 .0
-                .into_iter()
+                .into_par_iter()
                 .map(|(k, v)| (VectorId(k), v)),
             decrypt_vector,
         )
@@ -372,7 +373,7 @@ impl VectorOps for SaasShieldVectorClient {
                     new_key_id,
                     Self::get_edek_type(),
                     decrypted_vector,
-                    &mut *get_rng(&self.rng),
+                    self.rng.clone(),
                 )
             }
         };

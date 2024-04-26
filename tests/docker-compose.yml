@@ -1,4 +1,3 @@
-version: "3.3"
 services:
   tenant-security-proxy:
     env_file:

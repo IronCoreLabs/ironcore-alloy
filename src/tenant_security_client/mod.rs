@@ -26,7 +26,7 @@ mod request;
 mod rest;
 
 #[derive(Debug)]
-pub struct ApiKey(String);
+pub(crate) struct ApiKey(pub(crate) String);
 
 impl TryFrom<String> for ApiKey {
     type Error = AlloyError;
@@ -54,9 +54,9 @@ pub struct TenantSecurityClient {
 }
 
 impl TenantSecurityClient {
-    pub fn new(tsp_address: String, api_key: ApiKey, client: Client) -> TenantSecurityClient {
+    pub fn new(tsp_address: String, client: Client) -> TenantSecurityClient {
         TenantSecurityClient {
-            request: Arc::new(TspRequest::new(tsp_address, api_key, client)),
+            request: Arc::new(TspRequest::new(tsp_address, client)),
         }
     }
 

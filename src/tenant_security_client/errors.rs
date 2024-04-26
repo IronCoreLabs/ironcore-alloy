@@ -36,6 +36,7 @@ pub enum KmsError {
     KmsConfigurationInvalid,
     KmsUnreachable,
     KmsThrottled,
+    KmsAccountIssue,
 }
 
 /// Errors related to security events
@@ -129,6 +130,7 @@ impl TenantSecurityProxyError {
                 KmsError::KmsConfigurationInvalid => 207,
                 KmsError::KmsUnreachable => 208,
                 KmsError::KmsThrottled => 209,
+                KmsError::KmsAccountIssue => 210,
             },
             Self::SecurityEvent { error, .. } => match error {
                 SecurityEventError::SecurityEventRejected => 301,
@@ -175,7 +177,8 @@ impl Display for KmsError {
             Self::KmsAuthorizationFailed => write!(f, "Request to KMS failed because the tenant credentials were invalid or have been revoked"),
             Self::KmsConfigurationInvalid => write!(f, "Request to KMS failed because the key configuration was invalid or the necessary permissions for the operation were missing/revoked"),
             Self::KmsUnreachable => write!(f, "Request to KMS failed because KMS was unreachable"),
-            Self::KmsThrottled => write!(f, "Request to KMS failed because KMS throttled the Tenant Security Proxy")
+            Self::KmsThrottled => write!(f, "Request to KMS failed because KMS throttled the Tenant Security Proxy"),
+            Self::KmsAccountIssue => write!(f, "Request to KMS failed because of an issue with the KMS account."),
         }
     }
 }

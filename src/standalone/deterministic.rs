@@ -14,6 +14,7 @@ use crate::{
 };
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -158,7 +159,10 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             self.decrypt_sync(encrypted_field, &metadata.tenant_id)
         };
         Ok(perform_batch_action(
-            encrypted_fields.0.into_iter().map(|(k, v)| (FieldId(k), v)),
+            encrypted_fields
+                .0
+                .into_par_iter()
+                .map(|(k, v)| (FieldId(k), v)),
             decrypt_field,
         )
         .into())
@@ -252,7 +256,10 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             }
         };
         Ok(perform_batch_action(
-            encrypted_fields.0.into_iter().map(|(k, v)| (FieldId(k), v)),
+            encrypted_fields
+                .0
+                .into_par_iter()
+                .map(|(k, v)| (FieldId(k), v)),
             reencrypt_field,
         )
         .into())

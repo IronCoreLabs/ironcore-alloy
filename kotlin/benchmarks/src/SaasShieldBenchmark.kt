@@ -58,12 +58,17 @@ class SaasShieldBenchmark {
         }
     }
 
+    @TearDown
+    fun tearDown() {
+        saasShieldSdk.close()
+    }
+
     fun generatePlaintextDocument(bytesPerField: Int, numFields: Int): PlaintextDocument {
         val documentMap = HashMap<String, PlaintextBytes>()
         for (i in 1..numFields) {
             val byteArray = ByteArray(bytesPerField)
             kotlin.random.Random.nextBytes(byteArray)
-            documentMap.put("doc" + i, byteArray)
+            documentMap.put("field" + i, byteArray)
         }
         return documentMap
     }

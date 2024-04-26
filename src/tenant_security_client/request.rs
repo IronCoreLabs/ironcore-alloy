@@ -5,15 +5,12 @@ use super::rest::{
     SecretType, TenantDeriveKeyRequest, TspErrorResponse, UnwrapKeyRequest, UnwrapKeyResponse,
     WrapKeyResponse,
 };
-use super::{ApiKey, RequestMetadata};
+use super::RequestMetadata;
 use crate::errors::AlloyError;
 use crate::{DerivationPath, SecretPath};
 use async_trait::async_trait;
 use base64_type::Base64;
-use reqwest::{
-    header::{HeaderMap, HeaderValue},
-    Client, Response, StatusCode,
-};
+use reqwest::{Client, Response, StatusCode};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -29,28 +26,15 @@ const SECURITY_EVENT_ENDPOINT: &str = "event/security-event";
 
 pub struct TspRequest {
     tsp_address: String,
-    api_key: ApiKey,
     client: Client,
 }
 
 impl TspRequest {
-    pub fn new(tsp_address: String, api_key: ApiKey, client: Client) -> TspRequest {
+    pub fn new(tsp_address: String, client: Client) -> TspRequest {
         TspRequest {
             tsp_address,
-            api_key,
             client,
         }
-    }
-
-    pub fn get_default_headers(&self) -> HeaderMap {
-        let mut headers: HeaderMap = HeaderMap::default();
-        headers.insert("Content-Type", HeaderValue::from_static("application/json"));
-        let mut auth_header: HeaderValue = format!("cmk {}", self.api_key.0)
-            .parse()
-            .expect("Invalid API_KEY");
-        auth_header.set_sensitive(true);
-        headers.insert("Authorization", auth_header);
-        headers
     }
 
     async fn make_json_request<A: Serialize>(
@@ -59,13 +43,7 @@ impl TspRequest {
         post_data: A,
     ) -> Result<Response, AlloyError> {
         let url = format!("{}{}{}", self.tsp_address, TSP_API_PREFIX, endpoint);
-        let resp = self
-            .client
-            .post(url)
-            .json(&post_data)
-            .headers(self.get_default_headers())
-            .send()
-            .await?;
+        let resp = self.client.post(url).json(&post_data).send().await?;
         match resp.status() {
             StatusCode::OK => Ok(resp),
             status => {

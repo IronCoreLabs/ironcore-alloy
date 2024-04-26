@@ -1,5 +1,5 @@
 use super::{EncryptionKey, ScalingFactor, VectorEncryptionKey};
-use crate::util;
+use crate::util::{self, take_lock};
 use crate::util::{compute_auth_hash, create_rng, AuthHash};
 use itertools::Itertools;
 use ndarray::Array1;
@@ -7,6 +7,8 @@ use ndarray_rand::RandomExt;
 use rand::{CryptoRng, RngCore};
 use rand_chacha::ChaCha20Rng;
 use rand_distr::{Distribution, StandardNormal, Uniform};
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex};
 use std::{error::Error, fmt::Display};
 
 const SHUFFLE_KEY:&str = "One Ring to rule them all, One Ring to find them, One Ring to bring them all, and in the darkness bind them";
@@ -126,7 +128,7 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng>(
     key: &VectorEncryptionKey, // K + s in the paper, key and scaling factor
     approximation_factor: f32,
     message: Array1<f32>, // m in the paper, vector
-    rng: &mut R,
+    rng: Arc<Mutex<R>>,
 ) -> Result<EncryptResult, EncryptError> {
     if key.scaling_factor.0 == 0. || key.scaling_factor.0 == -0. {
         return Err(EncryptError::InvalidKey(
@@ -141,7 +143,7 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng>(
     // n in the paper
     let iv: [u8; 12] = {
         let mut iv_internal = [0u8; 12];
-        rng.fill_bytes(&mut iv_internal);
+        take_lock(&rng).deref_mut().fill_bytes(&mut iv_internal);
         iv_internal
     };
 
@@ -255,7 +257,7 @@ pub(crate) mod tests {
     const NEW_APPROX_FACTOR: f32 = 2.236;
     #[test]
     fn encrypt_produces_known_value() {
-        let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         let result = encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
@@ -269,7 +271,7 @@ pub(crate) mod tests {
             },
             NEW_APPROX_FACTOR,
             vec![1., 2., 3., 4., 5.].into(),
-            &mut k,
+            Arc::new(Mutex::new(k)),
         )
         .unwrap();
         assert_eq!(
@@ -291,7 +293,7 @@ pub(crate) mod tests {
 
     #[test]
     fn encrypt_works_with_empty_key() {
-        let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         let result = encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
@@ -305,7 +307,7 @@ pub(crate) mod tests {
             },
             ORIGINAL_APPROX_FACTOR,
             vec![1., 2., 3., 4., 5.].into(),
-            &mut k,
+            Arc::new(Mutex::new(k)),
         )
         .unwrap();
         assert_eq!(
@@ -327,7 +329,7 @@ pub(crate) mod tests {
 
     #[test]
     fn encrypt_works_with_empty_key_and_message() {
-        let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         let result = encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
@@ -341,7 +343,7 @@ pub(crate) mod tests {
             },
             ORIGINAL_APPROX_FACTOR,
             vec![].into(),
-            &mut k,
+            Arc::new(Mutex::new(k)),
         )
         .unwrap();
         assert_eq!(result.ciphertext.len(), 0);
@@ -352,7 +354,7 @@ pub(crate) mod tests {
     }
 
     fn encrypt_with_scaling_factor(s: f32) -> Result<EncryptResult, EncryptError> {
-        let mut k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
         encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(s),
@@ -366,7 +368,7 @@ pub(crate) mod tests {
             },
             ORIGINAL_APPROX_FACTOR,
             vec![].into(),
-            &mut k,
+            Arc::new(Mutex::new(k)),
         )
     }
 
@@ -495,7 +497,7 @@ pub(crate) mod tests {
             &key,
             ORIGINAL_APPROX_FACTOR,
             message.clone(),
-            &mut rand::thread_rng(),
+            Arc::new(Mutex::new(rand::thread_rng())),
         )
         .unwrap();
         let decrypt_result = decrypt(&key, ORIGINAL_APPROX_FACTOR, encrypt_result).unwrap();
@@ -512,7 +514,7 @@ pub(crate) mod tests {
             };
             let approximation_factor = 5.;
             let message: Array1<f32> = arb_msg.into_iter().map(|u| u as f32).collect();
-            let encrypt_result = encrypt(&key, approximation_factor, message.clone(), &mut rand::thread_rng()).unwrap();
+            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  Arc::new(Mutex::new(rand::thread_rng()))).unwrap();
             let decrypt_result = decrypt(&key, approximation_factor, encrypt_result).unwrap();
             assert_ulps_eq!(message.as_slice().unwrap(), decrypt_result.as_slice().unwrap());
         }
