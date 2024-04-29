@@ -87,8 +87,8 @@ path = "uniffi-bindgen.rs"
 # 6.9M vs 1.5M in initial testing. Can further have `strip` (the Unix utility) run on it to save ~0.2 MB more.
 # WARNING: be careful changing this, since downstream integration tests (in "core/tests") depend on this profile.
 [profile.release]
-opt-level = 3     # Our crypto basically requires opt-level 3 for reasonable speeds
-lto = true        # Enable Link Time Optimization
-codegen-units = 1 # Reduce number of codegen units to increase optimizations.
-panic = 'abort'   # Abort on panic
-strip = 'debug'
+opt-level = 3       # Our crypto basically requires opt-level 3 for reasonable speeds
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+panic = 'abort'     # Abort on panic
+strip = 'debuginfo'
