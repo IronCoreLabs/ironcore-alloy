@@ -103,20 +103,21 @@ pub trait StandardAttachedDocumentOps {
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
 }
 
+/// Turns the encrypted document into an attached document.
+/// Note that this assumes the EncryptedDocument will only have 1 field and that field should become the attached document.
 fn encrypted_document_to_attached(
     encrypted_document: EncryptedDocument,
 ) -> Result<EncryptedAttachedDocument, AlloyError> {
-    let hardcoded_field_id = FieldId("".to_string());
     let EncryptedDocument {
         edek: edek_with_key_id_bytes,
-        // Mutable so we can removed the hardcoded key below.
-        mut document,
+        document,
     } = encrypted_document;
     let (key_id_header, edek_bytes) =
         key_id_header::decode_version_prefixed_value(edek_with_key_id_bytes.0.into())?;
     let edek = v4_proto_from_bytes(edek_bytes)?;
     let edoc = document
-        .remove(&hardcoded_field_id)
+        .into_values()
+        .next()
         .ok_or(AlloyError::EncryptError {
             msg: "Encryption returned a document without a passed in field. This shouldn't happen."
                 .to_string(),
@@ -245,8 +246,8 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
 
 fn encrypted_attached_to_unattached<T: StandardDocumentOps>(
     encrypted_document: EncryptedAttachedDocument,
+    field_id: FieldId,
 ) -> Result<EncryptedDocument, AlloyError> {
-    let hardcoded_field_id = FieldId("".to_string());
     let AttachedDocument {
         key_id_header,
         edek,
@@ -255,7 +256,7 @@ fn encrypted_attached_to_unattached<T: StandardDocumentOps>(
     Ok(EncryptedDocument {
         edek: EdekWithKeyIdHeader::new(key_id_header, edek),
         document: [(
-            hardcoded_field_id.clone(),
+            field_id,
             EncryptedBytes(v5::EncryptedPayload::from(edoc).write_to_bytes()),
         )]
         .into_iter()
@@ -272,7 +273,9 @@ pub(crate) async fn decrypt_batch_core<T: StandardDocumentOps>(
     let BatchResult {
         successes: encrypted_unattached_documents,
         failures: transform_failures,
-    } = perform_batch_action(encrypted_documents, encrypted_attached_to_unattached::<T>);
+    } = perform_batch_action(encrypted_documents, |encrypted_document| {
+        encrypted_attached_to_unattached::<T>(encrypted_document, hardcoded_field_id.clone())
+    });
     let decrypted_batch = standard_client
         .decrypt_batch(EncryptedDocuments(encrypted_unattached_documents), metadata)
         .await?;
