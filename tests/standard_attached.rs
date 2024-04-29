@@ -215,7 +215,6 @@ mod tests {
             .standard_attached()
             .rekey_documents(docs, &metadata, None)
             .await?;
-        dbg!(&all_rekeyed.failures);
         assert_eq!(all_rekeyed.successes.len(), 1);
         assert_eq!(all_rekeyed.failures.len(), 0);
         assert!(all_rekeyed

@@ -42,7 +42,10 @@ ring = "0.17"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.96", features = ["float_roundtrip"] }
 thiserror = "1.0.50"
-uniffi = { git = "https://github.com/mozilla/uniffi-rs", features = ["tokio"] }
+uniffi = { git = "https://github.com/mozilla/uniffi-rs", features = [
+    "tokio",
+    "cli",
+] }
 z85 = "3.0.5"
 
 [dev-dependencies]
@@ -58,7 +61,6 @@ hex-literal = "0.4.1"
 lazy_static = "1.4"
 proptest = "1.2.0"
 tokio = { version = "1.33", features = ["macros", "rt-multi-thread"] }
-uniffi = { git = "https://github.com/mozilla/uniffi-rs", features = ["cli"] }
 uniffi_bindgen = { git = "https://github.com/mozilla/uniffi-rs" }
 z85 = "3.0.5"
 
@@ -80,7 +82,6 @@ name = "ironcore_alloy"
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
-required-features = ["uniffi/cli"]
 
 # used to create the smallest cdylib binary we can to ship with the library in each ecosystem.
 # 6.9M vs 1.5M in initial testing. Can further have `strip` (the Unix utility) run on it to save ~0.2 MB more.

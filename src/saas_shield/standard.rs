@@ -527,7 +527,6 @@ fn find_cmk_edek_v5(
             .iter()
             .map(|edek| edek.kmsConfigId as u32)
             .collect_vec();
-        dbg!(&kms_config_ids);
         maybe_cmk_edeks
             .into_iter()
             .find(|edek| edek.kmsConfigId as u32 == kms_config_id)
