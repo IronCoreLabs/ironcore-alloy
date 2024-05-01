@@ -1050,9 +1050,9 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd19765db5c9c4d9d1953cf161cc3d0e24230149b044ba659aa394dba70832fc"
+checksum = "caa3f9b0cb178f9448ea1e10a66ab71438a3faa4105d7b61eafa1b008a17eb21"
 dependencies = [
  "aes-gcm",
  "bytes",

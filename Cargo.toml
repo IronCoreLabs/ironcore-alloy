@@ -24,7 +24,7 @@ bytes = { version = "1.4.0", features = ["serde"] }
 convert_case = "0.6.0"
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = "0.1"
+ironcore-documents = "0.2"
 itertools = "0.12"
 ndarray = "0.15.6"
 ndarray-rand = "0.14.0"
