@@ -51,7 +51,7 @@ z85 = "3.0.5"
 approx = "0.5.1"
 ascii85 = "0.2.1"
 assertables = "7.0.1"
-base64 = "0.22.0"
+base64 = "0.22.1"
 base85 = "2.0.0"
 camino = "1.1"
 criterion = { version = "0.5", features = ["async_tokio"] }
