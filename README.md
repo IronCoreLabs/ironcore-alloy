@@ -49,20 +49,7 @@ cargo test --features integration_tests
 
 ## Benchmarks
 
-### Rust Benchmarks
-
-There are benchmarks that use the TSP as well as standalone. To run the TSP benchmarks you must start up a TSP locally. We provide a demo configuration as well as a docker compose to make this process easy. To do this run the following from the `benches` directory:
-
-```bash
-docker compose up -d
-cargo bench
-```
-
-If you'd like to only run the benchmarks for standalone mode, which do not require a TSP, you can execute them by running:
-
-```bash
-cargo bench -- "^Standalone.*"
-```
+We provide benchmarks of ironcore-alloy in both [Rust](./benches/README.md) and [Kotlin](./kotlin/benchmarks/src/README.md). These benchmark folders each contain a Docker Compose file that will start up a TSP with a predefined configuration for testing purposes.
 
 ## License
 
