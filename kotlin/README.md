@@ -12,6 +12,8 @@ Ensure the library and source have been created, typically done by running `carg
 
 You can run the benchmarks `./gradlew bench`.
 
+More information about the benchmarks is in its [README](./benchmarks/src/README.md).
+
 ## Publishing
 
 You can test publishing `./gradlew publishToMavenLocal`.
