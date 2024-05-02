@@ -102,11 +102,6 @@ jobs:
           python-version: |
             3.10
             3.11
-      - name: Install pipx (macos-14)
-        if: matrix.runs-on == 'macos-14'
-        run: |
-          brew install pipx
-          echo "/Users/runner/.local/bin" >> $GITHUB_PATH
       - name: Install hatch
         if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm' && matrix.runs-on != 'macos-14'
         run: pipx install hatch
@@ -116,4 +111,4 @@ jobs:
         run: sudo pipx install hatch
       - name: Run Python tests
         run: hatch run test:test
-        working-directory: python/ironcore-alloy/ironcore_alloy
+        working-directory: python/ironcore-alloy
