@@ -1,5 +1,6 @@
-use crate::errors::AlloyError;
-use crate::tenant_security_client::{ApiKey, TenantSecurityClient};
+use crate::tenant_security_client::TenantSecurityClient;
+use crate::{errors::AlloyError, tenant_security_client::ApiKey};
+use reqwest::header::{HeaderMap, HeaderValue};
 use std::sync::Arc;
 
 /// Configuration for the SaaS Shield SDKs. Sets the TSP domain/URI and API key to be used for SaaS Shield operations.
@@ -21,17 +22,25 @@ impl SaasShieldConfiguration {
         accept_invalid_certs: bool,
         approximation_factor: Option<f32>,
     ) -> Result<Arc<Self>, AlloyError> {
+        let parsed_api_key = ApiKey::try_from(api_key)?;
+        let default_headers = {
+            let mut headers: HeaderMap = HeaderMap::default();
+            headers.insert("Content-Type", HeaderValue::from_static("application/json"));
+            let mut auth_header: HeaderValue = format!("cmk {}", parsed_api_key.0)
+                .parse()
+                .expect("Invalid API_KEY");
+            auth_header.set_sensitive(true);
+            headers.insert("Authorization", auth_header);
+            headers
+        };
         let reqwest_client = reqwest::Client::builder()
+            .default_headers(default_headers)
             .danger_accept_invalid_certs(accept_invalid_certs)
             .build()
             .expect("Failed to create http client. This means there is a system misconfiguration.");
         Ok(Arc::new(Self {
             approximation_factor,
-            tenant_security_client: Arc::new(TenantSecurityClient::new(
-                tsp_uri,
-                ApiKey::try_from(api_key)?,
-                reqwest_client,
-            )),
+            tenant_security_client: Arc::new(TenantSecurityClient::new(tsp_uri, reqwest_client)),
         }))
     }
 }

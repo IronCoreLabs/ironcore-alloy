@@ -16,15 +16,18 @@ use crate::{DocumentId, FieldId, PlaintextBytes, TenantId};
 use bytes::Bytes;
 use futures::future::{join_all, FutureExt};
 use ironcore_documents::aes::EncryptionKey;
+use ironcore_documents::cmk_edek;
 use ironcore_documents::cmk_edek::EncryptedDek;
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
+use ironcore_documents::v4::validate_v4_header;
 use ironcore_documents::v5::key_id_header::{
     decode_version_prefixed_value, EdekType, KeyId, KeyIdHeader, PayloadType,
 };
-use ironcore_documents::{cmk_edek, v4};
+use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::convert::identity;
 use std::sync::{Arc, Mutex};
@@ -50,9 +53,19 @@ impl EdekParts {
     /// EncryptedDeks bytes ready to send to the TSP.
     fn get_edek_bytes(&self) -> Result<Vec<u8>, AlloyError> {
         match self {
-            EdekParts::V5(_, v4_document_header) | EdekParts::V4(v4_document_header) => {
+            EdekParts::V5(kms_config_id, v4_document_header) => {
+                let fixed_edek = fix_encrypted_dek(find_cmk_edek_v5(
+                    &v4_document_header.signed_payload.edeks,
+                    kms_config_id.0,
+                )?)?;
+                let edek_bytes = fixed_edek
+                    .write_to_bytes()
+                    .expect("Writing to bytes is safe");
+                Ok(edek_bytes)
+            }
+            EdekParts::V4(v4_document_header) => {
                 let fixed_edek =
-                    fix_encrypted_dek(find_cmk_edek(&v4_document_header.signed_payload.edeks)?)?;
+                    fix_encrypted_dek(find_cmk_edek_v4(&v4_document_header.signed_payload.edeks)?)?;
                 let edek_bytes = fixed_edek
                     .write_to_bytes()
                     .expect("Writing to bytes is safe");
@@ -81,7 +94,7 @@ impl SaasShieldStandardClient {
         }
     }
 
-    fn encrypt_document<R: RngCore + CryptoRng>(
+    fn encrypt_document<R: RngCore + CryptoRng + Send>(
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,
         dek: EncryptionKey,
@@ -149,24 +162,34 @@ impl SaasShieldStandardClient {
                 },
                 remaining_bytes,
             )) => {
-                let expected_edek_type = Self::get_edek_type();
-                let expected_payload_type = Self::get_payload_type();
-                if edek_type == expected_edek_type && payload_type == expected_payload_type {
-                    let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
-                    Ok(EdekParts::V5(key_id, v4_document_header))
+                // standard_attached uses a key ID of 0 to indicate V4 headers, as they can't exist in V5
+                if key_id.0 == 0 {
+                    Ok(v4_proto_from_bytes(&remaining_bytes).map(EdekParts::V4)?)
                 } else {
-                    Err(AlloyError::InvalidInput{ msg:
-                format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
-                })
+                    let expected_edek_type = Self::get_edek_type();
+                    let expected_payload_type = Self::get_payload_type();
+                    if edek_type == expected_edek_type && payload_type == expected_payload_type {
+                        let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
+                        Ok(EdekParts::V5(key_id, v4_document_header))
+                    } else {
+                        Err(AlloyError::InvalidInput{ msg:
+                            format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
+                        })
+                    }
                 }
             }
             // This is the case where the value did not have a key id header. This means it's either a v4 or v3.
             Err(_) => {
-                let bytes: Bytes = encrypted_bytes.0.into();
-                // Try to decode v4 first, since it has a specific form. V3 is just proto bytes.
-                v4::attached::decode_attached_edoc(bytes.clone())
-                    .map(|(edek, _)| EdekParts::V4(edek))
-                    .or_else(|_| Ok(EdekParts::V3(bytes)))
+                Ok(v4_proto_from_bytes(&encrypted_bytes.0)
+                    .ok()
+                    .and_then(|maybe_parsed_v4| {
+                        // Check that the parsing succeeded, meaning it is actually V4
+                        validate_v4_header(&maybe_parsed_v4).then(|| EdekParts::V4(maybe_parsed_v4))
+                    })
+                    .unwrap_or(
+                        // Parsing as V4 failed, so V3 is our fallback
+                        EdekParts::V3(encrypted_bytes.0.into()),
+                    ))
             }
         }
     }
@@ -179,7 +202,7 @@ impl SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<(BatchUnwrapKeyResponse, HashMap<DocumentId, AlloyError>), AlloyError>
     where
-        T: IntoIterator<Item = (&'a str, EdekWithKeyIdHeader)>,
+        T: IntoParallelIterator<Item = (&'a str, EdekWithKeyIdHeader)>,
     {
         let request_metadata = metadata.clone().try_into()?;
         let decompose_edek = |edek_with_header: EdekWithKeyIdHeader| {
@@ -256,7 +279,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let request_metadata = metadata.clone().try_into()?;
         let document_ids = plaintext_documents.0.keys().map(|d| d.0.as_str()).collect();
         let BatchWrapKeyResponse {
-            mut keys,
+            keys,
             failures: tsp_failures,
         } = self
             .tenant_security_client
@@ -264,10 +287,10 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             .await?;
         let docs_and_keys = plaintext_documents
             .0
-            .into_iter()
+            .into_par_iter()
             .map(|(document_id, document)| {
-                let maybe_keys = keys.remove(&document_id.0);
-                (document_id, (document, maybe_keys))
+                let maybe_keys = keys.get(&document_id.0);
+                (document_id, (document, maybe_keys.cloned()))
             });
         let encrypt_document =
             |(plaintext_document, maybe_keys): (PlaintextDocument, Option<WrapKeyResponse>)| {
@@ -327,17 +350,17 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     ) -> Result<StandardDecryptBatchResult, AlloyError> {
         let edeks_with_headers = encrypted_documents
             .0
-            .iter()
+            .par_iter()
             .map(|(k, v)| (k.0.as_str(), v.edek.clone()));
-        let (mut batch_unwrap_response, edek_failures) = self
+        let (batch_unwrap_response, edek_failures) = self
             .batch_unwrap_edeks(edeks_with_headers, metadata)
             .await?;
         let docs_and_keys = encrypted_documents
             .0
-            .into_iter()
+            .into_par_iter()
             .map(|(document_id, document)| {
-                let maybe_keys = batch_unwrap_response.keys.remove(&document_id.0);
-                (document_id, (document, maybe_keys))
+                let maybe_keys = batch_unwrap_response.keys.get(&document_id.0);
+                (document_id, (document, maybe_keys.cloned()))
             });
         let decrypt_document =
             |(encrypted_document, maybe_keys): (EncryptedDocument, Option<UnwrapKeyResponse>)| {
@@ -418,17 +441,17 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     ) -> Result<StandardEncryptBatchResult, AlloyError> {
         let edeks_with_headers = plaintext_documents
             .0
-            .iter()
+            .par_iter()
             .map(|(k, v)| (k.0.as_str(), v.edek.clone()));
-        let (mut batch_unwrap_response, edek_failures) = self
+        let (batch_unwrap_response, edek_failures) = self
             .batch_unwrap_edeks(edeks_with_headers, metadata)
             .await?;
         let docs_and_keys = plaintext_documents
             .0
-            .into_iter()
+            .into_par_iter()
             .map(|(document_id, document)| {
-                let maybe_keys = batch_unwrap_response.keys.remove(&document_id.0);
-                (document_id, (document, maybe_keys))
+                let maybe_keys = batch_unwrap_response.keys.get(&document_id.0);
+                (document_id, (document, maybe_keys.cloned()))
             });
         let encrypt_document = |(plaintext_document, maybe_keys): (
             PlaintextDocumentWithEdek,
@@ -481,7 +504,43 @@ impl SaasShieldSecurityEventOps for SaasShieldStandardClient {
     }
 }
 
-fn find_cmk_edek(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
+fn find_cmk_edek_v5(
+    edeks: &[EdekWrapper],
+    kms_config_id: u32,
+) -> Result<&EncryptedDek, AlloyError> {
+    let maybe_cmk_edeks = edeks
+        .iter()
+        .filter_map(|edek| {
+            if edek.has_cmk_edek() {
+                Some(edek.cmk_edek())
+            } else {
+                None
+            }
+        })
+        .collect_vec();
+    if maybe_cmk_edeks.is_empty() {
+        Err(AlloyError::DecryptError {
+            msg: "No Saas Shield EDEK found.".to_string(),
+        })
+    } else {
+        let kms_config_ids = maybe_cmk_edeks
+            .iter()
+            .map(|edek| edek.kmsConfigId as u32)
+            .collect_vec();
+        maybe_cmk_edeks
+            .into_iter()
+            .find(|edek| edek.kmsConfigId as u32 == kms_config_id)
+            .ok_or_else(|| AlloyError::DecryptError {
+                msg: format!(
+                    "Document header malformed. Header key ID ({}) not found in EDEKs. Found: [{}]",
+                    kms_config_id,
+                    kms_config_ids.into_iter().join(",")
+                ),
+            })
+    }
+}
+
+fn find_cmk_edek_v4(edeks: &[EdekWrapper]) -> Result<&EncryptedDek, AlloyError> {
     let maybe_edek_wrapper = edeks.iter().find(|edek| edek.has_cmk_edek());
     let cmk_edek = maybe_edek_wrapper
         .map(|edek| edek.cmk_edek())
@@ -610,25 +669,25 @@ mod test {
     }
 
     #[test]
-    fn parse_old_v5_document_works() {
+    fn parse_old_v4_document_works() {
         let edek_and_header = EdekWithKeyIdHeader(vec![
-            0, 0, 0, 0, 2, 0, 10, 36, 10, 32, 64, 210, 116, 17, 37, 169, 25, 195, 73, 47, 59, 120,
-            34, 200, 205, 142, 3, 154, 115, 130, 188, 198, 244, 161, 170, 163, 153, 254, 43, 237,
-            157, 167, 16, 1, 18, 215, 1, 18, 212, 1, 18, 209, 1, 10, 192, 1, 10, 48, 63, 225, 165,
-            108, 33, 17, 151, 119, 230, 185, 159, 203, 90, 67, 250, 185, 117, 54, 184, 68, 240,
-            128, 92, 176, 48, 35, 52, 183, 27, 153, 15, 247, 241, 63, 221, 179, 246, 99, 9, 98,
-            221, 121, 156, 193, 220, 197, 225, 126, 16, 255, 3, 24, 128, 5, 34, 12, 39, 49, 127,
-            75, 144, 142, 37, 173, 138, 210, 233, 129, 42, 120, 10, 118, 10, 113, 10, 36, 0, 165,
-            4, 100, 135, 130, 34, 228, 127, 190, 188, 55, 199, 103, 184, 137, 98, 81, 5, 243, 99,
-            119, 248, 110, 101, 114, 150, 161, 28, 100, 228, 110, 64, 123, 169, 222, 18, 73, 0,
-            220, 248, 78, 140, 39, 11, 119, 244, 9, 168, 242, 190, 48, 191, 108, 152, 157, 29, 120,
-            97, 56, 118, 104, 45, 144, 16, 245, 170, 9, 52, 111, 40, 22, 174, 185, 135, 102, 95,
-            142, 171, 180, 163, 118, 46, 183, 105, 45, 137, 66, 170, 61, 49, 166, 47, 184, 99, 232,
-            86, 42, 73, 118, 87, 194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50,
-            12, 116, 101, 110, 97, 110, 116, 45, 103, 99, 112, 45, 108,
+            10, 36, 10, 32, 64, 210, 116, 17, 37, 169, 25, 195, 73, 47, 59, 120, 34, 200, 205, 142,
+            3, 154, 115, 130, 188, 198, 244, 161, 170, 163, 153, 254, 43, 237, 157, 167, 16, 1, 18,
+            215, 1, 18, 212, 1, 18, 209, 1, 10, 192, 1, 10, 48, 63, 225, 165, 108, 33, 17, 151,
+            119, 230, 185, 159, 203, 90, 67, 250, 185, 117, 54, 184, 68, 240, 128, 92, 176, 48, 35,
+            52, 183, 27, 153, 15, 247, 241, 63, 221, 179, 246, 99, 9, 98, 221, 121, 156, 193, 220,
+            197, 225, 126, 16, 255, 3, 24, 128, 5, 34, 12, 39, 49, 127, 75, 144, 142, 37, 173, 138,
+            210, 233, 129, 42, 120, 10, 118, 10, 113, 10, 36, 0, 165, 4, 100, 135, 130, 34, 228,
+            127, 190, 188, 55, 199, 103, 184, 137, 98, 81, 5, 243, 99, 119, 248, 110, 101, 114,
+            150, 161, 28, 100, 228, 110, 64, 123, 169, 222, 18, 73, 0, 220, 248, 78, 140, 39, 11,
+            119, 244, 9, 168, 242, 190, 48, 191, 108, 152, 157, 29, 120, 97, 56, 118, 104, 45, 144,
+            16, 245, 170, 9, 52, 111, 40, 22, 174, 185, 135, 102, 95, 142, 171, 180, 163, 118, 46,
+            183, 105, 45, 137, 66, 170, 61, 49, 166, 47, 184, 99, 232, 86, 42, 73, 118, 87, 194,
+            50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97, 110,
+            116, 45, 103, 99, 112, 45, 108,
         ]);
         let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
-        assert!(matches!(edek_parts, EdekParts::V5(_, _)));
+        assert!(matches!(edek_parts, EdekParts::V4(_)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();
         let encrypted_deks: cmk_edek::EncryptedDeks =
             Message::parse_from_bytes(&edek_bytes).unwrap();

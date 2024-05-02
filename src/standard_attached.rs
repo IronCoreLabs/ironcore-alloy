@@ -1,12 +1,14 @@
 use crate::{
     create_batch_result_struct,
     errors::AlloyError,
-    standard::{EdekWithKeyIdHeader, EncryptedDocument, PlaintextDocument, StandardDocumentOps},
+    standard::{
+        EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
+        PlaintextDocuments, StandardDocumentOps,
+    },
     util::{perform_batch_action, v4_proto_from_bytes, BatchResult},
     AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
 use bytes::Bytes;
-use futures::{future::join_all, FutureExt};
 use ironcore_documents::{
     aes::IvAndCiphertext,
     v4,
@@ -16,7 +18,8 @@ use ironcore_documents::{
         key_id_header::{self, KeyId, KeyIdHeader},
     },
 };
-use std::{collections::HashMap, convert::identity};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::collections::HashMap;
 use uniffi::custom_newtype;
 
 // TODO: This newtype can't include PlaintextBytes because of a bug with generated Python
@@ -100,40 +103,25 @@ pub trait StandardAttachedDocumentOps {
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
 }
 
-pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
-    standard_client: &T,
-    plaintext_document: PlaintextBytes,
-    metadata: &AlloyMetadata,
+/// Turns the encrypted document into an attached document.
+/// Note that this assumes the EncryptedDocument will only have 1 field and that field should become the attached document.
+fn encrypted_document_to_attached(
+    encrypted_document: EncryptedDocument,
 ) -> Result<EncryptedAttachedDocument, AlloyError> {
-    // In order to call the encrypt on standard, we need a map. This is just a hardcoded string we will
-    // use to encrypt.
-    let hardcoded_id = FieldId("".to_string());
     let EncryptedDocument {
         edek: edek_with_key_id_bytes,
-        // Mutable so we can removed the hardcoded key below.
-        mut document,
-    } = standard_client
-        .encrypt(
-            PlaintextDocument(
-                [(hardcoded_id.clone(), plaintext_document)]
-                    .into_iter()
-                    .collect(),
-            ),
-            metadata,
-        )
-        .await?;
+        document,
+    } = encrypted_document;
     let (key_id_header, edek_bytes) =
         key_id_header::decode_version_prefixed_value(edek_with_key_id_bytes.0.into())?;
-
     let edek = v4_proto_from_bytes(edek_bytes)?;
-
     let edoc = document
-        .remove(&hardcoded_id)
+        .into_values()
+        .next()
         .ok_or(AlloyError::EncryptError {
             msg: "Encryption returned a document without a passed in field. This shouldn't happen."
                 .to_string(),
         })?;
-
     Ok(EncryptedAttachedDocument(
         AttachedDocument {
             key_id_header,
@@ -145,23 +133,61 @@ pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
     ))
 }
 
+pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
+    standard_client: &T,
+    plaintext_document: PlaintextBytes,
+    metadata: &AlloyMetadata,
+) -> Result<EncryptedAttachedDocument, AlloyError> {
+    // In order to call the encrypt on standard, we need a map. This is just a hardcoded string we will
+    // use to encrypt.
+    let hardcoded_id = FieldId("".to_string());
+    let encrypted_document = standard_client
+        .encrypt(
+            PlaintextDocument(
+                [(hardcoded_id.clone(), plaintext_document)]
+                    .into_iter()
+                    .collect(),
+            ),
+            metadata,
+        )
+        .await?;
+    encrypted_document_to_attached(encrypted_document)
+}
+
 pub(crate) async fn encrypt_batch_core<T: StandardDocumentOps>(
     standard_client: &T,
     plaintext_documents: PlaintextAttachedDocuments,
     metadata: &AlloyMetadata,
 ) -> Result<StandardAttachedEncryptBatchResult, AlloyError> {
-    let attempts = join_all(plaintext_documents.into_iter().map(
-        |(document_id, plaintext_document)| {
-            encrypt_core(
-                standard_client,
-                PlaintextBytes(plaintext_document.0),
-                metadata,
-            )
-            .map(|encrypted_document| (document_id, encrypted_document))
-        },
-    ))
-    .await;
-    Ok(perform_batch_action(attempts, identity).into())
+    let hardcoded_field_id = FieldId("".to_string());
+    let plaintext_unattached_documents = PlaintextDocuments(
+        plaintext_documents
+            .into_iter()
+            .map(|(id, document)| {
+                (
+                    id,
+                    PlaintextDocument(
+                        [(hardcoded_field_id.clone(), PlaintextBytes(document.0))].into(),
+                    ),
+                )
+            })
+            .collect(),
+    );
+    let encrypted_batch = standard_client
+        .encrypt_batch(plaintext_unattached_documents, metadata)
+        .await?;
+    let reformed_documents =
+        perform_batch_action(encrypted_batch.successes, encrypted_document_to_attached);
+    let combined_failures = encrypted_batch
+        .failures
+        .into_iter()
+        .chain(reformed_documents.failures)
+        .collect();
+    Ok(BatchResult {
+        successes: reformed_documents.successes,
+        failures: combined_failures,
+    }
+    .into())
 }
 
 fn decode_edoc<T: StandardDocumentOps>(
@@ -174,7 +200,7 @@ fn decode_edoc<T: StandardDocumentOps>(
                 key_id_header: KeyIdHeader::new(
                     T::get_edek_type(),
                     T::get_payload_type(),
-                    KeyId(0),
+                    KeyId(0), // v5 can never use key ID of 0
                 ),
                 edek,
                 edoc,
@@ -218,23 +244,66 @@ pub(crate) async fn decrypt_core<T: StandardDocumentOps>(
     Ok(plaintext)
 }
 
+fn encrypted_attached_to_unattached<T: StandardDocumentOps>(
+    encrypted_document: EncryptedAttachedDocument,
+    field_id: FieldId,
+) -> Result<EncryptedDocument, AlloyError> {
+    let AttachedDocument {
+        key_id_header,
+        edek,
+        edoc,
+    } = decode_edoc::<T>(encrypted_document)?;
+    Ok(EncryptedDocument {
+        edek: EdekWithKeyIdHeader::new(key_id_header, edek),
+        document: [(
+            field_id,
+            EncryptedBytes(v5::EncryptedPayload::from(edoc).write_to_bytes()),
+        )]
+        .into_iter()
+        .collect(),
+    })
+}
+
 pub(crate) async fn decrypt_batch_core<T: StandardDocumentOps>(
     standard_client: &T,
     encrypted_documents: EncryptedAttachedDocuments,
     metadata: &AlloyMetadata,
 ) -> Result<StandardAttachedDecryptBatchResult, AlloyError> {
-    let attempts = join_all(encrypted_documents.into_iter().map(
-        |(document_id, encrypted_document)| {
-            decrypt_core(standard_client, encrypted_document, metadata).map(|decrypted_document| {
-                (
-                    document_id,
-                    decrypted_document.map(|x| PlaintextAttachedDocument(x.0)),
-                )
-            })
-        },
-    ))
-    .await;
-    Ok(perform_batch_action(attempts, identity).into())
+    let hardcoded_field_id = FieldId("".to_string());
+    let BatchResult {
+        successes: encrypted_unattached_documents,
+        failures: transform_failures,
+    } = perform_batch_action(encrypted_documents, |encrypted_document| {
+        encrypted_attached_to_unattached::<T>(encrypted_document, hardcoded_field_id.clone())
+    });
+    let decrypted_batch = standard_client
+        .decrypt_batch(EncryptedDocuments(encrypted_unattached_documents), metadata)
+        .await?;
+    let decrypted_attached = decrypted_batch
+        .successes
+        .into_iter()
+        .map(|(document_id, mut document)| {
+            (
+                document_id,
+                PlaintextAttachedDocument(
+                    document
+                        .0
+                        .remove(&hardcoded_field_id)
+                        .expect("Decryption doesn't change the structure of the fields.")
+                        .0,
+                ),
+            )
+        })
+        .collect();
+    let combined_failures = decrypted_batch
+        .failures
+        .into_iter()
+        .chain(transform_failures)
+        .collect();
+    Ok(StandardAttachedDecryptBatchResult {
+        successes: decrypted_attached,
+        failures: combined_failures,
+    })
 }
 
 pub(crate) async fn rekey_core<T: StandardDocumentOps>(
@@ -243,7 +312,7 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
     metadata: &AlloyMetadata,
     new_tenant_id: Option<TenantId>,
 ) -> Result<RekeyAttachedDocumentsBatchResult, AlloyError> {
-    let (edeks, mut edocs, decoding_errors) = encrypted_documents.into_iter().try_fold(
+    let (edeks, edocs, decoding_errors) = encrypted_documents.into_iter().try_fold(
         (HashMap::new(), HashMap::new(), HashMap::new()),
         |(mut edeks, mut edocs, mut failures), (document_id, attached_document)| {
             let maybe_attached_document = decode_edoc::<T>(attached_document);
@@ -270,10 +339,10 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
         .await?;
     let edeks_and_edocs = rekeyed_edeks
         .successes
-        .into_iter()
+        .into_par_iter()
         .map(|(document_id, edek)| {
-            let maybe_doc = edocs.remove(&document_id);
-            (document_id, (edek, maybe_doc))
+            let maybe_doc = edocs.get(&document_id);
+            (document_id, (edek, maybe_doc.cloned()))
         });
     let form_attached_document =
         |(rekeyed_edek, maybe_edoc): (EdekWithKeyIdHeader, Option<IvAndCiphertext>)| {

@@ -10,8 +10,8 @@ group = "com.ironcorelabs"
 
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
-    kotlin("jvm") version "1.8.10"
-    id("org.jetbrains.dokka") version "1.9.0"
+    kotlin("jvm") version "1.9.23"
+    id("org.jetbrains.dokka") version "1.9.20"
 
     // Apply the java-library plugin for API and implementation separation.
     `java-library`
@@ -23,8 +23,8 @@ plugins {
 
     // benchmark deps
     java
-    id("org.jetbrains.kotlinx.benchmark") version "0.4.9"
-    kotlin("plugin.allopen") version "1.9.20"
+    id("org.jetbrains.kotlinx.benchmark") version "0.4.10"
+    kotlin("plugin.allopen") version "1.9.23"
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -55,8 +55,8 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     // Use the JUnit 5 integration.
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
-    implementation("net.java.dev.jna:jna:5.13.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("net.java.dev.jna:jna:5.14.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
     benchmarksImplementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.9")
     benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
@@ -129,7 +129,7 @@ benchmark {
     targets {
         register(benchmarks) {
             this as JvmBenchmarkTarget
-            jmhVersion = "1.21"
+            jmhVersion = "1.37"
         }
     }
 }

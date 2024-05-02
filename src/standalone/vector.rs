@@ -1,7 +1,7 @@
 use super::config::VectorSecret;
 use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
-use crate::util::{get_rng, perform_batch_action};
+use crate::util::perform_batch_action;
 use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
     GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorDecryptBatchResult,
@@ -11,13 +11,11 @@ use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
     StandaloneConfiguration, TenantId,
 };
-use futures::future::{join_all, FutureExt, TryFutureExt};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
-use std::convert::identity;
 use std::sync::{Arc, Mutex};
 
 #[derive(uniffi::Object)]
@@ -32,7 +30,7 @@ impl StandaloneVectorClient {
             rng: Arc::new(Mutex::new(ChaCha20Rng::from_entropy())),
         }
     }
-    pub(crate) async fn rotate_vector(
+    pub(crate) fn rotate_vector(
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
@@ -64,29 +62,12 @@ impl StandaloneVectorClient {
         {
             Ok(encrypted_vector)
         } else {
-            self.decrypt(encrypted_vector, metadata)
-                .and_then(|decrypted_vector| self.encrypt(decrypted_vector, new_metadata))
-                .await
+            self.decrypt_sync(encrypted_vector, metadata)
+                .and_then(|decrypted_vector| self.encrypt_sync(decrypted_vector, new_metadata))
         }
     }
-}
 
-impl AlloyClient for StandaloneVectorClient {
-    fn get_edek_type() -> EdekType {
-        EdekType::Standalone
-    }
-
-    fn get_payload_type() -> PayloadType {
-        PayloadType::VectorMetadata
-    }
-}
-
-#[uniffi::export]
-impl VectorOps for StandaloneVectorClient {
-    /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
-    /// and its values will be shuffled as part of the encryption.
-    /// The same tenant ID must be provided in the metadata when decrypting the embedding.
-    async fn encrypt(
+    fn encrypt_sync(
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &AlloyMetadata,
@@ -118,31 +99,11 @@ impl VectorOps for StandaloneVectorClient {
             KeyId(standalone_secret.id),
             Self::get_edek_type(),
             plaintext_vector,
-            &mut *get_rng(&self.rng),
+            self.rng.clone(),
         )
     }
 
-    /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
-    /// and their values will be shuffled as part of the encryption.
-    /// The same tenant ID must be provided in the metadata when decrypting the embeddings.
-    async fn encrypt_batch(
-        &self,
-        plaintext_vectors: PlaintextVectors,
-        metadata: &AlloyMetadata,
-    ) -> Result<VectorEncryptBatchResult, AlloyError> {
-        let attempts = join_all(plaintext_vectors.0.into_iter().map(
-            |(vector_id, plaintext_vector)| {
-                self.encrypt(plaintext_vector, metadata)
-                    .map(|encrypted_vector| (VectorId(vector_id), encrypted_vector))
-            },
-        ))
-        .await;
-        Ok(perform_batch_action(attempts, identity).into())
-    }
-
-    /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
-    /// be unshuffled to their original positions during decryption.
-    async fn decrypt(
+    fn decrypt_sync(
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
@@ -179,6 +140,65 @@ impl VectorOps for StandaloneVectorClient {
             icl_metadata_bytes,
         )
     }
+}
+
+impl AlloyClient for StandaloneVectorClient {
+    fn get_edek_type() -> EdekType {
+        EdekType::Standalone
+    }
+
+    fn get_payload_type() -> PayloadType {
+        PayloadType::VectorMetadata
+    }
+}
+
+#[uniffi::export]
+impl VectorOps for StandaloneVectorClient {
+    /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
+    /// and its values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embedding.
+    async fn encrypt(
+        &self,
+        plaintext_vector: PlaintextVector,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptedVector, AlloyError> {
+        self.encrypt_sync(plaintext_vector, metadata)
+    }
+
+    /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
+    /// and their values will be shuffled as part of the encryption.
+    /// The same tenant ID must be provided in the metadata when decrypting the embeddings.
+    async fn encrypt_batch(
+        &self,
+        plaintext_vectors: PlaintextVectors,
+        metadata: &AlloyMetadata,
+    ) -> Result<VectorEncryptBatchResult, AlloyError> {
+        let batch_result = perform_batch_action(plaintext_vectors.0, |plaintext_vector| {
+            self.encrypt_sync(plaintext_vector, metadata)
+        });
+        Ok(VectorEncryptBatchResult {
+            successes: batch_result
+                .successes
+                .into_iter()
+                .map(|(id, value)| (VectorId(id), value))
+                .collect(),
+            failures: batch_result
+                .failures
+                .into_iter()
+                .map(|(id, value)| (VectorId(id), value))
+                .collect(),
+        })
+    }
+
+    /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
+    /// be unshuffled to their original positions during decryption.
+    async fn decrypt(
+        &self,
+        encrypted_vector: EncryptedVector,
+        metadata: &AlloyMetadata,
+    ) -> Result<PlaintextVector, AlloyError> {
+        self.decrypt_sync(encrypted_vector, metadata)
+    }
 
     /// Decrypt multiple vector embeddings that were encrypted with the provided metadata. The values of the embeddings
     /// will be unshuffled to their original positions during decryption.
@@ -189,14 +209,21 @@ impl VectorOps for StandaloneVectorClient {
         encrypted_vectors: EncryptedVectors,
         metadata: &AlloyMetadata,
     ) -> Result<VectorDecryptBatchResult, AlloyError> {
-        let attempts = join_all(encrypted_vectors.0.into_iter().map(
-            |(vector_id, encrypted_vector)| {
-                self.decrypt(encrypted_vector, metadata)
-                    .map(|decrypted_vector| (VectorId(vector_id), decrypted_vector))
-            },
-        ))
-        .await;
-        Ok(perform_batch_action(attempts, identity).into())
+        let batch_result = perform_batch_action(encrypted_vectors.0, |encrypted_vector| {
+            self.decrypt_sync(encrypted_vector, metadata)
+        });
+        Ok(VectorDecryptBatchResult {
+            successes: batch_result
+                .successes
+                .into_iter()
+                .map(|(id, value)| (VectorId(id), value))
+                .collect(),
+            failures: batch_result
+                .failures
+                .into_iter()
+                .map(|(id, value)| (VectorId(id), value))
+                .collect(),
+        })
     }
 
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.
@@ -246,7 +273,7 @@ impl VectorOps for StandaloneVectorClient {
                             KeyId(standalone_secret.id),
                             StandaloneVectorClient::get_edek_type(),
                             plaintext_vector.clone(),
-                            &mut *get_rng(&self.rng),
+                            self.rng.clone(),
                         )
                     })
                     .try_collect()
@@ -313,14 +340,12 @@ impl VectorOps for StandaloneVectorClient {
                 ..metadata.clone()
             },
         };
-        let attempts: Vec<_> = join_all(encrypted_vectors.0.into_iter().map(
-            |(vector_id, encrypted_vector)| {
+        Ok(
+            perform_batch_action(encrypted_vectors.0, |encrypted_vector| {
                 self.rotate_vector(encrypted_vector, metadata, &new_metadata)
-                    .map(|rotated_vector| (vector_id, rotated_vector))
-            },
-        ))
-        .await;
-        Ok(perform_batch_action(attempts, identity).into())
+            })
+            .into(),
+        )
     }
 }
 

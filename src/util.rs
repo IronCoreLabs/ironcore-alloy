@@ -1,12 +1,14 @@
 use crate::{errors::AlloyError, AlloyMetadata, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::KeyId;
-use itertools::Itertools;
+use itertools::Either;
 use protobuf::Message;
 use rand::{
     rngs::{adapter::ReseedingRng, OsRng},
-    CryptoRng, RngCore, SeedableRng,
+    SeedableRng,
 };
 use rand_chacha::{ChaCha20Core, ChaCha20Rng};
+use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelIterator, ParallelExtend};
 use ring::hmac::{Key as HMACKey, HMAC_SHA256, HMAC_SHA512};
 use std::hash::Hash;
 use std::{
@@ -22,11 +24,29 @@ pub(crate) type OurReseedingRng = ReseedingRng<ChaCha20Core, OsRng>;
 #[derive(Debug, PartialEq)]
 pub(crate) struct AuthHash(pub(crate) [u8; 32]);
 
-/// Helper function to avoid `Mutex` noise at each call site. Must be derefed to use.
-pub(crate) fn get_rng<R: RngCore + CryptoRng>(rng: &Arc<Mutex<R>>) -> MutexGuard<'_, R> {
-    // should be safe... panics if the current thread holds the lock, we'll need to test to see how the FFI makes
-    // threads appear. Also panics if poisoned, which I don't think we care about cause everything is dying then.
-    rng.lock().unwrap()
+/// Acquire mutex in a blocking fashion. If the Mutex is or becomes poisoned, write out an error
+/// message and panic.
+///
+/// The lock is released when the returned MutexGuard falls out of scope.
+///
+/// # Usage:
+/// single statement (mut)
+/// `let result = take_lock(&t).deref_mut().call_method_on_t();`
+///
+/// multi-statement (mut)
+/// ```ignore
+/// let t = T {};
+/// let result = {
+///     let g = &mut *take_lock(&t);
+///     g.call_method_on_t()
+/// }; // lock released here
+/// ```
+///
+pub fn take_lock<T>(m: &Mutex<T>) -> MutexGuard<T> {
+    m.lock().unwrap_or_else(|e| {
+        let error = format!("Error when acquiring lock: {e}");
+        panic!("{error}");
+    })
 }
 
 pub(crate) fn hash256<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, payload: T) -> [u8; 32] {
@@ -135,19 +155,23 @@ macro_rules! create_batch_result_struct {
 /// success and failure hashmaps.
 pub(crate) fn perform_batch_action<T, U, F, I, K>(collection: I, func: F) -> BatchResult<K, U>
 where
-    F: Fn(T) -> Result<U, AlloyError>,
-    I: IntoIterator<Item = (K, T)>,
-    K: Hash + Eq,
-    HashMap<K, U>: Extend<(K, U)>,
-    HashMap<K, AlloyError>: Extend<(K, AlloyError)>,
+    F: Fn(T) -> Result<U, AlloyError> + Sync,
+    I: IntoParallelIterator<Item = (K, T)>,
+    K: Hash + Eq + Send,
+    U: Send,
+    HashMap<K, U>: ParallelExtend<(K, U)>,
+    HashMap<K, AlloyError>: ParallelExtend<(K, AlloyError)>,
 {
     let (successes, failures) = collection
-        .into_iter()
+        .into_par_iter()
         .map(|(key, value)| match func(value) {
             Ok(x) => Ok((key, x)),
             Err(x) => Err((key, x)),
         })
-        .partition_result();
+        .partition_map(|x| match x {
+            Ok(success) => Either::Left(success),
+            Err(failure) => Either::Right(failure),
+        });
     BatchResult {
         successes,
         failures,

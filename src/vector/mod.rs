@@ -16,7 +16,10 @@ use ironcore_documents::{
 use itertools::Itertools;
 use rand::{CryptoRng, RngCore};
 use serde::Serialize;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use uniffi::custom_newtype;
 
 pub(crate) mod crypto;
@@ -205,7 +208,7 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
     key_id: KeyId,
     edek_type: EdekType,
     plaintext_vector: PlaintextVector,
-    rng: &mut R,
+    rng: Arc<Mutex<R>>,
 ) -> Result<EncryptedVector, AlloyError> {
     let result = crypto::encrypt(
         key,

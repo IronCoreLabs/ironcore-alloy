@@ -32,7 +32,7 @@ mod test {
         generate_bindings(
             dynamic_library_paths[0].clone(),
             main_src_path,
-            uniffi::TargetLanguage::Kotlin,
+            uniffi::KotlinBindingGenerator,
         )?;
         // run the hatch test command and print the output as though it were our output
         let o = std::process::Command::new("./gradlew")

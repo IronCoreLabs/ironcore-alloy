@@ -1,6 +1,6 @@
 use crate::{
-    alloy_client_trait::AlloyClient, create_batch_result_struct, errors::AlloyError, util::get_rng,
-    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    alloy_client_trait::AlloyClient, create_batch_result_struct, errors::AlloyError, AlloyMetadata,
+    DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
 use ironcore_documents::{
     aes::{decrypt_document_with_attached_iv, EncryptionKey, IvAndCiphertext},
@@ -10,10 +10,9 @@ use ironcore_documents::{
         key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
     },
 };
-
-use itertools::Itertools;
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -185,8 +184,8 @@ pub(crate) fn verify_sig(
 }
 
 /// Encrypt each of the fields of the document using the aes_dek
-pub(crate) fn encrypt_document_core<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-    document: HashMap<FieldId, U>,
+pub(crate) fn encrypt_document_core<R: RngCore + CryptoRng + Send>(
+    document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
     key_id_header: KeyIdHeader,
@@ -199,16 +198,16 @@ pub(crate) fn encrypt_document_core<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
     })
 }
 
-pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
-    document: HashMap<FieldId, U>,
+pub(crate) fn encrypt_map<R: RngCore + CryptoRng + Send>(
+    document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
 ) -> Result<HashMap<FieldId, EncryptedBytes>, AlloyError> {
     let encrypted_document = document
-        .into_iter()
+        .into_par_iter()
         .map(|(label, plaintext)| {
             ironcore_documents::aes::encrypt_document_and_attach_iv(
-                &mut *get_rng(&rng),
+                rng.clone(),
                 aes_dek,
                 ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec()),
             )
@@ -219,7 +218,7 @@ pub(crate) fn encrypt_map<U: AsRef<[u8]>, R: RngCore + CryptoRng>(
                 )
             })
         })
-        .try_collect()?;
+        .collect::<Result<_, _>>()?;
     Ok(encrypted_document)
 }
 
@@ -228,7 +227,7 @@ pub(crate) fn decrypt_document_core(
     dek: EncryptionKey,
 ) -> Result<HashMap<FieldId, PlaintextBytes>, AlloyError> {
     Ok(document
-        .into_iter()
+        .into_par_iter()
         .map(|(label, ciphertext)| {
             // Further validation of the IronCore MAGIC will be done inside the function
             if ciphertext.0.starts_with(&v3::VERSION_AND_MAGIC) {
@@ -243,7 +242,7 @@ pub(crate) fn decrypt_document_core(
             }
             .map(|c| (label, PlaintextBytes(c.0)))
         })
-        .try_collect()?)
+        .collect::<Result<_, _>>()?)
 }
 
 #[cfg(test)]
@@ -261,7 +260,7 @@ mod test {
     fn encrypt_document_core_works() {
         let rng = create_rng();
         let result = encrypt_document_core(
-            [(FieldId("foo".to_string()), vec![100u8])].into(),
+            [(FieldId("foo".to_string()), PlaintextBytes(vec![100u8]))].into(),
             Arc::new(Mutex::new(rng)),
             EncryptionKey([0u8; 32]),
             KeyIdHeader::new(EdekType::SaasShield, PayloadType::StandardEdek, KeyId(1)),

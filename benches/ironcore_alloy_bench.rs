@@ -205,8 +205,11 @@ fn tsp_benches(c: &mut Criterion) {
     c.bench_function("TSP - batch encrypt 10 documents, 10 fields, 10B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
             || {
-                PlaintextDocuments((0..10).fold(HashMap::new(), |mut acc, i| {
-                    let doc = generate_plaintext(10, 10, &mut rng);
+                let num_documents = 10;
+                let num_fields = 10;
+                let field_size = 10;
+                PlaintextDocuments((0..num_documents).fold(HashMap::new(), |mut acc, i| {
+                    let doc = generate_plaintext(field_size, num_fields, &mut rng);
                     acc.insert(DocumentId(format!("doc{}", i)), doc);
                     acc
                 }))
