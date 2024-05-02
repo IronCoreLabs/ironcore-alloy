@@ -521,6 +521,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-deque"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613f8cc01fe9cf1a3eb3d7f488fd2fa8388403e97039e2f73692932e291a770d"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
+
+[[package]]
 name = "crypto-common"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1052,7 +1077,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "ironcore-alloy"
-version = "0.11.0-pre.5"
+version = "0.11.0-rc.5"
 dependencies = [
  "aes-gcm",
  "aes-siv",
@@ -1071,6 +1096,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "rand_distr",
+ "rayon",
  "regex",
  "reqwest 0.12.2",
  "ring",
@@ -1083,9 +1109,9 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd19765db5c9c4d9d1953cf161cc3d0e24230149b044ba659aa394dba70832fc"
+checksum = "caa3f9b0cb178f9448ea1e10a66ab71438a3faa4105d7b61eafa1b008a17eb21"
 dependencies = [
  "aes-gcm",
  "bytes",
@@ -1513,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "qdrant-example"
-version = "0.11.0-pre.5"
+version = "0.11.0-rc.5"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -1581,6 +1607,26 @@ name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
+
+[[package]]
+name = "rayon"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
+]
 
 [[package]]
 name = "redox_syscall"
