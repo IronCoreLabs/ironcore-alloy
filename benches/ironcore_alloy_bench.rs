@@ -21,9 +21,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
 
-fn random_bytes(rng: ThreadRng, length: usize) -> PlaintextBytes {
-    let uniform = Uniform::new_inclusive(0, 255);
-    PlaintextBytes(rng.sample_iter(&uniform).take(length).collect_vec())
+fn random_bytes(rng: &mut ThreadRng, length: usize) -> PlaintextBytes {
+    let random_bytes = {
+        let mut vec = vec![0; length];
+        rng.fill_bytes(&mut vec);
+        vec
+    };
+    PlaintextBytes(random_bytes)
 }
 
 fn benches(c: &mut Criterion) {
@@ -82,21 +86,21 @@ fn benches(c: &mut Criterion) {
 
     c.bench_function("Standalone - roundtrip 10B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || random_bytes(rng.clone(), 10),
+            || random_bytes(&mut rng, 10),
             roundtrip,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - roundtrip 10KB", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || random_bytes(rng.clone(), 10_000),
+            || random_bytes(&mut rng, 10_000),
             roundtrip,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - roundtrip 100KB", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || random_bytes(rng.clone(), 100_000),
+            || random_bytes(&mut rng, 100_000),
             roundtrip,
             BatchSize::SmallInput,
         )
@@ -115,7 +119,7 @@ fn benches(c: &mut Criterion) {
 }
 
 fn tsp_benches(c: &mut Criterion) {
-    let rng = rand::thread_rng();
+    let mut rng = rand::thread_rng();
     let tsp_uri = env::var("TSP_ADDRESS").unwrap_or("http://localhost".to_string());
     let tsp_port = env::var("TSP_PORT").unwrap_or("32804".to_string());
     let tenant_id = env::var("TENANT_ID").unwrap_or("tenant-gcp-l".to_string());
@@ -136,7 +140,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - encrypt 1B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || generate_plaintext(1, 1, rng.clone()),
+            || generate_plaintext(1, 1, &mut rng),
             encrypt,
             BatchSize::SmallInput,
         )
@@ -144,7 +148,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - encrypt 100B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || generate_plaintext(100, 1, rng.clone()),
+            || generate_plaintext(100, 1, &mut rng),
             encrypt,
             BatchSize::SmallInput,
         )
@@ -152,7 +156,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - encrypt 10KB", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || generate_plaintext(10_000, 1, rng.clone()),
+            || generate_plaintext(10_000, 1, &mut rng),
             encrypt,
             BatchSize::SmallInput,
         )
@@ -160,7 +164,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - encrypt 1MB", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || generate_plaintext(1_000_000, 1, rng.clone()),
+            || generate_plaintext(1_000_000, 1, &mut rng),
             encrypt,
             BatchSize::SmallInput,
         )
@@ -168,7 +172,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - decrypt 1B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || preencrypt(1, sdk.clone(), metadata.clone(), rng.clone()),
+            || preencrypt(1, sdk.clone(), metadata.clone(), &mut rng),
             decrypt,
             BatchSize::SmallInput,
         )
@@ -176,7 +180,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - decrypt 100B", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || preencrypt(100, sdk.clone(), metadata.clone(), rng.clone()),
+            || preencrypt(100, sdk.clone(), metadata.clone(), &mut rng),
             decrypt,
             BatchSize::SmallInput,
         )
@@ -184,7 +188,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - decrypt 10KB", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || preencrypt(10_000, sdk.clone(), metadata.clone(), rng.clone()),
+            || preencrypt(10_000, sdk.clone(), metadata.clone(), &mut rng),
             decrypt,
             BatchSize::LargeInput,
         )
@@ -192,7 +196,7 @@ fn tsp_benches(c: &mut Criterion) {
 
     c.bench_function("TSP - decrypt 1MB", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || preencrypt(1_000_000, sdk.clone(), metadata.clone(), rng.clone()),
+            || preencrypt(1_000_000, sdk.clone(), metadata.clone(), &mut rng),
             decrypt,
             BatchSize::SmallInput,
         )
@@ -202,7 +206,7 @@ fn tsp_benches(c: &mut Criterion) {
         b.to_async(Runtime::new().unwrap()).iter_batched(
             || {
                 PlaintextDocuments((0..10).fold(HashMap::new(), |mut acc, i| {
-                    let doc = generate_plaintext(10, 10, rng.clone());
+                    let doc = generate_plaintext(10, 10, &mut rng);
                     acc.insert(DocumentId(format!("doc{}", i)), doc);
                     acc
                 }))
@@ -221,12 +225,12 @@ fn tsp_benches(c: &mut Criterion) {
 fn generate_plaintext(
     bytes_per_field: usize,
     num_fields: usize,
-    rng: ThreadRng,
+    rng: &mut ThreadRng,
 ) -> PlaintextDocument {
     PlaintextDocument((0..num_fields).fold(HashMap::new(), |mut acc, i| {
         acc.insert(
             FieldId(format!("field{}", i)),
-            random_bytes(rng.clone(), bytes_per_field),
+            random_bytes(rng, bytes_per_field),
         );
         acc
     }))
@@ -238,7 +242,7 @@ fn preencrypt(
     size: usize,
     sdk: Arc<SaasShield>,
     metadata: Arc<AlloyMetadata>,
-    rng: ThreadRng,
+    rng: &mut ThreadRng,
 ) -> EncryptedDocument {
     let plaintext =
         PlaintextDocument([(FieldId("doc1".to_string()), random_bytes(rng, size))].into());
