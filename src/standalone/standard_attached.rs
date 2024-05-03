@@ -35,12 +35,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
         plaintext_document: PlaintextAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedAttachedDocument, AlloyError> {
-        encrypt_core(
-            &self.standard_client,
-            PlaintextBytes(plaintext_document.0),
-            metadata,
-        )
-        .await
+        encrypt_core(&self.standard_client, plaintext_document.0, metadata).await
     }
 
     /// Encrypt multiple documents with the provided metadata.
@@ -62,7 +57,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
         decrypt_core(&self.standard_client, encrypted_document, metadata)
             .await
-            .map(|x| PlaintextAttachedDocument(x.0))
+            .map(|x| PlaintextAttachedDocument(PlaintextBytes(x.0)))
     }
 
     /// Decrypt multiple documents that were encrypted with the provided metadata.
@@ -160,7 +155,7 @@ mod test {
             .await
             .unwrap();
 
-        assert_eq!(result.0, vec![100u8; 400]);
+        assert_eq!(result.0, PlaintextBytes(vec![100u8; 400]));
     }
 
     #[tokio::test]
@@ -224,6 +219,6 @@ mod test {
             .await
             .unwrap();
         let result = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(result.0, plaintext);
+        assert_eq!(result.0 .0, plaintext);
     }
 }

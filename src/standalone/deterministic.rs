@@ -7,14 +7,12 @@ use crate::deterministic::{
 };
 use crate::errors::AlloyError;
 use crate::util::{check_rotation_no_op, perform_batch_action};
-use crate::FieldId;
 use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
     StandaloneConfiguration, TenantId,
 };
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -158,14 +156,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         let decrypt_field = |encrypted_field: EncryptedField| {
             self.decrypt_sync(encrypted_field, &metadata.tenant_id)
         };
-        Ok(perform_batch_action(
-            encrypted_fields
-                .0
-                .into_par_iter()
-                .map(|(k, v)| (FieldId(k), v)),
-            decrypt_field,
-        )
-        .into())
+        Ok(perform_batch_action(encrypted_fields.0, decrypt_field).into())
     }
 
     /// Encrypt each plaintext field with any Current and InRotation keys for the provided secret path.
@@ -255,14 +246,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     })
             }
         };
-        Ok(perform_batch_action(
-            encrypted_fields
-                .0
-                .into_par_iter()
-                .map(|(k, v)| (FieldId(k), v)),
-            reencrypt_field,
-        )
-        .into())
+        Ok(perform_batch_action(encrypted_fields.0, reencrypt_field).into())
     }
 
     /// Generate a prefix that could used to search a data store for fields encrypted using an identifier (KMS

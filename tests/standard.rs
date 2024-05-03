@@ -80,7 +80,7 @@ mod tests {
         ]);
         let doc_bytes = [(FieldId("doc".to_string()), doc)].into();
         EncryptedDocument {
-            edek: EdekWithKeyIdHeader(edek_bytes.0),
+            edek: EdekWithKeyIdHeader(EncryptedBytes(edek_bytes.0)),
             document: doc_bytes,
         }
     }
@@ -93,7 +93,7 @@ mod tests {
             .standard()
             .encrypt(plaintext, &metadata)
             .await?;
-        assert_eq!(encrypted.edek.0.len(), 259);
+        assert_eq!(encrypted.edek.0 .0.len(), 259);
         Ok(())
     }
 
@@ -265,7 +265,7 @@ mod tests {
             .standard()
             .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
             .await?;
-        assert_eq!(encrypted.edek.0, edek_bytes);
+        assert_eq!(encrypted.edek.0 .0, edek_bytes);
         let decrypted = get_client()
             .standard()
             .decrypt(encrypted, &metadata)
@@ -357,7 +357,7 @@ mod tests {
             .get(&DocumentId("edek".to_string()))
             .unwrap();
         // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0 .0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 
@@ -385,7 +385,7 @@ mod tests {
             .unwrap();
         // This is now a V5 document, which starts with the KeyIdHeader
         // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0 .0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 

@@ -10,12 +10,11 @@ use crate::util::{check_rotation_no_op, perform_batch_action, OurReseedingRng};
 use crate::vector::{
     decrypt_internal, encrypt_internal, get_approximation_factor, EncryptedVector,
     EncryptedVectors, GenerateVectorQueryResult, PlaintextVector, PlaintextVectors,
-    VectorDecryptBatchResult, VectorEncryptBatchResult, VectorId, VectorOps, VectorRotateResult,
+    VectorDecryptBatchResult, VectorEncryptBatchResult, VectorOps, VectorRotateResult,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -159,14 +158,7 @@ impl VectorOps for SaasShieldVectorClient {
                 self.rng.clone(),
             )
         };
-        Ok(perform_batch_action(
-            plaintext_vectors
-                .0
-                .into_par_iter()
-                .map(|(k, v)| (VectorId(k), v)),
-            encrypt_vector,
-        )
-        .into())
+        Ok(perform_batch_action(plaintext_vectors.0, encrypt_vector).into())
     }
 
     /// Decrypt a vector embedding that was encrypted with the provided metadata. The values of the embedding will
@@ -254,14 +246,7 @@ impl VectorOps for SaasShieldVectorClient {
                 icl_metadata_bytes,
             )
         };
-        Ok(perform_batch_action(
-            encrypted_vectors
-                .0
-                .into_par_iter()
-                .map(|(k, v)| (VectorId(k), v)),
-            decrypt_vector,
-        )
-        .into())
+        Ok(perform_batch_action(encrypted_vectors.0, decrypt_vector).into())
     }
 
     /// Encrypt each plaintext vector with any Current and InRotation keys for the provided secret path.

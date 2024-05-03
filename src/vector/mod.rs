@@ -43,16 +43,13 @@ pub struct PlaintextVector {
     pub derivation_path: DerivationPath,
 }
 
-// TODO: These newtypes can't include VectorId because of a bug with generated Python
-// not using forward references. If this is addressed, we can change it.
-// See https://github.com/mozilla/uniffi-rs/issues/2067
-pub struct PlaintextVectors(pub HashMap<String, PlaintextVector>);
-custom_newtype!(PlaintextVectors, HashMap<String, PlaintextVector>);
-pub struct EncryptedVectors(pub HashMap<String, EncryptedVector>);
-custom_newtype!(EncryptedVectors, HashMap<String, EncryptedVector>);
-pub struct GenerateVectorQueryResult(pub HashMap<String, Vec<EncryptedVector>>);
-custom_newtype!(GenerateVectorQueryResult, HashMap<String, Vec<EncryptedVector>>);
-create_batch_result_struct!(VectorRotateResult, EncryptedVector, String);
+pub struct PlaintextVectors(pub HashMap<VectorId, PlaintextVector>);
+custom_newtype!(PlaintextVectors, HashMap<VectorId, PlaintextVector>);
+pub struct EncryptedVectors(pub HashMap<VectorId, EncryptedVector>);
+custom_newtype!(EncryptedVectors, HashMap<VectorId, EncryptedVector>);
+pub struct GenerateVectorQueryResult(pub HashMap<VectorId, Vec<EncryptedVector>>);
+custom_newtype!(GenerateVectorQueryResult, HashMap<VectorId, Vec<EncryptedVector>>);
+create_batch_result_struct!(VectorRotateResult, EncryptedVector, VectorId);
 
 create_batch_result_struct!(VectorEncryptBatchResult, EncryptedVector, VectorId);
 create_batch_result_struct!(VectorDecryptBatchResult, PlaintextVector, VectorId);

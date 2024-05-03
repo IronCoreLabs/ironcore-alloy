@@ -25,11 +25,8 @@ pub struct PlaintextField {
 pub struct PlaintextFields(pub HashMap<FieldId, PlaintextField>);
 custom_newtype!(PlaintextFields, HashMap<FieldId, PlaintextField>);
 
-// TODO: These newtype can't include FieldId because of a bug with generated Python
-// not using forward references. If this is addressed, we can change it.
-// See https://github.com/mozilla/uniffi-rs/issues/2067
-pub struct EncryptedFields(pub HashMap<String, EncryptedField>);
-custom_newtype!(EncryptedFields, HashMap<String, EncryptedField>);
+pub struct EncryptedFields(pub HashMap<FieldId, EncryptedField>);
+custom_newtype!(EncryptedFields, HashMap<FieldId, EncryptedField>);
 pub struct GenerateFieldQueryResult(pub HashMap<FieldId, Vec<EncryptedField>>);
 custom_newtype!(GenerateFieldQueryResult, HashMap<FieldId, Vec<EncryptedField>>);
 create_batch_result_struct!(DeterministicRotateResult, EncryptedField, FieldId);

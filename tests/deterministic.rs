@@ -93,8 +93,8 @@ mod tests {
             derivation_path: DerivationPath("deriv".to_string()),
         };
         let encrypted_fields = EncryptedFields(
-            iter::once(("bad_doc".to_string(), bad_encrypted))
-                .chain(encrypted.successes.into_iter().map(|(k, v)| (k.0, v)))
+            iter::once((FieldId("bad_doc".to_string()), bad_encrypted))
+                .chain(encrypted.successes)
                 .collect(),
         );
         let decrypted = get_client()
@@ -156,7 +156,7 @@ mod tests {
     #[tokio::test]
     async fn deterministic_rotate_fields_no_op() -> TestResult {
         let ciphertext = get_ciphertext();
-        let fields = EncryptedFields([("field".to_string(), ciphertext)].into());
+        let fields = EncryptedFields([(FieldId("field".to_string()), ciphertext)].into());
         let metadata = get_metadata();
         let mut resp = get_client()
             .deterministic()
@@ -182,7 +182,7 @@ mod tests {
     #[tokio::test]
     async fn deterministic_rotate_fields_new_tenant() -> TestResult {
         let ciphertext = get_ciphertext();
-        let fields = EncryptedFields([("field".to_string(), ciphertext)].into());
+        let fields = EncryptedFields([(FieldId("field".to_string()), ciphertext)].into());
         let metadata = get_metadata();
         let new_tenant_id = TenantId("tenant-aws-l".to_string());
         let mut resp = get_client()

@@ -5,7 +5,7 @@ use crate::util::perform_batch_action;
 use crate::vector::{
     decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
     GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorDecryptBatchResult,
-    VectorEncryptBatchResult, VectorEncryptionKey, VectorId, VectorOps, VectorRotateResult,
+    VectorEncryptBatchResult, VectorEncryptionKey, VectorOps, VectorRotateResult,
 };
 use crate::{
     alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
@@ -177,16 +177,8 @@ impl VectorOps for StandaloneVectorClient {
             self.encrypt_sync(plaintext_vector, metadata)
         });
         Ok(VectorEncryptBatchResult {
-            successes: batch_result
-                .successes
-                .into_iter()
-                .map(|(id, value)| (VectorId(id), value))
-                .collect(),
-            failures: batch_result
-                .failures
-                .into_iter()
-                .map(|(id, value)| (VectorId(id), value))
-                .collect(),
+            successes: batch_result.successes,
+            failures: batch_result.failures,
         })
     }
 
@@ -213,16 +205,8 @@ impl VectorOps for StandaloneVectorClient {
             self.decrypt_sync(encrypted_vector, metadata)
         });
         Ok(VectorDecryptBatchResult {
-            successes: batch_result
-                .successes
-                .into_iter()
-                .map(|(id, value)| (VectorId(id), value))
-                .collect(),
-            failures: batch_result
-                .failures
-                .into_iter()
-                .map(|(id, value)| (VectorId(id), value))
-                .collect(),
+            successes: batch_result.successes,
+            failures: batch_result.failures,
         })
     }
 
@@ -352,6 +336,7 @@ impl VectorOps for StandaloneVectorClient {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::vector::VectorId;
     use crate::TenantId;
     use crate::{standalone::config::StandaloneSecret, Secret};
     use approx::assert_ulps_eq;
@@ -501,7 +486,7 @@ mod test {
         let mut rotated_result = alloy_rotated_secret
             .rotate_vectors(
                 EncryptedVectors(HashMap::from_iter(
-                    vec![("one".to_string(), encrypt_result)].into_iter(),
+                    vec![(VectorId("one".to_string()), encrypt_result)].into_iter(),
                 )),
                 &get_metadata(),
                 Some(new_tenant_id.clone()),
@@ -509,7 +494,10 @@ mod test {
             .await
             .unwrap();
         assert_eq!(rotated_result.failures, HashMap::new());
-        let rotated_vector = rotated_result.successes.remove("one").unwrap();
+        let rotated_vector = rotated_result
+            .successes
+            .remove(&VectorId("one".to_string()))
+            .unwrap();
         // make sure we didn't hallucinate any other vectors
         assert!(rotated_result.successes.is_empty());
         let result = alloy_rotated_secret

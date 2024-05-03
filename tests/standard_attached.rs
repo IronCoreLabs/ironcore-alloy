@@ -14,6 +14,7 @@ mod tests {
         standard_attached::PlaintextAttachedDocument,
         AlloyMetadata, DocumentId, TenantId,
     };
+    use ironcore_alloy::{EncryptedBytes, PlaintextBytes};
     use serde_json::{Map, Value};
     use std::{
         sync::Arc,
@@ -25,11 +26,11 @@ mod tests {
     }
 
     fn get_plaintext() -> PlaintextAttachedDocument {
-        PlaintextAttachedDocument(vec![1, 2, 3])
+        PlaintextAttachedDocument(PlaintextBytes(vec![1, 2, 3]))
     }
 
     fn get_ciphertext() -> EncryptedAttachedDocument {
-        EncryptedAttachedDocument(vec![
+        EncryptedAttachedDocument(EncryptedBytes(vec![
             0, 0, 1, 255, 2, 0, 0, 253, 10, 36, 10, 32, 37, 182, 28, 151, 163, 201, 148, 166, 38,
             98, 139, 235, 173, 240, 18, 97, 90, 158, 165, 68, 239, 128, 213, 252, 29, 223, 194,
             125, 34, 51, 106, 186, 16, 1, 18, 212, 1, 18, 209, 1, 18, 206, 1, 10, 48, 11, 203, 103,
@@ -46,12 +47,12 @@ mod tests {
             116, 101, 110, 97, 110, 116, 45, 103, 99, 112, 45, 108, 87, 49, 227, 3, 137, 101, 136,
             209, 137, 109, 39, 207, 43, 133, 71, 96, 232, 250, 31, 212, 138, 200, 51, 23, 213, 139,
             96, 36, 111, 153, 33,
-        ])
+        ]))
     }
 
     fn get_v4_ciphertext() -> EncryptedAttachedDocument {
         let decoded = STANDARD.decode("BElST04A/QokCiBvYPHzvTW/gGnRJVMIUrFeZc/mcZjTXpU0KaltEM3/fRABEtQBEtEBEs4BCjDJDBYx+NdrCP3vsy05hBHDLP6IXeboCH+sYya/1ycUZlNmFKgkpAjIcBjnovfEunIQ/wMYhAUiDAcq7Se4Ea3H/pcEaCp4CnYKcQokAKUEZIdvQuLu6rsnAb5JaCthMBi2x3LwVQv8JsWJh77lZMKuEkkA3PhOjA9pdUXrwLuIG5earT9PhOqefFCTRBgri0hhcVcM0XD12peEwkXZDNLyupNVR1aUTXFqFScMkaG7wiEhy2Uzzg7f+l/eEP8DMgx0ZW5hbnQtZ2NwLWxUnq+7pZ5UJFqlbQiAD4p1uechLz1hlLhGgEPDV9OTi3eMAvvAeNJedYDang==").unwrap();
-        EncryptedAttachedDocument(decoded)
+        EncryptedAttachedDocument(EncryptedBytes(decoded))
     }
 
     #[tokio::test]
@@ -62,7 +63,7 @@ mod tests {
             .standard_attached()
             .encrypt(plaintext, &metadata)
             .await?;
-        assert_eq!(encrypted.0.len(), 292);
+        assert_eq!(encrypted.0 .0.len(), 292);
         Ok(())
     }
 
@@ -92,7 +93,7 @@ mod tests {
             .as_object()
             .unwrap()
             .clone();
-        let decrypted_json = serde_json::from_slice::<Map<String, Value>>(&decrypted.0).unwrap();
+        let decrypted_json = serde_json::from_slice::<Map<String, Value>>(&decrypted.0 .0).unwrap();
         assert_eq!(expected, decrypted_json);
         Ok(())
     }
@@ -109,7 +110,8 @@ mod tests {
             .await?;
         assert_eq!(encrypted.successes.len(), 1);
         assert_eq!(encrypted.failures.len(), 0);
-        let bad_document = EncryptedAttachedDocument(vec![0, 0, 1, 255, 2, 0, 0, 2, 10, 36]);
+        let bad_document =
+            EncryptedAttachedDocument(EncryptedBytes(vec![0, 0, 1, 255, 2, 0, 0, 2, 10, 36]));
         let new_encrypted: EncryptedAttachedDocuments = encrypted
             .successes
             .into_iter()
@@ -225,7 +227,7 @@ mod tests {
             .remove(&DocumentId("doc".to_string()))
             .unwrap();
         // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0 .0.starts_with(&[0, 0, 1, 255, 2, 0]));
         let decrypted = get_client()
             .standard_attached()
             .decrypt(rekeyed, &metadata)
@@ -255,7 +257,7 @@ mod tests {
             .remove(&DocumentId("doc".to_string()))
             .unwrap();
         // First 4 bytes are KMS config ID 512
-        assert!(rekeyed.0.starts_with(&[0, 0, 2, 0, 2, 0]));
+        assert!(rekeyed.0 .0.starts_with(&[0, 0, 2, 0, 2, 0]));
         let bad_decrypted = get_client()
             .standard_attached()
             .decrypt(rekeyed.clone(), &metadata)
