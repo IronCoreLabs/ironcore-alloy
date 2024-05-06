@@ -1077,7 +1077,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "ironcore-alloy"
-version = "0.11.0-pre.6"
+version = "0.11.0-rc.6"
 dependencies = [
  "aes-gcm",
  "aes-siv",
@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "qdrant-example"
-version = "0.11.0-pre.6"
+version = "0.11.0-rc.6"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
