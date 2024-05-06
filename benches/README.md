@@ -83,3 +83,7 @@ Since ironcore-alloy is a library that interacts with a back-end service (TSP), 
 In general, operation latency is a function of latency to the TSP + latency to the tenant's KMS (if key-leasing is disabled).
 
 The TSP's tenant logging mechanism has some tunable limits. By default, a TSP should be able to sustain 500 ops/sec/tenant, with the ability to burst higher for a limited time. The benchmark is using a single tenant, and (depending on your machine and benchmark config) can easily be executing a few thousand ops/sec. If you run a benchmark long enough you will overwhelm the TSP. In a real application, you would scale-out the TSP at this point. See [the TSP documentation](https://ironcorelabs.com/docs/saas-shield/tenant-security-proxy/deployment/) for more details.
+
+## Other Languages
+
+There are also benchmarks available in [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks/src) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
