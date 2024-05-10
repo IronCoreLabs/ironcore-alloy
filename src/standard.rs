@@ -43,18 +43,15 @@ pub struct PlaintextDocumentsWithEdeks(pub HashMap<DocumentId, PlaintextDocument
 custom_newtype!(PlaintextDocumentsWithEdeks, HashMap<DocumentId, PlaintextDocumentWithEdek>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-// TODO: This newtype can't include EncryptedBytes because of a bug with generated Python
-// not using forward references. If this is addressed, we can change it.
-// See https://github.com/mozilla/uniffi-rs/issues/2067
 // Key ID header followed by V4DocumentHeader containing the EDEK.
 // Note that in the case of SaaS Shield Standard, users could create this with a
 // legacy V3 EDEK, which is just the EDEK. This has to be handled manually on decrypts.
-pub struct EdekWithKeyIdHeader(pub Vec<u8>);
-custom_newtype!(EdekWithKeyIdHeader, Vec<u8>);
+pub struct EdekWithKeyIdHeader(pub EncryptedBytes);
+custom_newtype!(EdekWithKeyIdHeader, EncryptedBytes);
 
 impl EdekWithKeyIdHeader {
     pub fn new(key_id_header: KeyIdHeader, v4_doc: icl_header_v4::V4DocumentHeader) -> Self {
-        EdekWithKeyIdHeader(
+        EdekWithKeyIdHeader(EncryptedBytes(
             key_id_header
                 .put_header_on_document(
                     v4_doc
@@ -62,7 +59,7 @@ impl EdekWithKeyIdHeader {
                         .expect("Writing to in memory bytes should always succeed."),
                 )
                 .into(),
-        )
+        ))
     }
 }
 
@@ -267,7 +264,7 @@ mod test {
             Default::default(),
         )
         .unwrap();
-        assert_eq!(result.edek.0, vec![0, 0, 0, 1, 2, 0]);
+        assert_eq!(result.edek.0 .0, vec![0, 0, 0, 1, 2, 0]);
         assert_eq!(
             result.document.get(&FieldId("foo".to_string())).unwrap().0,
             vec![

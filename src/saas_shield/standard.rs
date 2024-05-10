@@ -152,7 +152,7 @@ impl SaasShieldStandardClient {
     ) -> Result<EdekParts, AlloyError> {
         // This doesn't just call Self::decompose_key_id_header because we still want to error on incorrect EDEK/payload type
         let maybe_decomposed =
-            decode_version_prefixed_value(Bytes::copy_from_slice(&encrypted_bytes.0));
+            decode_version_prefixed_value(Bytes::copy_from_slice(&encrypted_bytes.0 .0));
         match maybe_decomposed {
             Ok((
                 KeyIdHeader {
@@ -188,7 +188,7 @@ impl SaasShieldStandardClient {
                     })
                     .unwrap_or(
                         // Parsing as V4 failed, so V3 is our fallback
-                        EdekParts::V3(encrypted_bytes.0.into()),
+                        EdekParts::V3(encrypted_bytes.0 .0.into()),
                     ))
             }
         }
@@ -611,14 +611,14 @@ pub fn generate_cmk_v4_doc_and_sign(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::standard::EdekWithKeyIdHeader;
+    use crate::{standard::EdekWithKeyIdHeader, EncryptedBytes};
     use base64::{engine::general_purpose::STANDARD, Engine};
     use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]
     fn decompose_edek_header_makes_v3_for_invalid() {
         let encrypted_document = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(vec![0u8]),
+            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![0u8])),
             document: Default::default(),
         };
         assert!(matches!(
@@ -632,7 +632,7 @@ mod test {
         // This is a SaaS Shield Standard edek which is empty along with a valid header.
         let bytes = vec![0u8, 0, 0, 42, 1, 0, 18, 4, 18, 2, 18, 0];
         let encrypted_doc = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(bytes),
+            edek: EdekWithKeyIdHeader(EncryptedBytes(bytes)),
             document: Default::default(),
         };
 
@@ -661,7 +661,7 @@ mod test {
             KeyIdHeader::new(EdekType::SaasShield, PayloadType::StandardEdek, KeyId(123))
                 .put_header_on_document(doc_bytes);
         let encrypted_doc = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(final_bytes.to_vec()),
+            edek: EdekWithKeyIdHeader(EncryptedBytes(final_bytes.to_vec())),
             document: Default::default(),
         };
 
@@ -670,7 +670,7 @@ mod test {
 
     #[test]
     fn parse_old_v4_document_works() {
-        let edek_and_header = EdekWithKeyIdHeader(vec![
+        let edek_and_header = EdekWithKeyIdHeader(EncryptedBytes(vec![
             10, 36, 10, 32, 64, 210, 116, 17, 37, 169, 25, 195, 73, 47, 59, 120, 34, 200, 205, 142,
             3, 154, 115, 130, 188, 198, 244, 161, 170, 163, 153, 254, 43, 237, 157, 167, 16, 1, 18,
             215, 1, 18, 212, 1, 18, 209, 1, 10, 192, 1, 10, 48, 63, 225, 165, 108, 33, 17, 151,
@@ -685,7 +685,7 @@ mod test {
             183, 105, 45, 137, 66, 170, 61, 49, 166, 47, 184, 99, 232, 86, 42, 73, 118, 87, 194,
             50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97, 110,
             116, 45, 103, 99, 112, 45, 108,
-        ]);
+        ]));
         let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
         assert!(matches!(edek_parts, EdekParts::V4(_)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();
@@ -699,7 +699,7 @@ mod test {
 
     #[test]
     fn parse_new_v5_document_works() {
-        let edek_and_header = EdekWithKeyIdHeader(vec![
+        let edek_and_header = EdekWithKeyIdHeader(EncryptedBytes(vec![
             0, 0, 1, 255, 2, 0, 10, 36, 10, 32, 69, 182, 178, 20, 76, 114, 41, 199, 199, 34, 15,
             196, 128, 11, 147, 175, 190, 68, 241, 100, 46, 76, 139, 172, 5, 41, 226, 192, 84, 1,
             40, 31, 16, 1, 18, 212, 1, 18, 209, 1, 18, 206, 1, 10, 48, 212, 43, 219, 136, 159, 154,
@@ -714,7 +714,7 @@ mod test {
             46, 183, 105, 45, 137, 66, 170, 61, 49, 166, 47, 184, 99, 232, 86, 42, 73, 118, 87,
             194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97,
             110, 116, 45, 103, 99, 112, 45, 108,
-        ]);
+        ]));
         let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
         assert!(matches!(edek_parts, EdekParts::V5(_, _)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();
@@ -730,7 +730,7 @@ mod test {
     fn parse_v3_document_works() {
         let edek = STANDARD.decode("CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D").unwrap();
         // This type isn't true, but it's what a caller would be creating if they had old EDEKs
-        let liar_type_edek = EdekWithKeyIdHeader(edek);
+        let liar_type_edek = EdekWithKeyIdHeader(EncryptedBytes(edek));
         let edek_parts = SaasShieldStandardClient::decompose_edek_header(liar_type_edek).unwrap();
         assert!(matches!(edek_parts, EdekParts::V3(_)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();

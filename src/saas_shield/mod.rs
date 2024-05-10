@@ -8,6 +8,7 @@ use convert_case::Casing;
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use itertools::Itertools;
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 
 pub mod config;
 pub mod deterministic;
@@ -35,15 +36,16 @@ pub enum SecurityEvent {
     Custom { event: CustomEvent },
 }
 
-impl ToString for SecurityEvent {
-    fn to_string(&self) -> String {
-        match self {
+impl Display for SecurityEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
             SecurityEvent::Admin { event } => event.to_string(),
             SecurityEvent::Data { event } => event.to_string(),
             SecurityEvent::Periodic { event } => event.to_string(),
             SecurityEvent::User { event } => event.to_string(),
             SecurityEvent::Custom { event } => event.to_string(),
-        }
+        };
+        write!(f, "{str}")
     }
 }
 
@@ -55,9 +57,10 @@ pub enum AdminEvent {
     Remove,
 }
 
-impl ToString for AdminEvent {
-    fn to_string(&self) -> String {
-        format!("ADMIN_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
+impl Display for AdminEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let formatted = format!("ADMIN_{:?}", self).to_case(convert_case::Case::ScreamingSnake);
+        write!(f, "{formatted}")
     }
 }
 
@@ -82,9 +85,10 @@ pub enum UserEvent {
     VerifyEmail,
 }
 
-impl ToString for UserEvent {
-    fn to_string(&self) -> String {
-        format!("USER_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
+impl Display for UserEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let formatted = format!("USER_{:?}", self).to_case(convert_case::Case::ScreamingSnake);
+        write!(f, "{formatted}")
     }
 }
 
@@ -100,9 +104,10 @@ pub enum DataEvent {
     ChangePermissions,
 }
 
-impl ToString for DataEvent {
-    fn to_string(&self) -> String {
-        format!("DATA_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
+impl Display for DataEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let formatted = format!("DATA_{:?}", self).to_case(convert_case::Case::ScreamingSnake);
+        write!(f, "{formatted}")
     }
 }
 
@@ -112,9 +117,10 @@ pub enum PeriodicEvent {
     CreateBackup,
 }
 
-impl ToString for PeriodicEvent {
-    fn to_string(&self) -> String {
-        format!("PERIODIC_{:?}", self).to_case(convert_case::Case::ScreamingSnake)
+impl Display for PeriodicEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let formatted = format!("PERIODIC_{:?}", self).to_case(convert_case::Case::ScreamingSnake);
+        write!(f, "{formatted}")
     }
 }
 
@@ -141,9 +147,9 @@ impl CustomEvent {
     }
 }
 
-impl ToString for CustomEvent {
-    fn to_string(&self) -> String {
-        format!("CUSTOM_{}", self.event_name,)
+impl Display for CustomEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CUSTOM_{}", self.event_name)
     }
 }
 

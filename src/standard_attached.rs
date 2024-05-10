@@ -22,20 +22,14 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
 use uniffi::custom_newtype;
 
-// TODO: This newtype can't include PlaintextBytes because of a bug with generated Python
-// not using forward references. If this is addressed, we can change it.
-// See https://github.com/mozilla/uniffi-rs/issues/2067
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PlaintextAttachedDocument(pub Vec<u8>);
-custom_newtype!(PlaintextAttachedDocument, Vec<u8>);
+pub struct PlaintextAttachedDocument(pub PlaintextBytes);
+custom_newtype!(PlaintextAttachedDocument, PlaintextBytes);
 pub type PlaintextAttachedDocuments = HashMap<DocumentId, PlaintextAttachedDocument>;
 
-// TODO: This newtype can't include EncryptedBytes because of a bug with generated Python
-// not using forward references. If this is addressed, we can change it.
-// See https://github.com/mozilla/uniffi-rs/issues/2067
 #[derive(Debug, Clone)]
-pub struct EncryptedAttachedDocument(pub Vec<u8>);
-custom_newtype!(EncryptedAttachedDocument, Vec<u8>);
+pub struct EncryptedAttachedDocument(pub EncryptedBytes);
+custom_newtype!(EncryptedAttachedDocument, EncryptedBytes);
 
 pub type EncryptedAttachedDocuments = HashMap<DocumentId, EncryptedAttachedDocument>;
 
@@ -113,7 +107,7 @@ fn encrypted_document_to_attached(
         document,
     } = encrypted_document;
     let (key_id_header, edek_bytes) =
-        key_id_header::decode_version_prefixed_value(edek_with_key_id_bytes.0.into())?;
+        key_id_header::decode_version_prefixed_value(edek_with_key_id_bytes.0 .0.into())?;
     let edek = v4_proto_from_bytes(edek_bytes)?;
     let edoc = document
         .into_values()
@@ -122,7 +116,7 @@ fn encrypted_document_to_attached(
             msg: "Encryption returned a document without a passed in field. This shouldn't happen."
                 .to_string(),
         })?;
-    Ok(EncryptedAttachedDocument(
+    Ok(EncryptedAttachedDocument(EncryptedBytes(
         AttachedDocument {
             key_id_header,
             edek,
@@ -130,7 +124,7 @@ fn encrypted_document_to_attached(
         }
         .write_to_bytes()?
         .to_vec(),
-    ))
+    )))
 }
 
 pub(crate) async fn encrypt_core<T: StandardDocumentOps>(
@@ -166,9 +160,7 @@ pub(crate) async fn encrypt_batch_core<T: StandardDocumentOps>(
             .map(|(id, document)| {
                 (
                     id,
-                    PlaintextDocument(
-                        [(hardcoded_field_id.clone(), PlaintextBytes(document.0))].into(),
-                    ),
+                    PlaintextDocument([(hardcoded_field_id.clone(), document.0)].into()),
                 )
             })
             .collect(),
@@ -193,7 +185,7 @@ pub(crate) async fn encrypt_batch_core<T: StandardDocumentOps>(
 fn decode_edoc<T: StandardDocumentOps>(
     attached_document: EncryptedAttachedDocument,
 ) -> Result<AttachedDocument, AlloyError> {
-    let attached_document_bytes: Bytes = attached_document.0.into();
+    let attached_document_bytes: Bytes = attached_document.0 .0.into();
     Ok(
         v4::attached::decode_attached_edoc(attached_document_bytes.clone())
             .map(|(edek, edoc)| AttachedDocument {
@@ -285,13 +277,13 @@ pub(crate) async fn decrypt_batch_core<T: StandardDocumentOps>(
         .map(|(document_id, mut document)| {
             (
                 document_id,
-                PlaintextAttachedDocument(
+                PlaintextAttachedDocument(PlaintextBytes(
                     document
                         .0
                         .remove(&hardcoded_field_id)
                         .expect("Decryption doesn't change the structure of the fields.")
                         .0,
-                ),
+                )),
             )
         })
         .collect();
@@ -350,9 +342,9 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
                 msg: "Rekey failed for document.".to_string(),
             })?;
             let (key_id_header, edek_bytes) =
-                key_id_header::decode_version_prefixed_value(rekeyed_edek.0.into())?;
+                key_id_header::decode_version_prefixed_value(rekeyed_edek.0 .0.into())?;
             let edek = v4_proto_from_bytes(edek_bytes)?;
-            Ok(EncryptedAttachedDocument(
+            Ok(EncryptedAttachedDocument(EncryptedBytes(
                 AttachedDocument {
                     key_id_header,
                     edek,
@@ -360,7 +352,7 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
                 }
                 .write_to_bytes()?
                 .to_vec(),
-            ))
+            )))
         };
     let batch_rekey_response = perform_batch_action(edeks_and_edocs, form_attached_document);
     let combined_failures = batch_rekey_response

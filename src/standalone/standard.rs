@@ -94,7 +94,7 @@ impl StandaloneStandardClient {
         config_secrets: &HashMap<u32, Secret>,
         tenant_id: &TenantId,
     ) -> Result<EncryptionKey, AlloyError> {
-        let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0.into())?;
+        let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0)?;
 
         // Key id should never be 0. If it is we'll try all the keys we have.
         let secrets = if key_id.0 == 0 {
@@ -382,7 +382,8 @@ pub(crate) mod test {
             .await
             .unwrap();
         let (key_id_header, _) =
-            key_id_header::decode_version_prefixed_value(encrypted.edek.0.clone().into()).unwrap();
+            key_id_header::decode_version_prefixed_value(encrypted.edek.0 .0.clone().into())
+                .unwrap();
         assert_eq!(key_id_header.key_id, KeyId(1));
         assert_eq!(key_id_header.edek_type, EdekType::Standalone);
         assert_eq!(key_id_header.payload_type, PayloadType::StandardEdek);
@@ -518,7 +519,7 @@ pub(crate) mod test {
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
             //The header having a `4` means that the edek is for key id 4.
-            edek: EdekWithKeyIdHeader(vec![0, 0, 0, 4, 130, 0]),
+            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![0, 0, 0, 4, 130, 0])),
             document: HashMap::new(),
         };
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();
@@ -576,7 +577,7 @@ pub(crate) mod test {
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
         let encrypted = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(vec![
+            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![
                 0, 0, 0, 1, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
                 77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
                 42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
@@ -584,7 +585,7 @@ pub(crate) mod test {
                 209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
                 59, 126, 89, 87, 96, 177, 145, 45, 167, 75, 142, 49, 14, 249, 71, 29, 207, 70, 26,
                 1, 49,
-            ]),
+            ])),
             document: [(
                 FieldId("hi".to_string()),
                 EncryptedBytes(vec![
@@ -607,7 +608,7 @@ pub(crate) mod test {
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
         let encrypted = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(vec![
+            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![
                 0, 0, 0, 0, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
                 77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
                 42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
@@ -615,7 +616,7 @@ pub(crate) mod test {
                 209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
                 59, 126, 89, 87, 96, 177, 145, 45, 167, 75, 142, 49, 14, 249, 71, 29, 207, 70, 26,
                 1, 49,
-            ]),
+            ])),
             document: [(
                 FieldId("hi".to_string()),
                 EncryptedBytes(vec![
@@ -637,14 +638,14 @@ pub(crate) mod test {
         let client = new_client(Some(2));
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(vec![
+            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![
                 0, 0, 0, 0, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
                 77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
                 42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
                 71, 124, 244, 209, 252, 151, 18, 48, 77, 53, 19, 139, 40, 178, 7, 81, 160, 95, 18,
                 209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
                 59, 126, 89, 87,
-            ]),
+            ])),
             document: [(
                 FieldId("hi".to_string()),
                 EncryptedBytes(vec![
@@ -670,7 +671,7 @@ pub(crate) mod test {
         let client = default_client();
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let encrypted = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(vec![0, 0, 0, 1, 0, 0]),
+            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![0, 0, 0, 1, 0, 0])),
             document: HashMap::new(),
         };
         let error = client.decrypt(encrypted, &metadata).await.unwrap_err();

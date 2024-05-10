@@ -63,7 +63,7 @@ impl StandardSecrets {
 
         // check that the provided primary does in fact exist
         if let Some(id) = primary_secret_id {
-            if internal_secrets.get(&(id as u32)).is_none() {
+            if !internal_secrets.contains_key(&(id as u32)) {
                 return Err(AlloyError::InvalidKey {
                     msg: format!("Primary secret id not found in provided secrets: {id}"),
                 });
