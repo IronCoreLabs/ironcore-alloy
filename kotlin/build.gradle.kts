@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.allopen.gradle.*
 import org.jetbrains.kotlin.gradle.tasks.*
 import kotlinx.benchmark.gradle.*
 
-version = "0.11.0-SNAPSHOT"
+version = "0.11.0"
 
 group = "com.ironcorelabs"
 
