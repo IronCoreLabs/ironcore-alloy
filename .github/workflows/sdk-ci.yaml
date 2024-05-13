@@ -22,31 +22,37 @@ jobs:
     strategy:
       matrix:
         # This should stay in sync with the `os_matrix` above
-        runs-on: ["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]
+        runs-on:
+          [
+            "buildjet-2vcpu-ubuntu-2004",
+            "buildjet-4vcpu-ubuntu-2204-arm",
+            "macos-12",
+            "macos-14",
+          ]
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
-      with:
-        distribution: "temurin"
-        java-version: "17"
-    - uses: actions/download-artifact@v4
-      with:
-        name: ${{ join(matrix.runs-on) }}-
-        path: ${{ github.workspace }}/kotlin/src/main/resources/
-    - if: startsWith(matrix.runs-on, 'buildjet')
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-provider: buildjet
-    - if: startsWith(matrix.runs-on, 'macos')
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-provider: github
-    - name: Generate Kotlin files
-      run: cargo run --bin uniffi-bindgen generate --library resources/libironcore_alloy.* --language kotlin --out-dir kotlin
-      working-directory: kotlin/src/main
-    - name: Run Kotlin tests
-      run: ./gradlew test
-      working-directory: kotlin
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ join(matrix.runs-on) }}-
+          path: ${{ github.workspace }}/kotlin/src/main/resources/
+      - if: startsWith(matrix.runs-on, 'buildjet')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - if: startsWith(matrix.runs-on, 'macos')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate Kotlin files
+        run: cargo run --bin uniffi-bindgen generate --library resources/libironcore_alloy.* --language kotlin --out-dir kotlin
+        working-directory: kotlin/src/main
+      - name: Run Kotlin tests
+        run: ./gradlew test
+        working-directory: kotlin
 
   python-test:
     needs: generate-cdylibs
@@ -55,48 +61,54 @@ jobs:
       fail-fast: false
       matrix:
         # This should stay in sync with the `os_matrix` above and the `runs-on` from the other jobs in this file
-        runs-on: ["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]
+        runs-on:
+          [
+            "buildjet-2vcpu-ubuntu-2004",
+            "buildjet-4vcpu-ubuntu-2204-arm",
+            "macos-12",
+            "macos-14",
+          ]
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
-      with:
-        name: ${{ join(matrix.runs-on) }}-
-        path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy
-    - if: startsWith(matrix.runs-on, 'buildjet')
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-provider: buildjet
-    - if: startsWith(matrix.runs-on, 'macos')
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-provider: github
-    - name: Generate Python files
-      run: cargo run --bin uniffi-bindgen generate --library libironcore_alloy.* --language python --out-dir .
-      working-directory: python/ironcore-alloy/ironcore_alloy
-    - name: Install Python test matrix
-      if: endsWith(matrix.runs-on, 'arm') != true && matrix.runs-on != 'macos-14'
-      uses: actions/setup-python@v5
-      with:
-        # there are no builds for arm linux at all, so we'll make do with the system ones
-        python-version: |
-          3.9
-          3.10
-          3.11
-    - name: Install Python test matrix (macos-14)
-      if: matrix.runs-on == 'macos-14'
-      uses: actions/setup-python@v5
-      with:
-        # arm mac builds don't exist for pre-3.10
-        python-version: |
-          3.10
-          3.11
-    - name: Install hatch
-      if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm' && matrix.runs-on != 'macos-14'
-      run: pipx install hatch
-    - name: Install hatch (ARM)
-      if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm' || matrix.runs-on == 'macos-14'
-      # The arm machines have a permissions error if we don't use sudo
-      run: sudo pipx install hatch
-    - name: Run Python tests
-      run: hatch run test:test
-      working-directory: python/ironcore-alloy
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ join(matrix.runs-on) }}-
+          path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy
+      - if: startsWith(matrix.runs-on, 'buildjet')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - if: startsWith(matrix.runs-on, 'macos')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate Python files
+        run: cargo run --bin uniffi-bindgen generate --library libironcore_alloy.* --language python --out-dir .
+        working-directory: python/ironcore-alloy/ironcore_alloy
+      - name: Install Python test matrix
+        if: endsWith(matrix.runs-on, 'arm') != true && matrix.runs-on != 'macos-14'
+        uses: actions/setup-python@v5
+        with:
+          # there are no builds for arm linux at all, so we'll make do with the system ones
+          python-version: |
+            3.9
+            3.10
+            3.11
+      - name: Install Python test matrix (macos-14)
+        if: matrix.runs-on == 'macos-14'
+        uses: actions/setup-python@v5
+        with:
+          # arm mac builds don't exist for pre-3.10
+          python-version: |
+            3.10
+            3.11
+      - name: Install hatch
+        if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm' && matrix.runs-on != 'macos-14'
+        run: pipx install hatch
+      - name: Install hatch (ARM)
+        if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm' || matrix.runs-on == 'macos-14'
+        # The arm machines have a permissions error if we don't use sudo
+        run: sudo pipx install hatch
+      - name: Run Python tests
+        run: hatch run test:test
+        working-directory: python/ironcore-alloy
