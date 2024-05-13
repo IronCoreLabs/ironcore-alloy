@@ -87,3 +87,26 @@ The TSP's tenant logging mechanism has some tunable limits. By default, a TSP sh
 ## Other Languages
 
 There are also benchmarks available in [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks/src) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
+
+## Results
+
+The following benchmarking run was done on May 7, 2024 on a MacBook Pro (2023) with an Apple M2 Max chip. It uses a locally-built TSP running with the configuration from `demo-tsp.conf`.
+
+```
+Standalone - roundtrip 10B
+                        time:   [11.515 µs 11.536 µs 11.558 µs]
+Standalone - roundtrip 10KB
+                        time:   [141.92 µs 142.34 µs 142.75 µs]
+Standalone - roundtrip 100KB
+                        time:   [1.3312 ms 1.3350 ms 1.3387 ms]
+TSP - encrypt 1B        time:   [55.808 µs 56.149 µs 56.715 µs]
+TSP - encrypt 100B      time:   [56.793 µs 57.152 µs 57.713 µs]
+TSP - encrypt 10KB      time:   [127.61 µs 129.40 µs 131.57 µs]
+TSP - encrypt 1MB       time:   [7.1328 ms 7.1438 ms 7.1613 ms]
+TSP - decrypt 1B        time:   [59.172 µs 59.508 µs 59.865 µs]
+TSP - decrypt 100B      time:   [60.218 µs 60.462 µs 60.695 µs]
+TSP - decrypt 10KB      time:   [132.08 µs 132.43 µs 132.80 µs]
+TSP - decrypt 1MB       time:   [6.8972 ms 6.9199 ms 6.9441 ms]
+TSP - batch encrypt 10 documents, 10 fields, 10B
+                        time:   [414.47 µs 416.00 µs 417.20 µs]
+```
