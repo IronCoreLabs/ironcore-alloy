@@ -55,7 +55,7 @@ jobs:
       fail-fast: false
       matrix:
         # This should stay in sync with the `os_matrix` above and the `runs-on` from the other jobs in this file
-        runs-on: ["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]
+        runs-on: ["buildjet-2vcpu-ubuntu-2204", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]
     steps:
     - uses: actions/checkout@v4
     - uses: actions/download-artifact@v4
