@@ -1,7 +1,9 @@
 # IronCore Labs Alloy SDK
 
+[![Mentioned in Awesome Security Solutions for AI Systems](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/zmre/awesome-security-for-ai/)
+
 The Alloy SDK brings together a set of tools that you can use for your different Application Layer Encryption needs. It
-unifies functionality that was provided in our SaaS Shield Tenant Security Client (TSC) SDKs and our new Cloaked AI tools
+unifies functionality that was provided in our [SaaS Shield](https://ironcorelabs.com/products/saas-shield/) [Tenant Security Client (TSC) SDKs](https://ironcorelabs.com/docs/saas-shield/tenant-security-client/overview/) and our new [Cloaked AI](https://ironcorelabs.com/products/cloaked-ai/) tools
 in a single library that you can include in your application. This library provides tools to encrypt data using
 _standard_, _deterministic_, and _vector_ encryption algorithms.
 
@@ -21,7 +23,7 @@ This SDK was written in Rust and is using [uniffi](https://github.com/mozilla/un
 ## Getting Started
 
 Follow the links above to get the latest version for the appropriate language.
-You can see the examples on our main docs site [here](https://docs.ironcorelabs.com).
+You can see the examples on our main docs site [here](https://ironcorelabs.com/docs/). We also have specific [vector database integration examples](https://ironcorelabs.com/docs/cloaked-ai/integrations/) for our Cloaked AI functionality showing how to protect embeddings in various vector databases.
 
 ## Building Locally
 
