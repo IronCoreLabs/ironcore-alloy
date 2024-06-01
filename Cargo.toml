@@ -25,7 +25,7 @@ convert_case = "0.6.0"
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
 ironcore-documents = "0.2.1"
-itertools = "0.12"
+itertools = "0.13"
 ndarray = "0.15.6"
 ndarray-rand = "0.14.0"
 protobuf = { version = "3.3", features = ["with-bytes"] }
