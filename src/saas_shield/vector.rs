@@ -47,6 +47,7 @@ impl SaasShieldVectorClient {
         key: &VectorEncryptionKey,
         key_id: KeyId,
         plaintext_vector: PlaintextVector,
+        should_shuffle: bool,
     ) -> Result<EncryptedVector, AlloyError> {
         let approximation_factor = get_approximation_factor(self.approximation_factor)?;
         encrypt_internal(
@@ -56,6 +57,7 @@ impl SaasShieldVectorClient {
             Self::get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
+            should_shuffle,
         )
     }
 }
@@ -95,6 +97,7 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &AlloyMetadata,
+        should_shuffle: bool,
     ) -> Result<EncryptedVector, AlloyError> {
         let paths = [(
             plaintext_vector.secret_path.clone(),
@@ -116,7 +119,7 @@ impl VectorOps for SaasShieldVectorClient {
             DeriveKeyChoice::Current,
         )?;
         let (key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
-        self.encrypt_core(&key, key_id, plaintext_vector)
+        self.encrypt_core(&key, key_id, plaintext_vector, should_shuffle)
     }
 
     /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
@@ -156,6 +159,7 @@ impl VectorOps for SaasShieldVectorClient {
                 Self::get_edek_type(),
                 plaintext_vector,
                 self.rng.clone(),
+                true,
             )
         };
         Ok(perform_batch_action(plaintext_vectors.0, encrypt_vector).into())
@@ -167,6 +171,7 @@ impl VectorOps for SaasShieldVectorClient {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
+        is_shuffled: bool,
     ) -> Result<PlaintextVector, AlloyError> {
         let approximation_factor = get_approximation_factor(self.approximation_factor)?;
         let (key_id, icl_metadata_bytes) =
@@ -203,6 +208,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &key,
                 encrypted_vector,
                 icl_metadata_bytes,
+                is_shuffled,
             )
         }
     }
@@ -244,6 +250,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &original_vector_key,
                 encrypted_vector,
                 icl_metadata_bytes,
+                true,
             )
         };
         Ok(perform_batch_action(encrypted_vectors.0, decrypt_vector).into())
@@ -282,7 +289,7 @@ impl VectorOps for SaasShieldVectorClient {
                 keys.iter()
                     .map(|derived_key| {
                         let (key_id, key) = derived_key_to_vector_encryption_key(derived_key)?;
-                        self.encrypt_core(&key, key_id, plaintext_vector.clone())
+                        self.encrypt_core(&key, key_id, plaintext_vector.clone(), false)
                     })
                     .try_collect()
                     .map(|enc| (vector_id, enc))
@@ -344,6 +351,7 @@ impl VectorOps for SaasShieldVectorClient {
                     &original_vector_key,
                     encrypted_vector,
                     icl_metadata_bytes,
+                    true,
                 )?;
                 let new_derived_key = new_tenant_keys.get_key_for_path(
                     &decrypted_vector.secret_path,
@@ -359,6 +367,7 @@ impl VectorOps for SaasShieldVectorClient {
                     Self::get_edek_type(),
                     decrypted_vector,
                     self.rng.clone(),
+                    false,
                 )
             }
         };

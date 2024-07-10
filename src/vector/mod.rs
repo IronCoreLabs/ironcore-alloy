@@ -114,6 +114,7 @@ pub trait VectorOps {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &AlloyMetadata,
+        should_shuffle: bool,
     ) -> Result<EncryptedVector, AlloyError>;
 
     /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
@@ -131,6 +132,7 @@ pub trait VectorOps {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
+        is_shuffled: bool,
     ) -> Result<PlaintextVector, AlloyError>;
 
     /// Decrypt multiple vector embeddings that were encrypted with the provided metadata. The values of the embeddings
@@ -206,13 +208,17 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
     edek_type: EdekType,
     plaintext_vector: PlaintextVector,
     rng: Arc<Mutex<R>>,
+    should_shuffle: bool,
 ) -> Result<EncryptedVector, AlloyError> {
+    let maybe_shuffled = if should_shuffle {
+        shuffle(&key.key, plaintext_vector.plaintext_vector)
+    } else {
+        plaintext_vector.plaintext_vector.into()
+    };
     let result = crypto::encrypt(
         key,
         approximation_factor,
-        shuffle(&key.key, plaintext_vector.plaintext_vector)
-            .into_iter()
-            .collect(),
+        maybe_shuffled.into_iter().collect(),
         rng,
     )?;
     let (header, vector_metadata) = v5::key_id_header::create_vector_metadata(
@@ -235,6 +241,7 @@ pub(crate) fn decrypt_internal(
     key: &VectorEncryptionKey,
     encrypted_vector: EncryptedVector,
     icl_metadata_bytes: Bytes,
+    is_shuffled: bool,
 ) -> Result<PlaintextVector, AlloyError> {
     let (iv, auth_hash) = get_iv_and_auth_hash(&icl_metadata_bytes)?;
     Ok(crypto::decrypt(
@@ -246,7 +253,13 @@ pub(crate) fn decrypt_internal(
             auth_hash,
         },
     )
-    .map(|r| unshuffle(&key.key, r))?)
+    .map(|r| {
+        if is_shuffled {
+            unshuffle(&key.key, r)
+        } else {
+            r.into_iter().collect()
+        }
+    })?)
     .map(|dec| PlaintextVector {
         plaintext_vector: dec,
         secret_path: encrypted_vector.secret_path,

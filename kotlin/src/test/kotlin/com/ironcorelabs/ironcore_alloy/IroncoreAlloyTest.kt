@@ -58,8 +58,8 @@ class IroncoreAlloyTest {
         val plaintext = PlaintextVector(data, "", "")
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
-            val encrypted = sdk.vector().encrypt(plaintext, metadata)
-            val decrypted = sdk.vector().decrypt(encrypted, metadata)
+            val encrypted = sdk.vector().encrypt(plaintext, metadata, false)
+            val decrypted = sdk.vector().decrypt(encrypted, metadata, false)
             for (i in 0..(data.size - 1)) {
                 data.get(i).sameValueAs(decrypted.plaintextVector.get(i))
             }
@@ -74,7 +74,7 @@ class IroncoreAlloyTest {
         val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
-            val decrypted = sdk.vector().decrypt(encrypted, metadata)
+            val decrypted = sdk.vector().decrypt(encrypted, metadata, true)
             assertContentEquals(
                     decrypted.plaintextVector,
                     listOf(1.0f, 2.0f, 3.0f),
@@ -120,7 +120,7 @@ class IroncoreAlloyTest {
             assertEquals(rotated.failures.size, 0)
             assert(rotated.successes.containsKey("vector"))
             val newMetadata = AlloyMetadata.newSimple("tenant2")
-            val decrypted = sdk.vector().decrypt(rotated.successes.get("vector")!!, newMetadata)
+            val decrypted = sdk.vector().decrypt(rotated.successes.get("vector")!!, newMetadata, true)
             val expected = listOf(1.0f, 2.0f, 3.0f)
             for (i in 0..(decrypted.plaintextVector.size - 1)) {
                 decrypted.plaintextVector.get(i).sameValueAs(expected.get(i))
@@ -172,7 +172,7 @@ class IroncoreAlloyTest {
             val config3 =
                     StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets3)
             val sdk3 = Standalone(config3)
-            val decrypted = sdk3.vector().decrypt(rotated.successes.get("vector")!!, metadata)
+            val decrypted = sdk3.vector().decrypt(rotated.successes.get("vector")!!, metadata, true)
             val expected = listOf(1.0f, 2.0f, 3.0f)
             for (i in 0..(decrypted.plaintextVector.size - 1)) {
                 decrypted.plaintextVector.get(i).sameValueAs(expected.get(i))
@@ -427,7 +427,7 @@ class IroncoreAlloyTest {
                     val data = listOf(1.0f, 2.0f, 3.0f)
                     val plaintext = PlaintextVector(data, "", "")
                     val metadata = AlloyMetadata.newSimple("fake-tenant")
-                    runBlocking { integrationSdk.vector().encrypt(plaintext, metadata) }
+                    runBlocking { integrationSdk.vector().encrypt(plaintext, metadata, true) }
                 }
         assertContains(err.msg, "Tenant either doesn't exist")
     }

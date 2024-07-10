@@ -66,7 +66,7 @@ fn benches(c: &mut Criterion) {
                     secret_path: SecretPath("secret_path".to_string()),
                     derivation_path: DerivationPath("derivation_path".to_string()),
                 };
-                sdk.vector().encrypt(vector, &metadata).await.unwrap();
+                sdk.vector().encrypt(vector, &metadata, true).await.unwrap();
             },
             BatchSize::SmallInput,
         )

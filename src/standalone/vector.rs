@@ -62,8 +62,10 @@ impl StandaloneVectorClient {
         {
             Ok(encrypted_vector)
         } else {
-            self.decrypt_sync(encrypted_vector, metadata)
-                .and_then(|decrypted_vector| self.encrypt_sync(decrypted_vector, new_metadata))
+            self.decrypt_sync(encrypted_vector, metadata, true)
+                .and_then(|decrypted_vector| {
+                    self.encrypt_sync(decrypted_vector, new_metadata, true)
+                })
         }
     }
 
@@ -71,6 +73,7 @@ impl StandaloneVectorClient {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &AlloyMetadata,
+        should_shuffle: bool,
     ) -> Result<EncryptedVector, AlloyError> {
         let vector_secret = self
             .config
@@ -100,6 +103,7 @@ impl StandaloneVectorClient {
             Self::get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
+            should_shuffle,
         )
     }
 
@@ -107,6 +111,7 @@ impl StandaloneVectorClient {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
+        is_shuffled: bool,
     ) -> Result<PlaintextVector, AlloyError> {
         let (key_id, icl_metadata_bytes) =
             Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
@@ -138,6 +143,7 @@ impl StandaloneVectorClient {
             &key,
             encrypted_vector,
             icl_metadata_bytes,
+            is_shuffled,
         )
     }
 }
@@ -161,8 +167,9 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         plaintext_vector: PlaintextVector,
         metadata: &AlloyMetadata,
+        should_shuffle: bool,
     ) -> Result<EncryptedVector, AlloyError> {
-        self.encrypt_sync(plaintext_vector, metadata)
+        self.encrypt_sync(plaintext_vector, metadata, should_shuffle)
     }
 
     /// Encrypt multiple vector embeddings with the provided metadata. The provided embeddings are assumed to be normalized
@@ -174,7 +181,7 @@ impl VectorOps for StandaloneVectorClient {
         metadata: &AlloyMetadata,
     ) -> Result<VectorEncryptBatchResult, AlloyError> {
         let batch_result = perform_batch_action(plaintext_vectors.0, |plaintext_vector| {
-            self.encrypt_sync(plaintext_vector, metadata)
+            self.encrypt_sync(plaintext_vector, metadata, true)
         });
         Ok(VectorEncryptBatchResult {
             successes: batch_result.successes,
@@ -188,8 +195,9 @@ impl VectorOps for StandaloneVectorClient {
         &self,
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
+        is_shuffled: bool,
     ) -> Result<PlaintextVector, AlloyError> {
-        self.decrypt_sync(encrypted_vector, metadata)
+        self.decrypt_sync(encrypted_vector, metadata, is_shuffled)
     }
 
     /// Decrypt multiple vector embeddings that were encrypted with the provided metadata. The values of the embeddings
@@ -202,7 +210,7 @@ impl VectorOps for StandaloneVectorClient {
         metadata: &AlloyMetadata,
     ) -> Result<VectorDecryptBatchResult, AlloyError> {
         let batch_result = perform_batch_action(encrypted_vectors.0, |encrypted_vector| {
-            self.decrypt_sync(encrypted_vector, metadata)
+            self.decrypt_sync(encrypted_vector, metadata, true)
         });
         Ok(VectorDecryptBatchResult {
             successes: batch_result.successes,
@@ -258,6 +266,7 @@ impl VectorOps for StandaloneVectorClient {
                             StandaloneVectorClient::get_edek_type(),
                             plaintext_vector.clone(),
                             self.rng.clone(),
+                            false,
                         )
                     })
                     .try_collect()
@@ -432,7 +441,7 @@ mod test {
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
         let result = ironcore_alloy
-            .encrypt(plaintext, &get_metadata())
+            .encrypt(plaintext, &get_metadata(), true)
             .await
             .unwrap();
         assert_eq!(
@@ -458,11 +467,11 @@ mod test {
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
         let encrypt_result = ironcore_alloy
-            .encrypt(plaintext.clone(), &get_metadata())
+            .encrypt(plaintext.clone(), &get_metadata(), true)
             .await
             .unwrap();
         let result = ironcore_alloy
-            .decrypt(encrypt_result, &get_metadata())
+            .decrypt(encrypt_result, &get_metadata(), true)
             .await
             .unwrap();
         assert_ulps_eq!(result.plaintext_vector[..], plaintext.plaintext_vector[..]);
@@ -479,7 +488,7 @@ mod test {
             derivation_path: DerivationPath("deriv_path".to_string()),
         };
         let encrypt_result = alloy
-            .encrypt(plaintext.clone(), &get_metadata())
+            .encrypt(plaintext.clone(), &get_metadata(), true)
             .await
             .unwrap();
         let alloy_rotated_secret = get_in_rotation_client();
@@ -501,18 +510,18 @@ mod test {
         // make sure we didn't hallucinate any other vectors
         assert!(rotated_result.successes.is_empty());
         let result = alloy_rotated_secret
-            .decrypt(rotated_vector.clone(), &new_metadata)
+            .decrypt(rotated_vector.clone(), &new_metadata, true)
             .await
             .unwrap();
         assert_ulps_eq!(result.plaintext_vector[..], plaintext.plaintext_vector[..]);
 
         // the old SDK can't decrypt it, either with the old tenant_id or a new one
         alloy
-            .decrypt(rotated_vector.clone(), &get_metadata())
+            .decrypt(rotated_vector.clone(), &get_metadata(), true)
             .await
             .expect_err("the old sdk can't decrypt the rotated value with the old tenant id");
         alloy
-            .decrypt(rotated_vector, &new_metadata)
+            .decrypt(rotated_vector, &new_metadata, true)
             .await
             .expect_err("the old sdk can't decrypt the value with the new tenant id");
     }
