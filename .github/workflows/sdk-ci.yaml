@@ -14,6 +14,7 @@ jobs:
       # This should stay in sync with the `runs-on` from the other jobs in this file
       os_matrix: '["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]'
       build_profile: "release"
+      cargo_command_env_vars: RUSTFLAGS="-C target-feature=-crt-static"
     secrets: inherit
 
   kotlin-test:
