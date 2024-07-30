@@ -22,22 +22,28 @@
             [
               rusttoolchain
               pkg-config
-              pkgs.openssl
+              openssl
               # used when generating kotlin bindings in core
-              pkgs.ktlint
+              ktlint
               # used when running kotlin tests
-              pkgs.kotlin
+              kotlin
               # used when generating python bindings in core
-              pkgs.yapf
-              pkgs.curl
+              yapf
+              curl
               # used when running python tests
-              pkgs.python310
+              python310
               # used when building python distributions
-              pkgs.hatch
+              hatch
+              # used when building java distributions
+              openjdk21
+              (callPackage gradle-packages.gradle_8 {
+                java = openjdk21;
+              })
               (pkgs.google-cloud-sdk.withExtraComponents [ pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin ])
             ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin
               [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+          JAVA_HOME = "${pkgs.openjdk21}/lib/openjdk";
         };
 
       });

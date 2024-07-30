@@ -3,3 +3,6 @@ doc_comments = true
 
 [bindings.kotlin]
 package_name = "com.ironcorelabs.ironcore_alloy"
+
+[bindings.java]
+package_name = "com.ironcorelabs.ironcore_alloy_java"

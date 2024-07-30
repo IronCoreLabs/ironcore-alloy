@@ -1,0 +1,113 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+
+version = "0.11.1-SNAPSHOT"
+
+group = "com.ironcorelabs"
+
+plugins {
+    // Apply the java-library plugin for API and implementation separation.
+    `java-library`
+    `maven-publish`
+    signing
+    id("io.github.gradle-nexus.publish-plugin") version "2.0.0-rc-1"
+    id("com.dorongold.task-tree") version "2.1.1"
+
+    // benchmark deps
+    id("me.champeau.jmh") version "0.7.2"
+}
+
+val benchmarks = "benchmarks"
+sourceSets {
+    create(benchmarks)
+}
+
+sourceSets {
+    all {
+        java.setSrcDirs(listOf("$name/src"))
+        resources.setSrcDirs(listOf("$name/../src/main/resources"))
+    }
+
+    main {
+        java.setSrcDirs(listOf("src/main/java"))
+    }
+
+    test {
+        java.setSrcDirs(listOf("src/test/java"))
+    }
+}
+
+val benchmarksImplementation by configurations
+
+dependencies {
+    // Use the JUnit 5 integration.
+    testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    implementation("net.java.dev.jna:jna:5.14.0")
+    benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+    withSourcesJar()
+    withJavadocJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+nexusPublishing { repositories { sonatype() } }
+
+publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            from(components["java"])
+            groupId = "com.ironcorelabs"
+            artifactId = "ironcore-alloy-java"
+            pom {
+                name.set("IronCore Labs Alloy SDK")
+                description.set("IronCore Alloy bindings for Java.")
+                url.set("https://ironcorelabs.com")
+                licenses {
+                    license {
+                        name.set("GNU Affero General Public License v3 or later (AGPLv3+)")
+                        url.set("https://www.gnu.org/licenses/agpl-3.0.en.html#license-text")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("IronCore Labs")
+                        name.set("IronCore Labs")
+                        email.set("code@ironcorelabs.com")
+                    }
+                }
+                scm {
+                    connection.set("scm:git@github.com:IronCoreLabs/ironcore-alloy.git")
+                    url.set("https://github.com/IronCoreLabs")
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    // Use Maven Central for resolving dependencies.
+    mavenCentral()
+}
+
+tasks.test {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
+    testLogging {
+        exceptionFormat = TestExceptionFormat.FULL
+        events = mutableSetOf(TestLogEvent.FAILED, TestLogEvent.PASSED, TestLogEvent.SKIPPED)
+        showStandardStreams = true
+    }
+}
+
+signing {
+    useGpgCmd()
+    sign(publishing.publications["mavenJava"])
+}
+   

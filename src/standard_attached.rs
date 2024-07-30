@@ -1,5 +1,5 @@
 use crate::{
-    create_batch_result_struct,
+    create_batch_result_struct, create_batch_result_struct_using_newtype,
     errors::AlloyError,
     standard::{
         EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
@@ -25,23 +25,27 @@ use uniffi::custom_newtype;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlaintextAttachedDocument(pub PlaintextBytes);
 custom_newtype!(PlaintextAttachedDocument, PlaintextBytes);
-pub type PlaintextAttachedDocuments = HashMap<DocumentId, PlaintextAttachedDocument>;
-
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlaintextAttachedDocuments(pub HashMap<DocumentId, PlaintextAttachedDocument>);
+custom_newtype!(PlaintextAttachedDocuments, HashMap<DocumentId, PlaintextAttachedDocument>);
 #[derive(Debug, Clone)]
 pub struct EncryptedAttachedDocument(pub EncryptedBytes);
 custom_newtype!(EncryptedAttachedDocument, EncryptedBytes);
+#[derive(Debug, Clone)]
+pub struct EncryptedAttachedDocuments(pub HashMap<DocumentId, EncryptedAttachedDocument>);
+custom_newtype!(EncryptedAttachedDocuments, HashMap<DocumentId, EncryptedAttachedDocument>);
 
-pub type EncryptedAttachedDocuments = HashMap<DocumentId, EncryptedAttachedDocument>;
-
-create_batch_result_struct!(
+create_batch_result_struct_using_newtype!(
     StandardAttachedEncryptBatchResult,
     EncryptedAttachedDocument,
-    DocumentId
+    DocumentId,
+    EncryptedAttachedDocuments
 );
-create_batch_result_struct!(
+create_batch_result_struct_using_newtype!(
     StandardAttachedDecryptBatchResult,
     PlaintextAttachedDocument,
-    DocumentId
+    DocumentId,
+    PlaintextAttachedDocuments
 );
 create_batch_result_struct!(
     RekeyAttachedDocumentsBatchResult,
@@ -156,6 +160,7 @@ pub(crate) async fn encrypt_batch_core<T: StandardDocumentOps>(
     let hardcoded_field_id = FieldId("".to_string());
     let plaintext_unattached_documents = PlaintextDocuments(
         plaintext_documents
+            .0
             .into_iter()
             .map(|(id, document)| {
                 (
@@ -169,7 +174,7 @@ pub(crate) async fn encrypt_batch_core<T: StandardDocumentOps>(
         .encrypt_batch(plaintext_unattached_documents, metadata)
         .await?;
     let reformed_documents =
-        perform_batch_action(encrypted_batch.successes, encrypted_document_to_attached);
+        perform_batch_action(encrypted_batch.successes.0, encrypted_document_to_attached);
     let combined_failures = encrypted_batch
         .failures
         .into_iter()
@@ -265,28 +270,31 @@ pub(crate) async fn decrypt_batch_core<T: StandardDocumentOps>(
     let BatchResult {
         successes: encrypted_unattached_documents,
         failures: transform_failures,
-    } = perform_batch_action(encrypted_documents, |encrypted_document| {
+    } = perform_batch_action(encrypted_documents.0, |encrypted_document| {
         encrypted_attached_to_unattached::<T>(encrypted_document, hardcoded_field_id.clone())
     });
     let decrypted_batch = standard_client
         .decrypt_batch(EncryptedDocuments(encrypted_unattached_documents), metadata)
         .await?;
-    let decrypted_attached = decrypted_batch
-        .successes
-        .into_iter()
-        .map(|(document_id, mut document)| {
-            (
-                document_id,
-                PlaintextAttachedDocument(PlaintextBytes(
-                    document
-                        .0
-                        .remove(&hardcoded_field_id)
-                        .expect("Decryption doesn't change the structure of the fields.")
-                        .0,
-                )),
-            )
-        })
-        .collect();
+    let decrypted_attached = PlaintextAttachedDocuments(
+        decrypted_batch
+            .successes
+            .0
+            .into_iter()
+            .map(|(document_id, mut document)| {
+                (
+                    document_id,
+                    PlaintextAttachedDocument(PlaintextBytes(
+                        document
+                            .0
+                            .remove(&hardcoded_field_id)
+                            .expect("Decryption doesn't change the structure of the fields.")
+                            .0,
+                    )),
+                )
+            })
+            .collect(),
+    );
     let combined_failures = decrypted_batch
         .failures
         .into_iter()
@@ -304,7 +312,7 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
     metadata: &AlloyMetadata,
     new_tenant_id: Option<TenantId>,
 ) -> Result<RekeyAttachedDocumentsBatchResult, AlloyError> {
-    let (edeks, edocs, decoding_errors) = encrypted_documents.into_iter().try_fold(
+    let (edeks, edocs, decoding_errors) = encrypted_documents.0.into_iter().try_fold(
         (HashMap::new(), HashMap::new(), HashMap::new()),
         |(mut edeks, mut edocs, mut failures), (document_id, attached_document)| {
             let maybe_attached_document = decode_edoc::<T>(attached_document);

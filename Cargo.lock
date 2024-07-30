@@ -1040,6 +1040,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "uniffi",
+ "uniffi-bindgen-java",
  "uniffi_bindgen",
  "z85",
 ]
@@ -1926,6 +1927,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
 dependencies = [
  "smawk",
+ "unicode-linebreak",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2109,6 +2112,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
 
 [[package]]
+name = "unicode-linebreak"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
+
+[[package]]
 name = "unicode-normalization"
 version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2124,9 +2133,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4c87d22b6e3f4a18d4d40ef354e97c90fcb14dd91d7dc0aa9d8a1172ebf7202"
 
 [[package]]
+name = "unicode-width"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
+
+[[package]]
 name = "uniffi"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "anyhow",
  "camino",
@@ -2137,9 +2152,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "uniffi-bindgen-java"
+version = "0.1.0"
+source = "git+https://github.com/IronCoreLabs/uniffi-bindgen-java?branch=polish-before-alpha#1a0e86ea4e1223c2587a2bef9c78fde9fa6eabf5"
+dependencies = [
+ "anyhow",
+ "askama",
+ "camino",
+ "clap",
+ "heck",
+ "once_cell",
+ "paste",
+ "regex",
+ "serde",
+ "textwrap",
+ "toml",
+ "uniffi_bindgen",
+ "uniffi_meta",
+]
+
+[[package]]
 name = "uniffi_bindgen"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "anyhow",
  "askama",
@@ -2162,7 +2197,7 @@ dependencies = [
 [[package]]
 name = "uniffi_checksum_derive"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "quote",
  "syn",
@@ -2171,7 +2206,7 @@ dependencies = [
 [[package]]
 name = "uniffi_core"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "anyhow",
  "async-compat",
@@ -2186,7 +2221,7 @@ dependencies = [
 [[package]]
 name = "uniffi_macros"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "bincode",
  "camino",
@@ -2203,7 +2238,7 @@ dependencies = [
 [[package]]
 name = "uniffi_meta"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2214,7 +2249,7 @@ dependencies = [
 [[package]]
 name = "uniffi_testing"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "anyhow",
  "camino",
@@ -2226,7 +2261,7 @@ dependencies = [
 [[package]]
 name = "uniffi_udl"
 version = "0.28.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "anyhow",
  "textwrap",
@@ -2396,7 +2431,7 @@ dependencies = [
 [[package]]
 name = "weedle2"
 version = "5.0.0"
-source = "git+https://github.com/mozilla/uniffi-rs#56f4ed8a66e12d2eb76d94718584d64f4dd21e06"
+source = "git+https://github.com/skeet70/uniffi-rs?branch=thread-external-type-metadata-rustbuffer#310aa55765c51946cee7fa72e8cb1ccdb97d4b2f"
 dependencies = [
  "nom",
 ]

@@ -42,7 +42,7 @@ ring = "0.17"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = { version = "1.0.117", features = ["float_roundtrip"] }
 thiserror = "1.0.61"
-uniffi = { git = "https://github.com/mozilla/uniffi-rs", features = [
+uniffi = { git = "https://github.com/skeet70/uniffi-rs", branch="thread-external-type-metadata-rustbuffer", features = [
     "tokio",
     "cli",
 ] }
@@ -61,7 +61,8 @@ hex-literal = "0.4.1"
 lazy_static = "1.4"
 proptest = "1.5.0"
 tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = { git = "https://github.com/mozilla/uniffi-rs" }
+uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs", branch = "thread-external-type-metadata-rustbuffer" }
+uniffi-bindgen-java = { git = "https://github.com/IronCoreLabs/uniffi-bindgen-java", branch = "polish-before-alpha" }
 z85 = "3.0.5"
 
 [features]

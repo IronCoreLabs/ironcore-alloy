@@ -1,0 +1,11 @@
+# Ignore Gradle project-specific cache directory
+.gradle
+# Ignore Gradle build output directory
+build
+src/main/java/com/ironcorelabs/ironcore_alloy_java/*.java
+src/main/resources/libironcore_alloy.*
+gradle.properties
+.settings
+.project
+.gitattributes
+.classpath

@@ -1,6 +1,6 @@
 use self::crypto::{shuffle, unshuffle, EncryptResult};
 use crate::{
-    create_batch_result_struct,
+    create_batch_result_struct, create_batch_result_struct_using_newtype,
     errors::AlloyError,
     util::{self, AuthHash},
     AlloyMetadata, DerivationPath, EncryptedBytes, Secret, SecretPath, TenantId,
@@ -43,16 +43,28 @@ pub struct PlaintextVector {
     pub derivation_path: DerivationPath,
 }
 
+#[derive(Debug, Clone)]
 pub struct PlaintextVectors(pub HashMap<VectorId, PlaintextVector>);
 custom_newtype!(PlaintextVectors, HashMap<VectorId, PlaintextVector>);
+#[derive(Debug, Clone)]
 pub struct EncryptedVectors(pub HashMap<VectorId, EncryptedVector>);
 custom_newtype!(EncryptedVectors, HashMap<VectorId, EncryptedVector>);
 pub struct GenerateVectorQueryResult(pub HashMap<VectorId, Vec<EncryptedVector>>);
 custom_newtype!(GenerateVectorQueryResult, HashMap<VectorId, Vec<EncryptedVector>>);
 create_batch_result_struct!(VectorRotateResult, EncryptedVector, VectorId);
 
-create_batch_result_struct!(VectorEncryptBatchResult, EncryptedVector, VectorId);
-create_batch_result_struct!(VectorDecryptBatchResult, PlaintextVector, VectorId);
+create_batch_result_struct_using_newtype!(
+    VectorEncryptBatchResult,
+    EncryptedVector,
+    VectorId,
+    EncryptedVectors
+);
+create_batch_result_struct_using_newtype!(
+    VectorDecryptBatchResult,
+    PlaintextVector,
+    VectorId,
+    PlaintextVectors
+);
 
 /// Key used to for vector encryption.
 #[derive(Debug, Serialize, Clone)]

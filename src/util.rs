@@ -151,6 +151,31 @@ macro_rules! create_batch_result_struct {
     };
 }
 
+/// Creates a batch result struct named after the first parameter.
+/// The second parameter is the success type.
+/// Uses the third parameter as the key type for the failure HashMap.
+/// The fourth parameter is a newtype conaining a Map<KeyType, SuccessType>.
+/// The type will be a uniffi Record and it will have a From impl for BatchResult.
+#[macro_export]
+macro_rules! create_batch_result_struct_using_newtype {
+    ($struct_name:ident, $success_type:ident, $map_key_type:ident, $newtype:ident) => {
+        #[derive(Debug, Clone, uniffi::Record)]
+        pub struct $struct_name {
+            pub successes: $newtype,
+            pub failures: std::collections::HashMap<$map_key_type, $crate::errors::AlloyError>,
+        }
+
+        impl From<$crate::util::BatchResult<$map_key_type, $success_type>> for $struct_name {
+            fn from(value: $crate::util::BatchResult<$map_key_type, $success_type>) -> Self {
+                Self {
+                    successes: $newtype(value.successes),
+                    failures: value.failures,
+                }
+            }
+        }
+    };
+}
+
 /// Applies the function `func` to all the values of `collection`, then partitions them into
 /// success and failure hashmaps.
 pub(crate) fn perform_batch_action<T, U, F, I, K>(collection: I, func: F) -> BatchResult<K, U>

@@ -1,6 +1,7 @@
 use crate::{
-    alloy_client_trait::AlloyClient, create_batch_result_struct, errors::AlloyError, AlloyMetadata,
-    DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    alloy_client_trait::AlloyClient, create_batch_result_struct,
+    create_batch_result_struct_using_newtype, errors::AlloyError, AlloyMetadata, DocumentId,
+    EncryptedBytes, FieldId, PlaintextBytes, TenantId,
 };
 use ironcore_documents::{
     aes::{decrypt_document_with_attached_iv, EncryptionKey, IvAndCiphertext},
@@ -77,12 +78,23 @@ pub struct EncryptedDocument {
 #[derive(Debug, Clone)]
 pub struct EncryptedDocuments(pub HashMap<DocumentId, EncryptedDocument>);
 custom_newtype!(EncryptedDocuments, HashMap<DocumentId, EncryptedDocument>);
+#[derive(Debug, Clone)]
 pub struct PlaintextDocuments(pub HashMap<DocumentId, PlaintextDocument>);
 custom_newtype!(PlaintextDocuments, HashMap<DocumentId, PlaintextDocument>);
 
 create_batch_result_struct!(RekeyEdeksBatchResult, EdekWithKeyIdHeader, DocumentId);
-create_batch_result_struct!(StandardEncryptBatchResult, EncryptedDocument, DocumentId);
-create_batch_result_struct!(StandardDecryptBatchResult, PlaintextDocument, DocumentId);
+create_batch_result_struct_using_newtype!(
+    StandardEncryptBatchResult,
+    EncryptedDocument,
+    DocumentId,
+    EncryptedDocuments
+);
+create_batch_result_struct_using_newtype!(
+    StandardDecryptBatchResult,
+    PlaintextDocument,
+    DocumentId,
+    PlaintextDocuments
+);
 
 /// API for encrypting and decrypting documents using our standard encryption. This class of encryption is the most
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
