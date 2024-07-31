@@ -17,14 +17,15 @@ That will build the cdylib and generate the foreign code, placing them into the 
 
 ```console
 cargo b --release
-cargo run --release --bin uniffi-bindgen generate --library ../target/release/libironcore_alloy.so --language python --out-dir python/ironcore-alloy/ironcore_alloy/
-cp ../target/release/libironcore_alloy.so python/ironcore-alloy/ironcore_alloy/
+cargo run --release --bin uniffi-bindgen generate --library ./target/release/libironcore_alloy.so --language python --out-dir python/ironcore-alloy/ironcore_alloy/
+cp ./target/release/libironcore_alloy.so python/ironcore-alloy/ironcore_alloy/
 ```
 
 However the integration tests are guaranteed to always have the most current method of managing these files.
 Once you have a built environment, some common `hatch` commands you may want to use are:
 
 ```console
+cd python/ironcore-alloy
 hatch build -t wheel   # to produce .whl file for release
 hatch shell            # to get a local pyenv with the sdk installed
 hatch run test:test    # to run unit tests
