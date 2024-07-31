@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.Base64;
 import java.util.stream.Collectors;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class IroncoreAlloyTest {
@@ -224,6 +225,155 @@ public class IroncoreAlloyTest {
         assertArrayEquals("{\"title\":\"blah\"}".getBytes(), decrypted.value().value());
     }
 
+    @Test
+    public void sdkStandardAttachedRekeyV4() throws InterruptedException, ExecutionException {
+        byte[] encryptedDocument = base64ToByteArray(
+                "BElST04AdgokCiAsN4NHsRTS4bq0a6wE9QUJFbWSf67pqkIgrzHPfztA3RABEk4STBpKCgxVKAX2fYD7F4W13dwSMN6LnbYAlUgekKbpI0z9LFeoUNNJZTUDX7WqoDZSWJ+uSEOoR7U8YSnaBlTBG8tw5hoIOX50ZW5hbnRIXNdHBgvQNRD/s1lTAxgMaKrMv0CL2AwLFuNtKPpLjObeLmdAkYKpe+uwbg=="
+        );
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        EncryptedAttachedDocuments documents = new EncryptedAttachedDocuments(Map.of(new DocumentId("doc"), new EncryptedAttachedDocument(new EncryptedBytes(encryptedDocument))));
+
+        RekeyAttachedDocumentsBatchResult rekeyed = sdk.standardAttached().rekeyDocuments(documents, metadata, null).get();
+        assertEquals(1, rekeyed.successes().size());
+        assertEquals(0, rekeyed.failures().size());
+
+        PlaintextAttachedDocument decrypted = sdk.standardAttached().decrypt(rekeyed.successes().get(new DocumentId("doc")), metadata).get();
+        byte[] expected = "{\"title\":\"blah\"}".getBytes();
+        assertArrayEquals(expected, decrypted.value().value());
+    }
+
+    @Test
+    public void sdkStandardAttachedRekeyNewTenant() throws InterruptedException, ExecutionException {
+        byte[] plaintextDocument = "My data".getBytes();
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        PlaintextAttachedDocuments documents = new PlaintextAttachedDocuments(Map.of(new DocumentId("doc"), new PlaintextAttachedDocument(new PlaintextBytes(plaintextDocument))));
+
+        StandardAttachedEncryptBatchResult encrypted = sdk.standardAttached().encryptBatch(documents, metadata).get();
+        RekeyAttachedDocumentsBatchResult rekeyed = sdk.standardAttached().rekeyDocuments(encrypted.successes(), metadata, new TenantId("new_tenant")).get();
+        assertEquals(1, rekeyed.successes().size());
+        assertEquals(0, rekeyed.failures().size());
+
+        CompletableFuture<PlaintextAttachedDocument> result = sdk.standardAttached().decrypt(rekeyed.successes().get(new DocumentId("doc")), metadata);
+        ExecutionException err = assertThrows(ExecutionException.class, result::get);
+        AlloyException.DecryptException err2 = assertThrows(AlloyException.DecryptException.class, () -> {
+            throw err.getCause();
+        });
+        assertTrue(err2.getMessage().contains("Ensure the data and key are correct."));
+
+        AlloyMetadata newMetadata = AlloyMetadata.newSimple(new TenantId("new_tenant"));
+        PlaintextAttachedDocument decrypted = sdk.standardAttached().decrypt(rekeyed.successes().get(new DocumentId("doc")), newMetadata).get();
+        assertArrayEquals(plaintextDocument, decrypted.value().value());
+    }
+
+    @Test
+    public void sdkStandardRekeyEdeks() throws InterruptedException, ExecutionException {
+        PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(new FieldId("foo"), new PlaintextBytes("My data".getBytes())));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        TenantId newTenantId = new TenantId("tenant2");
+        AlloyMetadata newMetadata = AlloyMetadata.newSimple(newTenantId);
+
+        EncryptedDocument encrypted = sdk.standard().encrypt(plaintextDocument, metadata).get();
+        assertTrue(encrypted.document().containsKey(new FieldId("foo")));
+
+        Map<DocumentId, EdekWithKeyIdHeader> edeks = Map.of(new DocumentId("edek"), encrypted.edek());
+        RekeyEdeksBatchResult rekeyed = sdk.standard().rekeyEdeks(edeks, metadata, newTenantId).get();
+        assertEquals(1, rekeyed.successes().size());
+        assertEquals(0, rekeyed.failures().size());
+
+        EncryptedDocument remadeDocument = new EncryptedDocument(rekeyed.successes().get(new DocumentId("edek")), encrypted.document());
+        PlaintextDocument decrypted = sdk.standard().decrypt(remadeDocument, newMetadata).get();
+        assertArrayEquals(plaintextDocument.value().get(new FieldId("foo")).value(), decrypted.value().get(new FieldId("foo")).value());
+    }
+
+    @Test
+    public void sdkStandardEncryptWithExistingEdek() throws InterruptedException, ExecutionException {
+        PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(new FieldId("foo"), new PlaintextBytes("My data".getBytes())));
+        PlaintextDocument plaintextDocument2 = new PlaintextDocument(Map.of(new FieldId("foo"), new PlaintextBytes("My data2".getBytes())));
+
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        EncryptedDocument encrypted = sdk.standard().encrypt(plaintextDocument, metadata).get();
+        EncryptedDocument encrypted2 = sdk.standard().encryptWithExistingEdek(new PlaintextDocumentWithEdek(encrypted.edek(), plaintextDocument2), metadata).get();
+
+        PlaintextDocument decrypted = sdk.standard().decrypt(encrypted2, metadata).get();
+        assertArrayEquals(encrypted.edek().value().value(), encrypted2.edek().value().value());
+        assertArrayEquals(plaintextDocument2.value().get(new FieldId("foo")).value(), decrypted.value().get(new FieldId("foo")).value());
+    }
+
+    @Test
+    public void sdkStandardEncryptWithExistingEdekBatch() throws InterruptedException, ExecutionException {
+        PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(new FieldId("foo"), new PlaintextBytes("My data".getBytes())));
+        PlaintextDocument plaintextDocument2 = new PlaintextDocument(Map.of(new FieldId("foo"), new PlaintextBytes("My data2".getBytes())));
+
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        EncryptedDocument encrypted = sdk.standard().encrypt(plaintextDocument, metadata).get();
+
+        PlaintextDocumentsWithEdeks plaintexts = new PlaintextDocumentsWithEdeks(Map.of(new DocumentId("doc"), new PlaintextDocumentWithEdek(encrypted.edek(), plaintextDocument2)));
+        StandardEncryptBatchResult batchEncrypted = sdk.standard().encryptWithExistingEdekBatch(plaintexts, metadata).get();
+        assertEquals(1, batchEncrypted.successes().value().size());
+        assertEquals(0, batchEncrypted.failures().size());
+
+        EncryptedDocument encrypted2 = batchEncrypted.successes().value().get(new DocumentId("doc"));
+        PlaintextDocument decrypted = sdk.standard().decrypt(encrypted2, metadata).get();
+        assertArrayEquals(encrypted.edek().value().value(), encrypted2.edek().value().value());
+        assertArrayEquals(plaintextDocument2.value().get(new FieldId("foo")).value(), decrypted.value().get(new FieldId("foo")).value());
+    }
+
+    @Test
+    public void sdkDecryptDeterministic() throws InterruptedException, ExecutionException {
+        EncryptedBytes ciphertext = new EncryptedBytes(base64ToByteArray("AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak="));
+        EncryptedField encryptedField = new EncryptedField(ciphertext, new SecretPath(""), new DerivationPath(""));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+
+        PlaintextField decrypted = sdk.deterministic().decrypt(encryptedField, metadata).get();
+        byte[] expected = "My data".getBytes();
+        assertArrayEquals(expected, decrypted.plaintextField().value());
+    }
+
+    @Test
+    public void sdkBatchRoundtripDeterministic() throws InterruptedException, ExecutionException {
+        PlaintextBytes plaintextInput = new PlaintextBytes("My data".getBytes());
+        PlaintextField field = new PlaintextField(plaintextInput, new SecretPath(""), new DerivationPath(""));
+        PlaintextField badField = new PlaintextField(new PlaintextBytes("My data".getBytes()), new SecretPath("bad_path"), new DerivationPath("bad_path"));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        PlaintextFields plaintextFields = new PlaintextFields(Map.of(new FieldId("doc"), field, new FieldId("badDoc"), badField));
+
+        DeterministicEncryptBatchResult encrypted = sdk.deterministic().encryptBatch(plaintextFields, metadata).get();
+        assertEquals(1, encrypted.successes().value().size());
+        assertEquals(1, encrypted.failures().size());
+        assertEquals("msg=Provided secret path `bad_path` does not exist in the deterministic configuration.",
+                encrypted.failures().get(new FieldId("badDoc")).getMessage());
+
+        DeterministicDecryptBatchResult decrypted = sdk.deterministic().decryptBatch(encrypted.successes(), metadata).get();
+        assertEquals(1, decrypted.successes().value().size());
+        assertEquals(0, decrypted.failures().size());
+        assertArrayEquals(plaintextInput.value(), decrypted.successes().value().get(new FieldId("doc")).plaintextField().value());
+    }
+
+    @Test
+    public void sdkStandardDecryptWrongType() {
+        Map<FieldId, EncryptedBytes> documentFields = Map.of(new FieldId("foo"), new EncryptedBytes(base64ToByteArray("AAAAAoAA4hdzU2eh2aeCoUSq6NQiWYczhmQQNak=")));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+        byte[] edek = base64ToByteArray("AAAACoAACiQKID/RxqsV0L1yky5NMwXNlNtn5s5vi+PR92RKN7Iqa5TtEAESRxJFGkMKDPgVFQkpAEd89NH8lxIwTTUTiyiyB1GgXxLRBjVwJ94065fjRYvQzwggXAQcO35ZV2CxkS2nS44xDvlHHc9GGgEx");
+        EncryptedDocument document = new EncryptedDocument(new EdekWithKeyIdHeader(new EncryptedBytes(edek)), documentFields);
+        CompletableFuture<PlaintextDocument> result = sdk.standard().decrypt(document, metadata);
+        ExecutionException err = assertThrows(ExecutionException.class, result::get);
+        assertThrows(AlloyException.InvalidInput.class, () -> {
+            throw err.getCause(); 
+        });
+        assertTrue(err.getCause().getMessage().contains(" not a Standalone Standard EDEK wrapped value."));
+    }
+
+    @Test
+    @Disabled // This test requires the TSP from tests/docker-compose.yml to be running. Uncomment to test as needed.
+    public void integrationSdkUnknownTenant() {
+        AlloyException.TspException err = assertThrows(AlloyException.TspException.class, () -> {
+            List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
+            PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
+            AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("fake-tenant"));
+            sdk.vector().encrypt(plaintext, metadata).get();
+        });
+        assertTrue(err.getMessage().contains("Tenant either doesn't exist"));
+    }
  
     public static String toBase64(byte[] byteArray) {
         return Base64.getEncoder().encodeToString(byteArray);

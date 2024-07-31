@@ -54,6 +54,7 @@ ascii85 = "0.2.1"
 assertables = "7.0.1"
 base64 = "0.22.0"
 base85 = "2.0.0"
+cargo_metadata = "0.15"
 camino = "1.1"
 criterion = { version = "0.5", features = ["async_tokio"] }
 hex = "0.4.3"

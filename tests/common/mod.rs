@@ -77,16 +77,23 @@ pub(crate) fn generate_bindings<T: BindingGenerator>(
     out_dir: PathBuf,
     language: T,
 ) -> Result<(), Box<dyn Error>> {
+    let config_supplier = {
+        use uniffi_bindgen::cargo_metadata::CrateConfigSupplier;
+        let cmd = cargo_metadata::MetadataCommand::new();
+        let metadata = cmd.exec()?;
+        CrateConfigSupplier::from(metadata)
+    };
+
     let camino_lib_path = camino::Utf8PathBuf::from_path_buf(library_path).unwrap();
     let camino_out_dir = camino::Utf8PathBuf::from_path_buf(out_dir).unwrap();
     uniffi_bindgen::library_mode::generate_bindings(
         &camino_lib_path,
         None,
         &language,
+        &config_supplier,
         None,
         &camino_out_dir,
         true,
-        false,
     )?;
 
     Ok(())
