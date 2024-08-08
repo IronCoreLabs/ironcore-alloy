@@ -25,6 +25,11 @@ This SDK was written in Rust and is using [uniffi](https://github.com/mozilla/un
 Follow the links above to get the latest version for the appropriate language.
 You can see the examples on our main docs site [here](https://ironcorelabs.com/docs/). We also have specific [vector database integration examples](https://ironcorelabs.com/docs/cloaked-ai/integrations/) for our Cloaked AI functionality showing how to protect embeddings in various vector databases.
 
+### Prerequisites
+
+Across all languages:
+- glibc 2.29+ 
+
 ## Building Locally
 
 - `cargo t --release` will build Kotlin and Python bindings as well as run Rust and foreign code integration tests. It'll leave the binding project's directories in a state that they could be released from. This requires Python and Kotlin infrastructure to be installed.
