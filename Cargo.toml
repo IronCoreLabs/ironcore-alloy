@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.11.1-pre.1"
+version = "0.11.1-pre.3"
 description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
 authors = ["IronCore Labs <info@ironcorelabs.com>"]
 edition = "2021"
@@ -20,7 +20,7 @@ aes-siv = "0.7"
 async-trait = "0.1.74"
 base64 = "0.22"
 base64_type = "0.2"
-bytes = { version = "1.4.0", features = ["serde"] }
+bytes = { version = "1.7.1", features = ["serde"] }
 convert_case = "0.6.0"
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
@@ -33,16 +33,16 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_distr = "0.4.3"
 rayon = "1.10.0"
-regex = "1.10.2"
+regex = "1.10.5"
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
 ] }
 ring = "0.17"
-serde = { version = "1.0.163", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 serde_json = { version = "1.0.117", features = ["float_roundtrip"] }
-thiserror = "1.0.61"
-uniffi = { git = "https://github.com/skeet70/uniffi-rs", branch="thread-external-type-metadata-rustbuffer", features = [
+thiserror = "1.0.63"
+uniffi = { git = "https://github.com/mozilla/uniffi-rs", features = [
     "tokio",
     "cli",
 ] }
@@ -61,8 +61,8 @@ hex = "0.4.3"
 hex-literal = "0.4.1"
 lazy_static = "1.4"
 proptest = "1.5.0"
-tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = { git = "https://github.com/skeet70/uniffi-rs", branch = "thread-external-type-metadata-rustbuffer" }
+tokio = { version = "1.39", features = ["macros", "rt-multi-thread"] }
+uniffi_bindgen = { git = "https://github.com/mozilla/uniffi-rs" }
 uniffi-bindgen-java = { git = "https://github.com/IronCoreLabs/uniffi-bindgen-java", branch = "polish-before-alpha" }
 z85 = "3.0.5"
 
