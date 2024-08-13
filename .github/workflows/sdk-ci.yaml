@@ -53,6 +53,44 @@ jobs:
       - name: Run Kotlin tests
         run: ./gradlew test
         working-directory: kotlin
+        
+  java-test:
+    needs: generate-cdylibs
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        # This should stay in sync with the `os_matrix` above
+        runs-on:
+          [
+            "buildjet-2vcpu-ubuntu-2004",
+            "buildjet-4vcpu-ubuntu-2204-arm",
+            "macos-12",
+            "macos-14",
+          ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ join(matrix.runs-on) }}-
+          path: ${{ github.workspace }}/java/src/main/resources/
+      - if: startsWith(matrix.runs-on, 'buildjet')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - if: startsWith(matrix.runs-on, 'macos')
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate Java files
+        run: cargo run --bin uniffi-bindgen-java generate --library resources/libironcore_alloy.* --out-dir java
+        working-directory: java/src/main
+      - name: Run Java tests
+        run: ./gradlew test
+        working-directory: java
 
   python-test:
     needs: generate-cdylibs
