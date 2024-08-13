@@ -13,6 +13,7 @@ mod test {
     fn foreign_tests_java() -> Result<(), Box<dyn Error>> {
         use crate::common::generate_bindings;
         use std::io::Write;
+        use uniffi_bindgen_java::JavaBindingGenerator;
 
         // `cargo test` doesn't build the cdylib targets, so we need to manually build them to make sure they're there
         build_dynamic_library()?;
@@ -32,7 +33,7 @@ mod test {
         generate_bindings(
             dynamic_library_paths[0].clone(),
             main_src_path,
-            uniffi_bindgen_java::JavaBindingGenerator,
+            JavaBindingGenerator,
         )?;
         // run the hatch test command and print the output as though it were our output
         let o = std::process::Command::new("./gradlew")
