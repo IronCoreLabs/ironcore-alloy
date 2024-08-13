@@ -1,4 +1,4 @@
-name: Python/Kotlin Release
+name: Python/Kotlin/Java Release
 on:
   # https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#release
   # The Bump Version workflow will make a Github release if it isn't a prerelease version

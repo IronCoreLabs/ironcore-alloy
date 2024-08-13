@@ -60,7 +60,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
         decrypt_core(&self.standard_client, attached_document, metadata)
             .await
-            .map(|x| PlaintextAttachedDocument(x))
+            .map(PlaintextAttachedDocument)
     }
 
     /// Decrypt multiple documents that were encrypted with the provided metadata.

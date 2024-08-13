@@ -57,7 +57,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
         decrypt_core(&self.standard_client, encrypted_document, metadata)
             .await
-            .map(|x| PlaintextAttachedDocument(x))
+            .map(PlaintextAttachedDocument)
     }
 
     /// Decrypt multiple documents that were encrypted with the provided metadata.

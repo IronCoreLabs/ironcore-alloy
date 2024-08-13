@@ -1,4 +1,4 @@
-name: Python/Kotlin CI
+name: Python/Kotlin/Java CI
 on:
   pull_request:
   workflow_dispatch:

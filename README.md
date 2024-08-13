@@ -13,7 +13,7 @@ to protect the private or sensitive data your apps process.
 
 ## Language Support
 
-- [Java](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy)
+- [Java](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy-java)
 - [Kotlin](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy)
 - [Python](https://pypi.org/project/ironcore-alloy)
 - Rust - Depend on this repo using a git dependency.
