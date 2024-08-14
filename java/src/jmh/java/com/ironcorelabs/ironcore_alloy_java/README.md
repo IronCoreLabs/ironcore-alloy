@@ -80,4 +80,4 @@ The benchmark is using a single tenant, and (depending on your machine and bench
 
 ## Other Languages
 
-There are also benchmarks available in [Rust](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/benches) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
+There are also benchmarks available in [Rust](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/benches), [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).

@@ -46,7 +46,7 @@ uniffi = { git = "https://github.com/mozilla/uniffi-rs", branch = "main", featur
    "tokio",
    "cli",
 ] }
-uniffi-bindgen-java = { git = "https://github.com/IronCoreLabs/uniffi-bindgen-java", branch = "polish-before-alpha" }
+uniffi-bindgen-java = { git = "https://github.com/IronCoreLabs/uniffi-bindgen-java", branch = "main" }
 z85 = "3.0.5"
 
 [dev-dependencies]

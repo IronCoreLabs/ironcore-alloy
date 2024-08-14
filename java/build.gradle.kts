@@ -17,34 +17,11 @@ plugins {
     id("me.champeau.jmh") version "0.7.2"
 }
 
-val benchmarks = "benchmarks"
-sourceSets {
-    create(benchmarks)
-}
-
-sourceSets {
-    all {
-        java.setSrcDirs(listOf("$name/src"))
-        resources.setSrcDirs(listOf("$name/../src/main/resources"))
-    }
-
-    main {
-        java.setSrcDirs(listOf("src/main/java"))
-    }
-
-    test {
-        java.setSrcDirs(listOf("src/test/java"))
-    }
-}
-
-val benchmarksImplementation by configurations
-
 dependencies {
     // Use the JUnit 5 integration.
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("net.java.dev.jna:jna:5.14.0")
-    benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
 }
 
 java {
