@@ -5,7 +5,8 @@ To build and run the benchmark, just execute the following commands from this di
 
 ```
 docker compose up -d
-../../gradlew jmh
+cd <project_root>/java
+./gradlew jmh
 ```
 
 ## Tenant Security Proxy
