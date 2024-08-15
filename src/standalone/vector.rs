@@ -177,7 +177,7 @@ impl VectorOps for StandaloneVectorClient {
             self.encrypt_sync(plaintext_vector, metadata)
         });
         Ok(VectorEncryptBatchResult {
-            successes: batch_result.successes,
+            successes: EncryptedVectors(batch_result.successes),
             failures: batch_result.failures,
         })
     }
@@ -205,7 +205,7 @@ impl VectorOps for StandaloneVectorClient {
             self.decrypt_sync(encrypted_vector, metadata)
         });
         Ok(VectorDecryptBatchResult {
-            successes: batch_result.successes,
+            successes: PlaintextVectors(batch_result.successes),
             failures: batch_result.failures,
         })
     }

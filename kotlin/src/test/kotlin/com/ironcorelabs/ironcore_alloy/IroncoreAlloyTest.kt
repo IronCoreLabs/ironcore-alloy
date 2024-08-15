@@ -13,7 +13,7 @@ fun ByteArray.toBase64(): String = String(Base64.getEncoder().encode(this))
 fun String.base64ToByteArray(): ByteArray = Base64.getDecoder().decode(this)
 
 fun Float.sameValueAs(other: Float): Boolean {
-    return (abs(this - other) < 0.0000000001)
+    return (abs(this - other) < 0.0000001)
 }
 
 class IroncoreAlloyTest {

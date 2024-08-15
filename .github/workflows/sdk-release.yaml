@@ -1,4 +1,4 @@
-name: Python/Kotlin Release
+name: Python/Kotlin/Java Release
 on:
   # https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#release
   # The Bump Version workflow will make a Github release if it isn't a prerelease version
@@ -11,13 +11,13 @@ jobs:
   generate-cdylibs:
     uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
     with:
-      os_matrix: '["buildjet-2vcpu-ubuntu-2204", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]'
+      os_matrix: '["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-12", "macos-14"]'
       build_profile: "release"
     secrets: inherit
 
   kotlin-release:
     needs: generate-cdylibs
-    runs-on: buildjet-2vcpu-ubuntu-2204
+    runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -25,7 +25,7 @@ jobs:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
       - name: Rename directories
         run: |
-          mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
+          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
           mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
           mv macos-12- darwin-x86-64
           mv macos-14- darwin-aarch64
@@ -54,9 +54,52 @@ jobs:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.SONATYPE_USERNAME }}
           ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.SONATYPE_PASSWORD }}
 
+  java-release:
+    needs: generate-cdylibs
+    runs-on: buildjet-2vcpu-ubuntu-2004
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/java/src/main/resources/
+      - name: Rename directories
+        run: |
+          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
+          mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
+          mv macos-12- darwin-x86-64
+          mv macos-14- darwin-aarch64
+        working-directory: java/src/main/resources/
+      - name: Decrypt GPG key and gradle.properties
+        uses: IronCoreLabs/ironhide-actions/decrypt@v3
+        with:
+          keys: ${{ secrets.IRONHIDE_KEYS }}
+          input: .github/9FA43559.asc.iron .github/gradle.properties.iron
+      - name: Move gradle properties and GPG key
+        run: mv .github/gradle.properties java/gradle.properties
+      - name: Import GPG key
+        run: gpg --batch --import .github/9FA43559.asc
+      - name: Export GPG signing key
+        run: gpg --export-secret-keys > /tmp/9FA43559.asc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: buildjet
+      - name: Generate Java files
+        run: cargo run --bin uniffi-bindgen-java generate --library resources/linux-x86-64/libironcore_alloy.so --out-dir java
+        working-directory: java/src/main
+      - name: Publish
+        run: ./gradlew publish
+        working-directory: java
+        env:
+          ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.SONATYPE_USERNAME }}
+          ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.SONATYPE_PASSWORD }}
+
   python-release:
     needs: generate-cdylibs
-    runs-on: buildjet-2vcpu-ubuntu-2204
+    runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -64,7 +107,7 @@ jobs:
           path: ${{ github.workspace }}/python/ironcore-alloy
       - name: Rename directories
         run: |
-          mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
+          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
           mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
           mv macos-12- darwin-x86-64
           mv macos-14- darwin-aarch64

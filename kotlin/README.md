@@ -2,7 +2,7 @@
 
 ## Build
 
-Ensure the library and source have been created, typically done by running `cargo t` in `../core`.
+Ensure the library and source have been created, typically done by running `cargo t` in `../`.
 
 ## Testing
 

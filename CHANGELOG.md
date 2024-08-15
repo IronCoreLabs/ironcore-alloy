@@ -1,4 +1,4 @@
-## 0.11.0 (Unreleased)
+## 0.11.1
 
 Breaking changes:
 
@@ -9,6 +9,7 @@ Breaking changes:
 
 Other changes:
 
+- Added Java bindings, `ironcore-alloy-java`
 - Added batch functionality to all SDK traits.
 - Fixed a bug where Standard Attached wasn't accessible for SaaS Shield clients.
 - Added rekey functionality for standard_attached data.

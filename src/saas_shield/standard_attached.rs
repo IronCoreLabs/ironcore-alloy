@@ -9,7 +9,7 @@ use crate::{
         StandardAttachedEncryptBatchResult,
     },
     tenant_security_client::TenantSecurityClient,
-    AlloyMetadata, PlaintextBytes, TenantId,
+    AlloyMetadata, TenantId,
 };
 
 use super::{standard::SaasShieldStandardClient, SaasShieldSecurityEventOps, SecurityEvent};
@@ -60,7 +60,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
         decrypt_core(&self.standard_client, attached_document, metadata)
             .await
-            .map(|x| PlaintextAttachedDocument(PlaintextBytes(x.0)))
+            .map(PlaintextAttachedDocument)
     }
 
     /// Decrypt multiple documents that were encrypted with the provided metadata.

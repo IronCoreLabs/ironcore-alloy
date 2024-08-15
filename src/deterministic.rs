@@ -1,6 +1,7 @@
 use crate::{
-    create_batch_result_struct, errors::AlloyError, util, AlloyMetadata, DerivationPath,
-    EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath, TenantId,
+    create_batch_result_struct, create_batch_result_struct_using_newtype, errors::AlloyError, util,
+    AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath,
+    TenantId,
 };
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
@@ -22,16 +23,27 @@ pub struct PlaintextField {
     pub secret_path: SecretPath,
     pub derivation_path: DerivationPath,
 }
+#[derive(Debug, Clone)]
 pub struct PlaintextFields(pub HashMap<FieldId, PlaintextField>);
 custom_newtype!(PlaintextFields, HashMap<FieldId, PlaintextField>);
-
+#[derive(Debug, Clone)]
 pub struct EncryptedFields(pub HashMap<FieldId, EncryptedField>);
 custom_newtype!(EncryptedFields, HashMap<FieldId, EncryptedField>);
 pub struct GenerateFieldQueryResult(pub HashMap<FieldId, Vec<EncryptedField>>);
 custom_newtype!(GenerateFieldQueryResult, HashMap<FieldId, Vec<EncryptedField>>);
 create_batch_result_struct!(DeterministicRotateResult, EncryptedField, FieldId);
-create_batch_result_struct!(DeterministicEncryptBatchResult, EncryptedField, FieldId);
-create_batch_result_struct!(DeterministicDecryptBatchResult, PlaintextField, FieldId);
+create_batch_result_struct_using_newtype!(
+    DeterministicEncryptBatchResult,
+    EncryptedField,
+    FieldId,
+    EncryptedFields
+);
+create_batch_result_struct_using_newtype!(
+    DeterministicDecryptBatchResult,
+    PlaintextField,
+    FieldId,
+    PlaintextFields
+);
 
 /// Key used for deterministic operations.
 #[derive(Debug, Clone)]

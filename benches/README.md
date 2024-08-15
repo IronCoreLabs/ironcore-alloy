@@ -86,7 +86,7 @@ The TSP's tenant logging mechanism has some tunable limits. By default, a TSP sh
 
 ## Other Languages
 
-There are also benchmarks available in [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks/src) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
+There are also benchmarks available in [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks/src), [Java](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/java/src/jmh/java/com/ironcorelabs/ironcore_alloy_java), and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
 
 ## Results
 

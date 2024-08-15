@@ -9,7 +9,7 @@ use crate::{
         StandardAttachedDecryptBatchResult, StandardAttachedDocumentOps,
         StandardAttachedEncryptBatchResult,
     },
-    AlloyMetadata, PlaintextBytes, TenantId,
+    AlloyMetadata, TenantId,
 };
 
 #[derive(uniffi::Object)]
@@ -57,7 +57,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
         decrypt_core(&self.standard_client, encrypted_document, metadata)
             .await
-            .map(|x| PlaintextAttachedDocument(PlaintextBytes(x.0)))
+            .map(PlaintextAttachedDocument)
     }
 
     /// Decrypt multiple documents that were encrypted with the provided metadata.
@@ -101,6 +101,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::PlaintextBytes;
     fn default_client() -> StandaloneStandardAttachedClient {
         new_client(Some(1))
     }
@@ -207,18 +208,15 @@ mod test {
 
     #[tokio::test]
     async fn test_roundtrip() {
-        let plaintext = [1u8; 10];
+        let plaintext = PlaintextBytes([1u8; 10].to_vec());
         let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
 
         let client = default_client();
         let encrypted = client
-            .encrypt(
-                PlaintextAttachedDocument(plaintext.to_vec().into()),
-                &metadata,
-            )
+            .encrypt(PlaintextAttachedDocument(plaintext.clone()), &metadata)
             .await
             .unwrap();
         let result = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(result.0 .0, plaintext);
+        assert_eq!(result.0, plaintext);
     }
 }

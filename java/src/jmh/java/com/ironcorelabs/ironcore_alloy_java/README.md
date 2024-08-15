@@ -1,11 +1,12 @@
-# ironcore-alloy Kotlin Benchmarks
+# ironcore-alloy Java Benchmarks
 
-This directory contains a benchmark suite for the Kotlin version of ironcore-alloy.
+This directory contains a benchmark suite for the Java version of ironcore-alloy.
 To build and run the benchmark, just execute the following commands from this directory:
 
 ```
 docker compose up -d
-../../gradlew bench
+cd <project_root>/java
+./gradlew jmh
 ```
 
 ## Tenant Security Proxy
@@ -28,7 +29,7 @@ created in IronCore's staging infrastructure.
 
 Production TSPs will often be accompanied by one or more
 [Tenant Security Logdriver](https://ironcorelabs.com/docs/saas-shield/tenant-security-logdriver/overview/) instances.
-Because the purpose of this benchmark is to demonstrate the capabilities of ironcore-alloy Kotlin, we have chosen to not include
+Because the purpose of this benchmark is to demonstrate the capabilities of ironcore-alloy Java, we have chosen to not include
 Logdriver in it. If you wish to modify the Docker Compose file to include Logdriver, be sure to consult its
 [Deployment](https://ironcorelabs.com/docs/saas-shield/tenant-security-logdriver/deployment/) page to learn how to properly configure it
 based on the resources you have available.
@@ -72,7 +73,7 @@ before running the benchmark.
 
 ## Interpreting Results
 
-Since ironcore-alloy is a library that interacts with a back-end service (TSP), the benchmark results are not always straightforward to interpret. Most API calls in ironcore-alloy make a round-trip to the TSP, and the TSP also does some computation. If testing on a single machine, it is good to monitor the CPU/RAM usage of the TSP processes in addition to the Kotlin benchmark process to make sure you aren't resource constrained.
+Since ironcore-alloy is a library that interacts with a back-end service (TSP), the benchmark results are not always straightforward to interpret. Most API calls in ironcore-alloy make a round-trip to the TSP, and the TSP also does some computation. If testing on a single machine, it is good to monitor the CPU/RAM usage of the TSP processes in addition to the Java benchmark process to make sure you aren't resource constrained.
 
 In general, operation latency is a function of latency to the TSP + latency to the tenant's KMS (if key-leasing is disabled).
 
@@ -80,24 +81,22 @@ The benchmark is using a single tenant, and (depending on your machine and bench
 
 ## Other Languages
 
-There are also benchmarks available in [Rust](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/benches), [Java](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/java/src/jmh/java/com/ironcorelabs/ironcore_alloy_java), and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
+There are also benchmarks available in [Rust](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/benches), [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
 
-## Results
+The following were benchmarks run on 8/15/2024 on a Macbook M1 Max.
 
-The following benchmarking run was done on May 7, 2024 on a MacBook Pro (2023) with an Apple M2 Max chip. It uses a locally-built TSP running with the configuration from `demo-tsp.conf`.
-
-```
-Benchmark                                             Mode  Cnt     Score     Error  Units
-SaasShieldBenchmark.batchEncrypt10DocsOf100B          avgt    5   545.626 ±  19.272  us/op
-SaasShieldBenchmark.tspDecrypt100B                    avgt    5   148.846 ±  11.811  us/op
-SaasShieldBenchmark.tspDecrypt10KB                    avgt    5   242.892 ±   2.902  us/op
-SaasShieldBenchmark.tspDecrypt1B                      avgt    5   141.517 ±   7.603  us/op
-SaasShieldBenchmark.tspDecrypt1MB                     avgt    5  9104.683 ±  74.820  us/op
-SaasShieldBenchmark.tspEncrypt100B                    avgt    5   142.432 ±   5.696  us/op
-SaasShieldBenchmark.tspEncrypt10KB                    avgt    5   246.627 ±   5.616  us/op
-SaasShieldBenchmark.tspEncrypt1B                      avgt    5   139.817 ±   5.732  us/op
-SaasShieldBenchmark.tspEncrypt1MB                     avgt    5  9322.918 ± 136.650  us/op
-StandaloneBenchmark.standaloneRoundtripStandard100Kb  avgt    5   117.444 ±  56.447  us/op
-StandaloneBenchmark.standaloneRoundtripStandard10B    avgt    5   112.489 ±  56.958  us/op
-StandaloneBenchmark.standaloneRoundtripStandard10Kb   avgt    5   113.051 ±  51.750  us/op
+```text
+Benchmark                                             Mode  Cnt       Score       Error  Units
+SaasShieldBenchmark.batchEncrypt10DocsOf100B          avgt    5    3880.803 ±   373.629  us/op
+SaasShieldBenchmark.tspDecrypt100B                    avgt    5     899.365 ±   151.952  us/op
+SaasShieldBenchmark.tspDecrypt10KB                    avgt    5    6204.417 ±   804.504  us/op
+SaasShieldBenchmark.tspDecrypt1B                      avgt    5     753.186 ±    53.981  us/op
+SaasShieldBenchmark.tspDecrypt1MB                     avgt    5  344116.886 ± 11127.442  us/op
+SaasShieldBenchmark.tspEncrypt100B                    avgt    5     919.766 ±   249.134  us/op
+SaasShieldBenchmark.tspEncrypt10KB                    avgt    5    6705.966 ±   646.834  us/op
+SaasShieldBenchmark.tspEncrypt1B                      avgt    5    1211.361 ±   900.329  us/op
+SaasShieldBenchmark.tspEncrypt1MB                     avgt    5  340480.214 ±  6824.536  us/op
+StandaloneBenchmark.standaloneRoundtripStandard100Kb  avgt    5     525.981 ±   169.361  us/op
+StandaloneBenchmark.standaloneRoundtripStandard10B    avgt    5     427.260 ±   164.509  us/op
+StandaloneBenchmark.standaloneRoundtripStandard10Kb   avgt    5     445.747 ±   161.576  us/op
 ```
