@@ -99,7 +99,7 @@ jobs:
 
   python-release:
     needs: generate-cdylibs
-    runs-on: buildjet-2vcpu-ubuntu-2204
+    runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -107,7 +107,7 @@ jobs:
           path: ${{ github.workspace }}/python/ironcore-alloy
       - name: Rename directories
         run: |
-          mv buildjet-2vcpu-ubuntu-2204- linux-x86-64
+          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
           mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
           mv macos-12- darwin-x86-64
           mv macos-14- darwin-aarch64
