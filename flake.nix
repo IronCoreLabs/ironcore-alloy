@@ -43,7 +43,7 @@
             ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin
               [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
-          JAVA_HOME = "${pkgs.openjdk21}/lib/openjdk";
+          JAVA_HOME = if pkgs.stdenv.isDarwin then "${pkgs.openjdk21}/lib" else "${pkgs.openjdk21}/lib/openjdk";
         };
 
       });

@@ -2,7 +2,7 @@
 
 ## Build
 
-Ensure the library and source have been created, typically done by running `cargo t` in `../core`.
+Ensure the library and source have been created, typically done by running `cargo t` in `../`.
 
 ## Testing
 
@@ -12,7 +12,7 @@ Ensure the library and source have been created, typically done by running `carg
 
 You can run the benchmarks `./gradlew bench`.
 
-More information about the benchmarks is in its [README](./benchmarks/src/README.md).
+More information about the benchmarks is in its [README](/java/src/jmh/java/com/ironcorelabs/ironcore_alloy_java/README.md).
 
 ## Publishing
 
