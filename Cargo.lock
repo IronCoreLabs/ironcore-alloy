@@ -2146,7 +2146,7 @@ dependencies = [
 [[package]]
 name = "uniffi-bindgen-java"
 version = "0.1.0"
-source = "git+https://github.com/IronCoreLabs/uniffi-bindgen-java?branch=polish-before-alpha#af6eb00f8ea7e807a1e7cf9661d8c66e541baa6b"
+source = "git+https://github.com/IronCoreLabs/uniffi-bindgen-java?branch=main#c865946b665c409fc6792cf239fb29a96ad5cdfb"
 dependencies = [
  "anyhow",
  "askama",

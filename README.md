@@ -56,7 +56,7 @@ cargo test --features integration_tests
 
 ## Benchmarks
 
-We provide benchmarks of ironcore-alloy in both [Rust](./benches/README.md) and [Kotlin](./kotlin/benchmarks/src/README.md). These benchmark folders each contain a Docker Compose file that will start up a TSP with a predefined configuration for testing purposes.
+We provide benchmarks of ironcore-alloy in [Rust](./benches/README.md), [Kotlin](./kotlin/benchmarks/src/README.md), [Java](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/java/src/jmh/java/com/ironcorelabs/ironcore_alloy_java), and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py). These benchmark folders each contain a Docker Compose file that will start up a TSP with a predefined configuration for testing purposes.
 
 ## License
 
