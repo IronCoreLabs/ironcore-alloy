@@ -82,3 +82,21 @@ The benchmark is using a single tenant, and (depending on your machine and bench
 ## Other Languages
 
 There are also benchmarks available in [Rust](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/benches), [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
+
+The following were benchmarks run on 8/15/2024 on a Macbook M1 Max.
+
+```text
+Benchmark                                             Mode  Cnt       Score       Error  Units
+SaasShieldBenchmark.batchEncrypt10DocsOf100B          avgt    5    3880.803 ±   373.629  us/op
+SaasShieldBenchmark.tspDecrypt100B                    avgt    5     899.365 ±   151.952  us/op
+SaasShieldBenchmark.tspDecrypt10KB                    avgt    5    6204.417 ±   804.504  us/op
+SaasShieldBenchmark.tspDecrypt1B                      avgt    5     753.186 ±    53.981  us/op
+SaasShieldBenchmark.tspDecrypt1MB                     avgt    5  344116.886 ± 11127.442  us/op
+SaasShieldBenchmark.tspEncrypt100B                    avgt    5     919.766 ±   249.134  us/op
+SaasShieldBenchmark.tspEncrypt10KB                    avgt    5    6705.966 ±   646.834  us/op
+SaasShieldBenchmark.tspEncrypt1B                      avgt    5    1211.361 ±   900.329  us/op
+SaasShieldBenchmark.tspEncrypt1MB                     avgt    5  340480.214 ±  6824.536  us/op
+StandaloneBenchmark.standaloneRoundtripStandard100Kb  avgt    5     525.981 ±   169.361  us/op
+StandaloneBenchmark.standaloneRoundtripStandard10B    avgt    5     427.260 ±   164.509  us/op
+StandaloneBenchmark.standaloneRoundtripStandard10Kb   avgt    5     445.747 ±   161.576  us/op
+```
