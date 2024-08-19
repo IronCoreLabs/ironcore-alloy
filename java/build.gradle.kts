@@ -1,7 +1,7 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
-version = "0.11.1-SNAPSHOT"
+version = "0.11.1"
 
 group = "com.ironcorelabs"
 
