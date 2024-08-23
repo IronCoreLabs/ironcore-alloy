@@ -40,7 +40,7 @@ artifacts = ["*.so", "*.dylib"]
 python = "3.10"
 
 [tool.hatch.envs.docs]
-dependencies = ["mkdocs.material==9.4.8", "mkdocstrings-python==1.7.4"]
+dependencies = ["mkdocs.material==9.4.8", "mkdocstrings-python==1.10.8"]
 
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build --clean --strict {args}"
