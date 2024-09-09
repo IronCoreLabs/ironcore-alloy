@@ -84,10 +84,12 @@ name = "ironcore_alloy"
 [[bin]]
 name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
+bench = false
 
 [[bin]]
 name = "uniffi-bindgen-java"
 path = "uniffi-bindgen-java.rs"
+bench = false
 
 # used to create the smallest cdylib binary we can to ship with the library in each ecosystem.
 # 6.9M vs 1.5M in initial testing. Can further have `strip` (the Unix utility) run on it to save ~0.2 MB more.

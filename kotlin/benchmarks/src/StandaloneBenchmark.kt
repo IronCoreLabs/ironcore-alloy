@@ -3,6 +3,7 @@ package test
 import com.ironcorelabs.ironcore_alloy.*
 import java.util.Base64
 import java.util.concurrent.*
+import java.util.Random
 import kotlin.ByteArray
 import kotlin.system.*
 import kotlinx.coroutines.*
@@ -23,7 +24,7 @@ class StandaloneBenchmark {
     var largeWord: ByteArray = "".toByteArray()
 
     val keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".base64ToByteArray()
-    val approximationFactor = 1.1f
+    val approximationFactor = 2.5f
     val standardSecrets = StandardSecrets(10, listOf(StandaloneSecret(10, Secret(keyByteArray))))
     val deterministicSecrets =
             mapOf(
@@ -60,6 +61,18 @@ class StandaloneBenchmark {
         smallWord = randomWord(1).toByteArray()
         mediumWord = randomWord(10).toByteArray()
         largeWord = randomWord(100).toByteArray()
+    }
+
+    @State(Scope.Thread)
+    open class Vector384State {
+        var vector: List<Float> = (1..384).map { Random().nextFloat() }
+    }
+
+    @Benchmark
+    fun standaloneVectorEncrypt384d(s: Vector384State) {
+        runBlocking {
+            standaloneSdk.vector().encrypt(PlaintextVector(s.vector, "", ""), metadata)
+        }
     }
 
     @Benchmark

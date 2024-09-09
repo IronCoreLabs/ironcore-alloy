@@ -90,23 +90,55 @@ There are also benchmarks available in [Kotlin](https://github.com/IronCoreLabs/
 
 ## Results
 
-The following benchmarking run was done on May 7, 2024 on a MacBook Pro (2023) with an Apple M2 Max chip. It uses a locally-built TSP running with the configuration from `demo-tsp.conf`.
+The following benchmarking run was done on August 30th, 2024 on a Lenovo Thinkpad X1 Extreme 2nd Gen with an i9-9880H CPU. It uses a locally-built TSP running with the configuration from `demo-tsp.conf`.
 
 ```
+Standalone - vector_encrypt d=384
+                        time:   [17.430 µs 17.573 µs 17.735 µs]
+Standalone - vector_encrypt d=768
+                        time:   [32.334 µs 32.547 µs 32.741 µs]
+Standalone - vector_encrypt d=1536
+                        time:   [60.878 µs 61.498 µs 62.147 µs]
+Standalone - vector_encrypt d=2048
+                        time:   [87.224 µs 88.124 µs 89.011 µs]
+Standalone - vector_roundtrip d=384
+                        time:   [39.432 µs 39.517 µs 39.622 µs]
+Standalone - vector_roundtrip d=768
+                        time:   [80.038 µs 80.114 µs 80.199 µs]
+Standalone - vector_roundtrip d=1536
+                        time:   [190.09 µs 191.63 µs 193.30 µs]
+Standalone - vector_roundtrip d=2048
+                        time:   [249.74 µs 251.00 µs 252.41 µs]
 Standalone - roundtrip 10B
-                        time:   [11.515 µs 11.536 µs 11.558 µs]
+                        time:   [7.3951 µs 7.4709 µs 7.5491 µs]
 Standalone - roundtrip 10KB
-                        time:   [141.92 µs 142.34 µs 142.75 µs]
+                        time:   [23.303 µs 23.426 µs 23.548 µs]
 Standalone - roundtrip 100KB
-                        time:   [1.3312 ms 1.3350 ms 1.3387 ms]
-TSP - encrypt 1B        time:   [55.808 µs 56.149 µs 56.715 µs]
-TSP - encrypt 100B      time:   [56.793 µs 57.152 µs 57.713 µs]
-TSP - encrypt 10KB      time:   [127.61 µs 129.40 µs 131.57 µs]
-TSP - encrypt 1MB       time:   [7.1328 ms 7.1438 ms 7.1613 ms]
-TSP - decrypt 1B        time:   [59.172 µs 59.508 µs 59.865 µs]
-TSP - decrypt 100B      time:   [60.218 µs 60.462 µs 60.695 µs]
-TSP - decrypt 10KB      time:   [132.08 µs 132.43 µs 132.80 µs]
-TSP - decrypt 1MB       time:   [6.8972 ms 6.9199 ms 6.9441 ms]
+                        time:   [179.20 µs 181.46 µs 183.65 µs]
+TSP - vector_encrypt d=384
+                        time:   [142.69 µs 152.19 µs 161.07 µs]
+TSP - vector_encrypt d=768
+                        time:   [172.72 µs 176.22 µs 181.64 µs]
+TSP - vector_encrypt d=1536
+                        time:   [218.59 µs 235.90 µs 248.05 µs]
+TSP - vector_encrypt d=2048
+                        time:   [270.12 µs 286.51 µs 298.61 µs]
+TSP - vector_roundtrip d=384
+                        time:   [312.78 µs 321.93 µs 333.69 µs]
+TSP - vector_roundtrip d=768
+                        time:   [383.62 µs 395.26 µs 409.41 µs]
+TSP - vector_roundtrip d=1536
+                        time:   [529.15 µs 545.48 µs 562.23 µs]
+TSP - vector_roundtrip d=2048
+                        time:   [651.78 µs 662.87 µs 675.18 µs]
+TSP - encrypt 1B        time:   [126.73 µs 128.40 µs 130.31 µs]
+TSP - encrypt 100B      time:   [130.53 µs 133.51 µs 135.96 µs]
+TSP - encrypt 10KB      time:   [140.84 µs 143.25 µs 146.06 µs]
+TSP - encrypt 1MB       time:   [1.2828 ms 1.3429 ms 1.4088 ms]
+TSP - decrypt 1B        time:   [136.40 µs 144.30 µs 149.06 µs]
+TSP - decrypt 100B      time:   [136.97 µs 141.28 µs 148.68 µs]
+TSP - decrypt 10KB      time:   [159.37 µs 165.90 µs 175.01 µs]
+TSP - decrypt 1MB       time:   [1.5501 ms 1.5733 ms 1.6051 ms]
 TSP - batch encrypt 10 documents, 10 fields, 10B
-                        time:   [414.47 µs 416.00 µs 417.20 µs]
+                        time:   [412.43 µs 417.72 µs 421.34 µs]
 ```
