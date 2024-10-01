@@ -52,7 +52,7 @@ z85 = "3.0.5"
 [dev-dependencies]
 approx = "0.5.1"
 ascii85 = "0.2.1"
-assertables = "7.0.1"
+assertables = "8.11.0"
 base64 = "0.22.0"
 base85 = "2.0.0"
 camino = "1.1"
