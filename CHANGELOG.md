@@ -1,3 +1,8 @@
+## 0.11.2
+
+- Dependency updates
+- Dropped build for Mac OS 12 and replaced it with Mac OS 13.
+
 ## 0.11.1
 
 Breaking changes:
