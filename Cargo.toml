@@ -20,7 +20,7 @@ aes-siv = "0.7"
 async-trait = "0.1.83"
 base64 = "0.22"
 base64_type = "0.2"
-bytes = { version = "1.7.1", features = ["serde"] }
+bytes = { version = "1.8.0", features = ["serde"] }
 convert_case = "0.6.0"
 futures = "0.3.29"
 hmac = { version = "0.12.1", features = ["std"] }
