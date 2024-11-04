@@ -42,7 +42,7 @@ ring = "0.17"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.132", features = ["float_roundtrip"] }
 thiserror = "1.0.63"
-uniffi = { version = "0.28.1", features = [
+uniffi = { version = "0.28.2", features = [
    "tokio",
    "cli",
 ] }
