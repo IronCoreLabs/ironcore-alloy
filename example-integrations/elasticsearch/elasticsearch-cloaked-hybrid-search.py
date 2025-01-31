@@ -5,6 +5,7 @@ import json
 from urllib.request import urlopen
 import asyncio
 
+
 def pretty_response(response):
     if len(response["hits"]["hits"]) == 0:
         print("Your search returned no results.")
@@ -90,7 +91,12 @@ async def main():
         title_embedding = model.encode(book["title"]).tolist()
         # Encrypt the title embedding with IronCore Labs' Cloaked AI
         encrypted_title_embedding = await sdk.vector().encrypt(
-            alloy.PlaintextVector(title_embedding, "book_index", ""), metadata
+            alloy.PlaintextVector(
+                plaintext_vector=title_embedding,
+                secret_path="book_index",
+                derivation_path="",
+            ),
+            metadata,
         )
         operations.append({"index": {"_index": "book_index"}})
         book["title_vector"] = encrypted_title_embedding.encrypted_vector
@@ -104,7 +110,13 @@ async def main():
     # search for both resulting vectors. Elasticsearch [doesn't explicitly support multiple vectors](https://discuss.elastic.co/t/run-multi-vectors-knn-search/299958/2) yet. Two workarounds are
     # searching for each separately and combining them in the client or boolean ANDing the knn query for the same field twice (which is what we've done here).
     encrypted_title_query_embeddings = await sdk.vector().generate_query_vectors(
-        {"title": alloy.PlaintextVector(title_query_embedding, "book_index", "")},
+        {
+            "title": alloy.PlaintextVector(
+                plaintext_vector=title_query_embedding,
+                secret_path="book_index",
+                derivation_path="",
+            )
+        },
         metadata,
     )
     embedding_queries = [

@@ -101,7 +101,12 @@ async def main():
         title_embedding = model.encode(book["title"]).tolist()
         # Encrypt the title embedding with IronCore Labs' Cloaked AI
         encrypted_title_embedding = await sdk.vector().encrypt(
-            alloy.PlaintextVector(title_embedding, "book_index", ""), metadata
+            alloy.PlaintextVector(
+                plaintext_vector=title_embedding,
+                secret_path="book_index",
+                derivation_path="",
+            ),
+            metadata,
         )
         operations.append({"index": {"_index": "book_index"}})
         book["title_vector"] = encrypted_title_embedding.encrypted_vector
@@ -113,7 +118,13 @@ async def main():
     title_query_embedding = model.encode("python programming").tolist()
     # `generate_query_vectors` returns a list because the secret involved may be in rotation.
     encrypted_title_query_embeddings = await sdk.vector().generate_query_vectors(
-        {"title": alloy.PlaintextVector(title_query_embedding, "book_index", "")},
+        {
+            "title": alloy.PlaintextVector(
+                plaintext_vector=title_query_embedding,
+                secret_path="book_index",
+                derivation_path="",
+            )
+        },
         metadata,
     )
     embedding_queries = [

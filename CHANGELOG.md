@@ -11,6 +11,7 @@ Breaking changes:
 - Reworked several type aliases into newtype structs. In Rust this will require creating structs, but Python and Kotlin are unaffected.
 - Renamed `StandaloneAttachedStandardClient` to `StandaloneStandardAttachedClient`.
 - Changed Standard Attached `get_searchable_edek_prefix` to be synchronous.
+- Changed several constructors to require keyword arguments.
 
 Other changes:
 
