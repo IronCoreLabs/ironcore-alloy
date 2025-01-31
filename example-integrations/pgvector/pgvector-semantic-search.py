@@ -22,7 +22,7 @@ async def display_results(
         decrypted_question = await alloy_client.standard_attached().decrypt(
             recreated_question, metadata
         )
-        recreated_round = alloy.EncryptedField(base64.b64decode(round_str), secret_path, derivation_path)  # type: ignore
+        recreated_round = alloy.EncryptedField(encrypted_field=base64.b64decode(round_str), secret_path=secret_path, derivation_path=derivation_path)  # type: ignore
         # We have to deterministically decrypt the round because it was deterministically encrypted earlier
         decrypted_round = await alloy_client.deterministic().decrypt(
             recreated_round, metadata
@@ -72,7 +72,9 @@ async def main():
         question_emb = model.encode(row["Question"]).tolist()  # type: ignore
         # each index and set of vectors is encrypted with different derived keys
         plaintext_vector = alloy.PlaintextVector(
-            question_emb, secret_path, derivation_path
+            plaintext_vector=question_emb,
+            secret_path=secret_path,
+            derivation_path=derivation_path,
         )
         # Some questions contain HTML tags that muddle the results, so we'll skip inserting those ones
         if "<" in row["Question"]:
@@ -86,7 +88,9 @@ async def main():
             ),
             alloy_client.deterministic().encrypt(
                 alloy.PlaintextField(
-                    bytes(row["Round"], "utf-8"), secret_path, derivation_path
+                    plaintext_field=bytes(row["Round"], "utf-8"),
+                    secret_path=secret_path,
+                    derivation_path=derivation_path,
                 ),
                 metadata,
             ),
@@ -110,7 +114,11 @@ async def main():
 
     # Create the query embedding
     query_emb = model.encode(query).tolist()  # type: ignore
-    plaintext_query = alloy.PlaintextVector(query_emb, secret_path, derivation_path)
+    plaintext_query = alloy.PlaintextVector(
+        plaintext_vector=query_emb,
+        secret_path=secret_path,
+        derivation_path=derivation_path,
+    )
     # `generate_query_vectors` returns a list because the secret involved may be in rotation. In that case you should
     # search for both resulting vectors.
     query_vector = (
@@ -131,7 +139,9 @@ async def main():
     # Now we'll query a second time, only returning answers from the Double Jeopardy round
     round_filter = await alloy_client.deterministic().encrypt(
         alloy.PlaintextField(
-            bytes("Double Jeopardy!", "utf-8"), secret_path, derivation_path
+            plaintext_field=bytes("Double Jeopardy!", "utf-8"),
+            secret_path=secret_path,
+            derivation_path=derivation_path,
         ),
         metadata,
     )

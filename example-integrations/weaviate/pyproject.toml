@@ -3,9 +3,9 @@
 [project]
 name = "weaviate-example"
 authors = [{ name = "IronCore Labs", email = "info@ironcorelabs.com" }]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
-    "ironcore-alloy>=0.10.3,<0.11",
+    "ironcore-alloy>=0.11.2,<0.12",
     "weaviate_client==4.4.0",
     "sentence_transformers==2.3.1",
     "pydantic==2.6.1",

@@ -62,7 +62,7 @@ async def main():
     print("Encrypting embeddings and their associated text.")
     # first we'll encrypt the vectors
     for row in dataset.documents.itertuples():
-        plaintext_vector = alloy.PlaintextVector(row.values, "quora", "sentence") # each index and set of vectors encrypted with different derived keys
+        plaintext_vector = alloy.PlaintextVector(plaintext_vector=row.values, secret_path="quora", derivation_path="sentence") # each index and set of vectors encrypted with different derived keys
         # first we encrypt the dense vector
         encrypted_vector = await sdk.vector().encrypt(plaintext_vector, tenant_id)
         # then we encrypt the "metadata" -- in this case the source text used to create the vector
@@ -82,7 +82,7 @@ async def main():
     print(f"\nQuery: {query}")
     # create the query vector
     plaintext_query = model.encode(query).tolist()
-    xq = alloy.PlaintextVector(plaintext_query, "quora", "sentence")
+    xq = alloy.PlaintextVector(plaintext_vector=plaintext_query, secret_path="quora", derivation_path="sentence")
     query_vectors = (await sdk.vector().generate_query_vectors({"vec_1": xq},tenant_id))["vec_1"]
 
     # now query Pinecone
@@ -90,7 +90,7 @@ async def main():
     xc
 
     for result in xc['matches']:
-        recreated = alloy.EncryptedDocument(base64.b64decode(result['metadata']['edek']), {"text":base64.b64decode(result['metadata']['text'])})
+        recreated = alloy.EncryptedDocument(edek=base64.b64decode(result['metadata']['edek']), document={"text":base64.b64decode(result['metadata']['text'])})
         decrypted = await sdk.standard().decrypt(recreated, tenant_id) # decrypt the metadata
         # we could also decrypt the vector, but it isn't returned and we don't need it
         print(f"{round(result['score'], 2)}: {decrypted['text'].decode('utf-8')}")
@@ -98,13 +98,13 @@ async def main():
     query = "which metropolis has the highest number of people?"
     print(f"\nQuery: {query}")
     # create the query vector
-    xq = alloy.PlaintextVector(model.encode(query).tolist(), "quora", "sentence")
+    xq = alloy.PlaintextVector(plaintext_vector=model.encode(query).tolist(), secret_path="quora", derivation_path="sentence")
     query_vectors = (await sdk.vector().generate_query_vectors({"vec_1": xq}, tenant_id))["vec_1"]
     # now query
     xc = index.query(vector=query_vectors[0].encrypted_vector, top_k=5, include_metadata=True)
 
     for result in xc['matches']:
-        recreated = alloy.EncryptedDocument(base64.b64decode(result['metadata']['edek']), {"text":base64.b64decode(result['metadata']['text'])})
+        recreated = alloy.EncryptedDocument(edek=base64.b64decode(result['metadata']['edek']), document={"text":base64.b64decode(result['metadata']['text'])})
         decrypted = await sdk.standard().decrypt(recreated, tenant_id)
         print(f"{round(result['score'], 2)}: {decrypted['text'].decode('utf-8')}")
         
