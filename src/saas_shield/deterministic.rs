@@ -1,18 +1,17 @@
 use super::{
-    derive_keys_many_paths, get_in_rotation_prefix_internal, get_keys_for_rotation,
     DeriveKeyChoice, RotationKeys, SaasShieldSecurityEventOps, SecurityEvent,
+    derive_keys_many_paths, get_in_rotation_prefix_internal, get_keys_for_rotation,
 };
 
 use crate::deterministic::{
-    decrypt_internal, encrypt_internal, DeterministicDecryptBatchResult,
-    DeterministicEncryptBatchResult, DeterministicEncryptionKey, DeterministicFieldOps,
-    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateFieldQueryResult,
-    PlaintextField, PlaintextFields,
+    DeterministicDecryptBatchResult, DeterministicEncryptBatchResult, DeterministicEncryptionKey,
+    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
+    GenerateFieldQueryResult, PlaintextField, PlaintextFields, decrypt_internal, encrypt_internal,
 };
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
 use crate::util::{check_rotation_no_op, perform_batch_action};
-use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath, TenantId};
+use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, alloy_client_trait::AlloyClient};
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -367,8 +366,8 @@ impl SaasShieldSecurityEventOps for SaasShieldDeterministicClient {
 mod test {
     use super::*;
     use crate::{
-        tenant_security_client::{DerivedKey, KeyDeriveResponse, TenantSecretAssignmentId},
         DerivationPath, EncryptedBytes, SecretPath,
+        tenant_security_client::{DerivedKey, KeyDeriveResponse, TenantSecretAssignmentId},
     };
     use base64_type::Base64;
     use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};

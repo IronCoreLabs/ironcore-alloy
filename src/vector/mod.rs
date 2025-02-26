@@ -1,9 +1,9 @@
-use self::crypto::{shuffle, unshuffle, EncryptResult};
+use self::crypto::{EncryptResult, shuffle, unshuffle};
 use crate::{
+    AlloyMetadata, DerivationPath, EncryptedBytes, Secret, SecretPath, TenantId,
     create_batch_result_struct, create_batch_result_struct_using_newtype,
     errors::AlloyError,
     util::{self, AuthHash},
-    AlloyMetadata, DerivationPath, EncryptedBytes, Secret, SecretPath, TenantId,
 };
 use bytes::Bytes;
 use ironcore_documents::{

@@ -3,7 +3,7 @@ name = "ironcore-alloy"
 version = "0.11.3-pre.5"
 description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
 authors = ["IronCore Labs <info@ironcorelabs.com>"]
-edition = "2021"
+edition = "2024"
 # We exclude Cargo.lock instead of deleting it because we want consistent builds for generated SDKs
 exclude = ["Cargo.lock"]
 license = "AGPL-3.0-only"
@@ -12,7 +12,7 @@ readme = "README.md"
 repository = "https://github.com/IronCoreLabs/ironcore-alloy"
 categories = ["cryptography"]
 keywords = ["cryptography", "saas-shield", "ALE", "cloaked-ai"]
-rust-version = "1.75.0"
+rust-version = "1.85.0"
 
 [dependencies]
 aes-gcm = "0.10"
@@ -42,10 +42,7 @@ ring = "0.17"
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.134", features = ["float_roundtrip"] }
 thiserror = "2.0.9"
-uniffi = { version = "0.28.2", features = [
-   "tokio",
-   "cli",
-] }
+uniffi = { version = "0.28.2", features = ["tokio", "cli"] }
 uniffi-bindgen-java = "0.1.0"
 z85 = "3.0.5"
 

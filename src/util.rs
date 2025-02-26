@@ -1,15 +1,15 @@
-use crate::{errors::AlloyError, AlloyMetadata, TenantId, VectorEncryptionKey};
+use crate::{AlloyMetadata, TenantId, VectorEncryptionKey, errors::AlloyError};
 use ironcore_documents::v5::key_id_header::KeyId;
 use itertools::Either;
 use protobuf::Message;
 use rand::{
-    rngs::{adapter::ReseedingRng, OsRng},
     SeedableRng,
+    rngs::{OsRng, adapter::ReseedingRng},
 };
 use rand_chacha::{ChaCha20Core, ChaCha20Rng};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelExtend};
-use ring::hmac::{Key as HMACKey, HMAC_SHA256, HMAC_SHA512};
+use ring::hmac::{HMAC_SHA256, HMAC_SHA512, Key as HMACKey};
 use std::hash::Hash;
 use std::{
     collections::HashMap,

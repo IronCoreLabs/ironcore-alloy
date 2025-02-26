@@ -316,9 +316,11 @@ pub(crate) mod alloy_client_trait {
             if edek_type == expected_edek_type && payload_type == expected_payload_type {
                 Ok((key_id, remaining_bytes))
             } else {
-                Err(AlloyError::InvalidInput{ msg:
-                    format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
-            })
+                Err(AlloyError::InvalidInput {
+                    msg: format!(
+                        "The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"
+                    ),
+                })
             }
         }
     }

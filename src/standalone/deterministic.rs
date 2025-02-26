@@ -1,15 +1,14 @@
 use super::config::RotatableSecret;
 use crate::deterministic::{
-    decrypt_internal, encrypt_internal, DeterministicDecryptBatchResult,
-    DeterministicEncryptBatchResult, DeterministicEncryptionKey, DeterministicFieldOps,
-    DeterministicRotateResult, EncryptedField, EncryptedFields, GenerateFieldQueryResult,
-    PlaintextField, PlaintextFields,
+    DeterministicDecryptBatchResult, DeterministicEncryptBatchResult, DeterministicEncryptionKey,
+    DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
+    GenerateFieldQueryResult, PlaintextField, PlaintextFields, decrypt_internal, encrypt_internal,
 };
 use crate::errors::AlloyError;
 use crate::util::{check_rotation_no_op, perform_batch_action};
 use crate::{
-    alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
-    StandaloneConfiguration, TenantId,
+    AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+    alloy_client_trait::AlloyClient,
 };
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use itertools::Itertools;
@@ -260,15 +259,14 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
         _derivation_path: DerivationPath,
         _metadata: &AlloyMetadata,
     ) -> Result<Vec<u8>, AlloyError> {
-        let secret =
-            self.config
-                .get(&secret_path)
-                .ok_or_else(|| AlloyError::InvalidConfiguration {
-                    msg: format!(
-                "Provided secret path `{}` does not exist in the deterministic configuration.",
-                &secret_path.0
-            ),
-                })?;
+        let secret = self.config.get(&secret_path).ok_or_else(|| {
+            AlloyError::InvalidConfiguration {
+                msg: format!(
+                    "Provided secret path `{}` does not exist in the deterministic configuration.",
+                    &secret_path.0
+                ),
+            }
+        })?;
         let in_rotation_secret =
             secret
                 .in_rotation_secret
@@ -291,8 +289,8 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
 mod test {
     use super::*;
     use crate::{
-        standalone::config::StandaloneSecret, tests::get_metadata, DerivationPath, EncryptedBytes,
-        Secret,
+        DerivationPath, EncryptedBytes, Secret, standalone::config::StandaloneSecret,
+        tests::get_metadata,
     };
     use assertables::*;
     use hex_literal::hex;

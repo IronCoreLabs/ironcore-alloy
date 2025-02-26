@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use ironcore_alloy::{
-    errors::AlloyError, saas_shield::config::SaasShieldConfiguration, SaasShield,
+    SaasShield, errors::AlloyError, saas_shield::config::SaasShieldConfiguration,
 };
 use std::{
     env,

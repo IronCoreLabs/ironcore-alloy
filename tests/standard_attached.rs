@@ -2,17 +2,17 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use crate::common::{get_client, TestResult};
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use crate::common::{TestResult, get_client};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use ironcore_alloy::standard_attached::{
         EncryptedAttachedDocument, EncryptedAttachedDocuments, PlaintextAttachedDocuments,
         StandardAttachedDocumentOps,
     };
     use ironcore_alloy::{
+        AlloyMetadata, DocumentId, TenantId,
         errors::AlloyError,
         saas_shield::{DataEvent, SaasShieldSecurityEventOps, SecurityEvent},
         standard_attached::PlaintextAttachedDocument,
-        AlloyMetadata, DocumentId, TenantId,
     };
     use ironcore_alloy::{EncryptedBytes, PlaintextBytes};
     use serde_json::{Map, Value};
@@ -63,7 +63,7 @@ mod tests {
             .standard_attached()
             .encrypt(plaintext, &metadata)
             .await?;
-        assert_eq!(encrypted.0 .0.len(), 292);
+        assert_eq!(encrypted.0.0.len(), 292);
         Ok(())
     }
 
@@ -93,7 +93,7 @@ mod tests {
             .as_object()
             .unwrap()
             .clone();
-        let decrypted_json = serde_json::from_slice::<Map<String, Value>>(&decrypted.0 .0).unwrap();
+        let decrypted_json = serde_json::from_slice::<Map<String, Value>>(&decrypted.0.0).unwrap();
         assert_eq!(expected, decrypted_json);
         Ok(())
     }
@@ -219,15 +219,17 @@ mod tests {
             .await?;
         assert_eq!(all_rekeyed.successes.len(), 1);
         assert_eq!(all_rekeyed.failures.len(), 0);
-        assert!(all_rekeyed
-            .successes
-            .contains_key(&DocumentId("doc".to_string())));
+        assert!(
+            all_rekeyed
+                .successes
+                .contains_key(&DocumentId("doc".to_string()))
+        );
         let rekeyed = all_rekeyed
             .successes
             .remove(&DocumentId("doc".to_string()))
             .unwrap();
         // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0 .0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0.0.starts_with(&[0, 0, 1, 255, 2, 0]));
         let decrypted = get_client()
             .standard_attached()
             .decrypt(rekeyed, &metadata)
@@ -249,15 +251,17 @@ mod tests {
             .await?;
         assert_eq!(all_rekeyed.successes.len(), 1);
         assert_eq!(all_rekeyed.failures.len(), 0);
-        assert!(all_rekeyed
-            .successes
-            .contains_key(&DocumentId("doc".to_string())));
+        assert!(
+            all_rekeyed
+                .successes
+                .contains_key(&DocumentId("doc".to_string()))
+        );
         let rekeyed = all_rekeyed
             .successes
             .remove(&DocumentId("doc".to_string()))
             .unwrap();
         // First 4 bytes are KMS config ID 512
-        assert!(rekeyed.0 .0.starts_with(&[0, 0, 2, 0, 2, 0]));
+        assert!(rekeyed.0.0.starts_with(&[0, 0, 2, 0, 2, 0]));
         let bad_decrypted = get_client()
             .standard_attached()
             .decrypt(rekeyed.clone(), &metadata)

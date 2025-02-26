@@ -1,16 +1,17 @@
 // Standard standalone works for V4 and V5 documents. There is no suport for V3 since Standalone wasn't
 // available in V3.
 use super::config::{StandaloneConfiguration, StandardSecrets};
+use crate::DocumentId;
 use crate::errors::AlloyError;
 use crate::standard::{
-    decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, EncryptedDocuments, PlaintextDocument, PlaintextDocumentWithEdek,
-    PlaintextDocuments, PlaintextDocumentsWithEdeks, RekeyEdeksBatchResult,
-    StandardDecryptBatchResult, StandardDocumentOps, StandardEncryptBatchResult,
+    EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
+    PlaintextDocumentWithEdek, PlaintextDocuments, PlaintextDocumentsWithEdeks,
+    RekeyEdeksBatchResult, StandardDecryptBatchResult, StandardDocumentOps,
+    StandardEncryptBatchResult, decrypt_document_core, encrypt_document_core, encrypt_map,
+    verify_sig,
 };
-use crate::util::{hash256, perform_batch_action, OurReseedingRng};
-use crate::DocumentId;
-use crate::{alloy_client_trait::AlloyClient, AlloyMetadata, Secret, TenantId};
+use crate::util::{OurReseedingRng, hash256, perform_batch_action};
+use crate::{AlloyMetadata, Secret, TenantId, alloy_client_trait::AlloyClient};
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
 use ironcore_documents::{icl_header_v4, v5};
@@ -334,8 +335,8 @@ fn derive_aes_encryption_key_legacy<K: AsRef<[u8]>>(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
     use crate::{EncryptedBytes, FieldId, Secret};
+    use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
     use ironcore_documents::v5::key_id_header::{self, EdekType, KeyId, PayloadType};
 
     fn default_client() -> StandaloneStandardClient {
@@ -382,7 +383,7 @@ pub(crate) mod test {
             .await
             .unwrap();
         let (key_id_header, _) =
-            key_id_header::decode_version_prefixed_value(encrypted.edek.0 .0.clone().into())
+            key_id_header::decode_version_prefixed_value(encrypted.edek.0.0.clone().into())
                 .unwrap();
         assert_eq!(key_id_header.key_id, KeyId(1));
         assert_eq!(key_id_header.edek_type, EdekType::Standalone);
@@ -439,9 +440,11 @@ pub(crate) mod test {
             .await
             .unwrap();
         assert!(rekeyed.failures.is_empty());
-        assert!(rekeyed
-            .successes
-            .contains_key(&DocumentId("foo".to_string())));
+        assert!(
+            rekeyed
+                .successes
+                .contains_key(&DocumentId("foo".to_string()))
+        );
         let new_edek = rekeyed
             .successes
             .remove(&DocumentId("foo".to_string()))
@@ -487,9 +490,11 @@ pub(crate) mod test {
             .await
             .unwrap();
         assert!(rekeyed.failures.is_empty());
-        assert!(rekeyed
-            .successes
-            .contains_key(&DocumentId("foo".to_string())));
+        assert!(
+            rekeyed
+                .successes
+                .contains_key(&DocumentId("foo".to_string()))
+        );
         let new_edek = rekeyed
             .successes
             .remove(&DocumentId("foo".to_string()))

@@ -1,12 +1,12 @@
 use crate::{
+    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
     create_batch_result_struct, create_batch_result_struct_using_newtype,
     errors::AlloyError,
     standard::{
         EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
         PlaintextDocuments, StandardDocumentOps,
     },
-    util::{perform_batch_action, v4_proto_from_bytes, BatchResult},
-    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    util::{BatchResult, perform_batch_action, v4_proto_from_bytes},
 };
 use bytes::Bytes;
 use ironcore_documents::{
@@ -111,7 +111,7 @@ fn encrypted_document_to_attached(
         document,
     } = encrypted_document;
     let (key_id_header, edek_bytes) =
-        key_id_header::decode_version_prefixed_value(edek_with_key_id_bytes.0 .0.into())?;
+        key_id_header::decode_version_prefixed_value(edek_with_key_id_bytes.0.0.into())?;
     let edek = v4_proto_from_bytes(edek_bytes)?;
     let edoc = document
         .into_values()
@@ -190,7 +190,7 @@ pub(crate) async fn encrypt_batch_core<T: StandardDocumentOps>(
 fn decode_edoc<T: StandardDocumentOps>(
     attached_document: EncryptedAttachedDocument,
 ) -> Result<AttachedDocument, AlloyError> {
-    let attached_document_bytes: Bytes = attached_document.0 .0.into();
+    let attached_document_bytes: Bytes = attached_document.0.0.into();
     Ok(
         v4::attached::decode_attached_edoc(attached_document_bytes.clone())
             .map(|(edek, edoc)| AttachedDocument {
@@ -350,7 +350,7 @@ pub(crate) async fn rekey_core<T: StandardDocumentOps>(
                 msg: "Rekey failed for document.".to_string(),
             })?;
             let (key_id_header, edek_bytes) =
-                key_id_header::decode_version_prefixed_value(rekeyed_edek.0 .0.into())?;
+                key_id_header::decode_version_prefixed_value(rekeyed_edek.0.0.into())?;
             let edek = v4_proto_from_bytes(edek_bytes)?;
             Ok(EncryptedAttachedDocument(EncryptedBytes(
                 AttachedDocument {
