@@ -2,13 +2,13 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use crate::common::{get_client, TestResult};
+    use crate::common::{TestResult, get_client};
     use ironcore_alloy::{
+        AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, SecretPath, TenantId,
         deterministic::{
             DeterministicFieldOps, EncryptedField, EncryptedFields, PlaintextField, PlaintextFields,
         },
         errors::AlloyError,
-        AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, SecretPath, TenantId,
     };
     use std::{iter, sync::Arc};
 

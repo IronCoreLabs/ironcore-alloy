@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use ironcore_alloy::saas_shield::config::SaasShieldConfiguration;
 use ironcore_alloy::standalone::config::{
     RotatableSecret, StandaloneConfiguration, StandaloneSecret, StandardSecrets, VectorSecret,

@@ -1,7 +1,7 @@
 use crate::{
-    create_batch_result_struct, create_batch_result_struct_using_newtype, errors::AlloyError, util,
     AlloyMetadata, DerivationPath, EncryptedBytes, FieldId, PlaintextBytes, Secret, SecretPath,
-    TenantId,
+    TenantId, create_batch_result_struct, create_batch_result_struct_using_newtype,
+    errors::AlloyError, util,
 };
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
@@ -208,7 +208,9 @@ mod test {
     // but that may not prove much since that is this own library's test.
     #[test]
     fn test_known_deterministic() {
-        let key = hex!("fffefdfcfbfaf9f8f7f6f5f4f3f2f1f06f6e6d6c6b6a69686766656463626160f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f");
+        let key = hex!(
+            "fffefdfcfbfaf9f8f7f6f5f4f3f2f1f06f6e6d6c6b6a69686766656463626160f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f"
+        );
         let ad = hex!("101112131415161718191a1b1c1d1e1f2021222324252627");
         let plaintext = hex!("112233445566778899aabbccddee");
         let encrypt_result = deterministic_encrypt_core(key, &plaintext, &ad).unwrap();

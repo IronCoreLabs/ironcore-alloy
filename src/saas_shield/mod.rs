@@ -2,7 +2,7 @@ use crate::tenant_security_client::{
     DerivationType, DeriveKeyChoice, DerivedKey, KeyDeriveResponse, SecretType,
     TenantSecurityClient,
 };
-use crate::{errors::AlloyError, AlloyMetadata, VectorEncryptionKey};
+use crate::{AlloyMetadata, VectorEncryptionKey, errors::AlloyError};
 use crate::{DerivationPath, SecretPath, TenantId};
 use convert_case::Casing;
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};

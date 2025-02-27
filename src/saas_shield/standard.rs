@@ -1,20 +1,21 @@
 use super::{SaasShieldSecurityEventOps, SecurityEvent};
 use crate::errors::AlloyError;
 use crate::standard::{
-    decrypt_document_core, encrypt_document_core, encrypt_map, verify_sig, EdekWithKeyIdHeader,
-    EncryptedDocument, EncryptedDocuments, PlaintextDocument, PlaintextDocumentWithEdek,
-    PlaintextDocuments, PlaintextDocumentsWithEdeks, RekeyEdeksBatchResult,
-    StandardDecryptBatchResult, StandardDocumentOps, StandardEncryptBatchResult,
+    EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
+    PlaintextDocumentWithEdek, PlaintextDocuments, PlaintextDocumentsWithEdeks,
+    RekeyEdeksBatchResult, StandardDecryptBatchResult, StandardDocumentOps,
+    StandardEncryptBatchResult, decrypt_document_core, encrypt_document_core, encrypt_map,
+    verify_sig,
 };
 use crate::tenant_security_client::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, RequestMetadata, TenantSecurityClient,
     UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{perform_batch_action, v4_proto_from_bytes, BatchResult, OurReseedingRng};
-use crate::{alloy_client_trait::AlloyClient, AlloyMetadata};
+use crate::util::{BatchResult, OurReseedingRng, perform_batch_action, v4_proto_from_bytes};
+use crate::{AlloyMetadata, alloy_client_trait::AlloyClient};
 use crate::{DocumentId, FieldId, PlaintextBytes, TenantId};
 use bytes::Bytes;
-use futures::future::{join_all, FutureExt};
+use futures::future::{FutureExt, join_all};
 use ironcore_documents::aes::EncryptionKey;
 use ironcore_documents::cmk_edek;
 use ironcore_documents::cmk_edek::EncryptedDek;
@@ -22,7 +23,7 @@ use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
 use ironcore_documents::v4::validate_v4_header;
 use ironcore_documents::v5::key_id_header::{
-    decode_version_prefixed_value, EdekType, KeyId, KeyIdHeader, PayloadType,
+    EdekType, KeyId, KeyIdHeader, PayloadType, decode_version_prefixed_value,
 };
 use itertools::Itertools;
 use protobuf::Message;
@@ -152,7 +153,7 @@ impl SaasShieldStandardClient {
     ) -> Result<EdekParts, AlloyError> {
         // This doesn't just call Self::decompose_key_id_header because we still want to error on incorrect EDEK/payload type
         let maybe_decomposed =
-            decode_version_prefixed_value(Bytes::copy_from_slice(&encrypted_bytes.0 .0));
+            decode_version_prefixed_value(Bytes::copy_from_slice(&encrypted_bytes.0.0));
         match maybe_decomposed {
             Ok((
                 KeyIdHeader {
@@ -172,8 +173,10 @@ impl SaasShieldStandardClient {
                         let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
                         Ok(EdekParts::V5(key_id, v4_document_header))
                     } else {
-                        Err(AlloyError::InvalidInput{ msg:
-                            format!("The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"),
+                        Err(AlloyError::InvalidInput {
+                            msg: format!(
+                                "The data indicated that this was not a {expected_edek_type} {expected_payload_type} wrapped value. Found: {edek_type}, {payload_type}"
+                            ),
                         })
                     }
                 }
@@ -188,7 +191,7 @@ impl SaasShieldStandardClient {
                     })
                     .unwrap_or(
                         // Parsing as V4 failed, so V3 is our fallback
-                        EdekParts::V3(encrypted_bytes.0 .0.into()),
+                        EdekParts::V3(encrypted_bytes.0.0.into()),
                     ))
             }
         }
@@ -611,8 +614,8 @@ pub fn generate_cmk_v4_doc_and_sign(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{standard::EdekWithKeyIdHeader, EncryptedBytes};
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use crate::{EncryptedBytes, standard::EdekWithKeyIdHeader};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
 
     #[test]

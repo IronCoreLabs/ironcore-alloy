@@ -1,7 +1,7 @@
 use self::rest::RekeyResponse;
+use crate::TenantId;
 use crate::errors::AlloyError;
 use crate::saas_shield::SecurityEvent;
-use crate::TenantId;
 use crate::{DerivationPath, SecretPath};
 use base64_type::Base64;
 use request::{TenantSecurityRequest, TspRequest};

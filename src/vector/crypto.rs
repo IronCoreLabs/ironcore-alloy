@@ -1,6 +1,6 @@
 use super::{EncryptionKey, ScalingFactor, VectorEncryptionKey};
 use crate::util::{self, take_lock};
-use crate::util::{compute_auth_hash, create_rng, AuthHash};
+use crate::util::{AuthHash, compute_auth_hash, create_rng};
 use itertools::Itertools;
 use ndarray::Array1;
 use ndarray_rand::RandomExt;
@@ -11,7 +11,7 @@ use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 use std::{error::Error, fmt::Display};
 
-const SHUFFLE_KEY:&str = "One Ring to rule them all, One Ring to find them, One Ring to bring them all, and in the darkness bind them";
+const SHUFFLE_KEY: &str = "One Ring to rule them all, One Ring to find them, One Ring to bring them all, and in the darkness bind them";
 
 #[derive(Debug)]
 pub(crate) struct EncryptResult {

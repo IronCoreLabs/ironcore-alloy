@@ -1,3 +1,4 @@
+use super::RequestMetadata;
 use super::errors::TenantSecurityProxyError;
 use super::rest::{
     BatchUnwrapKeyRequest, BatchUnwrapKeyResponse, BatchWrapKeyRequest, BatchWrapKeyResponse,
@@ -5,7 +6,6 @@ use super::rest::{
     SecretType, TenantDeriveKeyRequest, TspErrorResponse, UnwrapKeyRequest, UnwrapKeyResponse,
     WrapKeyResponse,
 };
-use super::RequestMetadata;
 use crate::errors::AlloyError;
 use crate::{DerivationPath, SecretPath};
 use async_trait::async_trait;

@@ -1,18 +1,18 @@
 use crate::{
+    AlloyMetadata, TenantId,
     errors::AlloyError,
     standard::StandardDocumentOps,
     standard_attached::{
-        decrypt_batch_core, decrypt_core, encrypt_batch_core, encrypt_core, rekey_core,
         EncryptedAttachedDocument, EncryptedAttachedDocuments, PlaintextAttachedDocument,
         PlaintextAttachedDocuments, RekeyAttachedDocumentsBatchResult,
         StandardAttachedDecryptBatchResult, StandardAttachedDocumentOps,
-        StandardAttachedEncryptBatchResult,
+        StandardAttachedEncryptBatchResult, decrypt_batch_core, decrypt_core, encrypt_batch_core,
+        encrypt_core, rekey_core,
     },
     tenant_security_client::TenantSecurityClient,
-    AlloyMetadata, TenantId,
 };
 
-use super::{standard::SaasShieldStandardClient, SaasShieldSecurityEventOps, SecurityEvent};
+use super::{SaasShieldSecurityEventOps, SecurityEvent, standard::SaasShieldStandardClient};
 use std::sync::Arc;
 
 #[derive(uniffi::Object)]

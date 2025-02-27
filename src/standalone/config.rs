@@ -1,4 +1,4 @@
-use crate::{errors::AlloyError, Secret, SecretPath};
+use crate::{Secret, SecretPath, errors::AlloyError};
 use ironcore_documents::v5::key_id_header::KeyId;
 use std::{collections::HashMap, sync::Arc};
 

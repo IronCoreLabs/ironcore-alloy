@@ -1,4 +1,4 @@
-use super::{errors::TenantSecurityProxyError, DerivationPath, RequestMetadata, SecretPath};
+use super::{DerivationPath, RequestMetadata, SecretPath, errors::TenantSecurityProxyError};
 use crate::errors::AlloyError;
 use base64_type::Base64;
 use ironcore_documents::v5::key_id_header::KeyId;

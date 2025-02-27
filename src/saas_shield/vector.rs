@@ -1,16 +1,16 @@
 use super::{
+    DeriveKeyChoice, RotationKeys, SaasShieldSecurityEventOps, SecurityEvent,
     derive_keys_many_paths, derived_key_to_vector_encryption_key, get_in_rotation_prefix_internal,
-    get_keys_for_rotation, DeriveKeyChoice, RotationKeys, SaasShieldSecurityEventOps,
-    SecurityEvent,
+    get_keys_for_rotation,
 };
 use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::{check_rotation_no_op, perform_batch_action, OurReseedingRng};
+use crate::util::{OurReseedingRng, check_rotation_no_op, perform_batch_action};
 use crate::vector::{
-    decrypt_internal, encrypt_internal, get_approximation_factor, EncryptedVector,
-    EncryptedVectors, GenerateVectorQueryResult, PlaintextVector, PlaintextVectors,
-    VectorDecryptBatchResult, VectorEncryptBatchResult, VectorOps, VectorRotateResult,
+    EncryptedVector, EncryptedVectors, GenerateVectorQueryResult, PlaintextVector,
+    PlaintextVectors, VectorDecryptBatchResult, VectorEncryptBatchResult, VectorOps,
+    VectorRotateResult, decrypt_internal, encrypt_internal, get_approximation_factor,
 };
 use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};

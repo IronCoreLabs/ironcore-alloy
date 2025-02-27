@@ -2,9 +2,10 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use crate::common::{get_client, TestResult};
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use crate::common::{TestResult, get_client};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use ironcore_alloy::{
+        AlloyMetadata, DocumentId, EncryptedBytes, FieldId, TenantId,
         errors::{AlloyError, KmsError, TenantSecurityProxyError},
         saas_shield::{DataEvent, SaasShieldSecurityEventOps, SecurityEvent},
         standard::{
@@ -12,7 +13,6 @@ mod tests {
             PlaintextDocumentWithEdek, PlaintextDocuments, PlaintextDocumentsWithEdeks,
             StandardDocumentOps,
         },
-        AlloyMetadata, DocumentId, EncryptedBytes, FieldId, TenantId,
     };
     use std::{
         collections::HashMap,
@@ -93,7 +93,7 @@ mod tests {
             .standard()
             .encrypt(plaintext, &metadata)
             .await?;
-        assert_eq!(encrypted.edek.0 .0.len(), 259);
+        assert_eq!(encrypted.edek.0.0.len(), 259);
         Ok(())
     }
 
@@ -265,7 +265,7 @@ mod tests {
             .standard()
             .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
             .await?;
-        assert_eq!(encrypted.edek.0 .0, edek_bytes);
+        assert_eq!(encrypted.edek.0.0, edek_bytes);
         let decrypted = get_client()
             .standard()
             .decrypt(encrypted, &metadata)
@@ -348,16 +348,18 @@ mod tests {
             .standard()
             .rekey_edeks(edeks, &metadata, None)
             .await?;
-        assert!(all_rekeyed
-            .successes
-            .contains_key(&DocumentId("edek".to_string())));
+        assert!(
+            all_rekeyed
+                .successes
+                .contains_key(&DocumentId("edek".to_string()))
+        );
         assert!(all_rekeyed.failures.is_empty());
         let rekeyed = all_rekeyed
             .successes
             .get(&DocumentId("edek".to_string()))
             .unwrap();
         // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0 .0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0.0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 
@@ -375,9 +377,11 @@ mod tests {
             .standard()
             .rekey_edeks(edeks, &metadata, None)
             .await?;
-        assert!(all_rekeyed
-            .successes
-            .contains_key(&DocumentId("edek".to_string())));
+        assert!(
+            all_rekeyed
+                .successes
+                .contains_key(&DocumentId("edek".to_string()))
+        );
         assert!(all_rekeyed.failures.is_empty());
         let rekeyed = all_rekeyed
             .successes
@@ -385,7 +389,7 @@ mod tests {
             .unwrap();
         // This is now a V5 document, which starts with the KeyIdHeader
         // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0 .0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0.0.starts_with(&[0, 0, 1, 255, 2, 0]));
         Ok(())
     }
 

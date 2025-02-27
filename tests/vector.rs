@@ -2,15 +2,15 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use crate::common::{get_client, TestResult};
+    use crate::common::{TestResult, get_client};
     use approx::assert_ulps_eq;
     use ironcore_alloy::{
+        AlloyMetadata, DerivationPath, SecretPath, TenantId,
         errors::AlloyError,
         vector::{
             EncryptedVector, EncryptedVectors, PlaintextVector, PlaintextVectors, VectorId,
             VectorOps,
         },
-        AlloyMetadata, DerivationPath, SecretPath, TenantId,
     };
     use std::{iter, sync::Arc};
 
@@ -162,9 +162,11 @@ mod tests {
             )
             .await
             .unwrap_err();
-        assert!(prefix_err
-            .to_string()
-            .contains("didn't have the requested key."));
+        assert!(
+            prefix_err
+                .to_string()
+                .contains("didn't have the requested key.")
+        );
         Ok(())
     }
 

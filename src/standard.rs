@@ -1,14 +1,14 @@
 use crate::{
+    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
     alloy_client_trait::AlloyClient, create_batch_result_struct,
-    create_batch_result_struct_using_newtype, errors::AlloyError, AlloyMetadata, DocumentId,
-    EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    create_batch_result_struct_using_newtype, errors::AlloyError,
 };
 use ironcore_documents::{
-    aes::{decrypt_document_with_attached_iv, EncryptionKey, IvAndCiphertext},
+    aes::{EncryptionKey, IvAndCiphertext, decrypt_document_with_attached_iv},
     icl_header_v4, v3,
     v5::{
         self,
-        key_id_header::{get_prefix_bytes_for_search, KeyId, KeyIdHeader},
+        key_id_header::{KeyId, KeyIdHeader, get_prefix_bytes_for_search},
     },
 };
 use protobuf::Message;
@@ -276,7 +276,7 @@ mod test {
             Default::default(),
         )
         .unwrap();
-        assert_eq!(result.edek.0 .0, vec![0, 0, 0, 1, 2, 0]);
+        assert_eq!(result.edek.0.0, vec![0, 0, 0, 1, 2, 0]);
         assert_eq!(
             result.document.get(&FieldId("foo".to_string())).unwrap().0,
             vec![

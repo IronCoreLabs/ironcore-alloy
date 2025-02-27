@@ -3,13 +3,13 @@ use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
 use crate::util::perform_batch_action;
 use crate::vector::{
-    decrypt_internal, encrypt_internal, EncryptedVector, EncryptedVectors,
-    GenerateVectorQueryResult, PlaintextVector, PlaintextVectors, VectorDecryptBatchResult,
-    VectorEncryptBatchResult, VectorEncryptionKey, VectorOps, VectorRotateResult,
+    EncryptedVector, EncryptedVectors, GenerateVectorQueryResult, PlaintextVector,
+    PlaintextVectors, VectorDecryptBatchResult, VectorEncryptBatchResult, VectorEncryptionKey,
+    VectorOps, VectorRotateResult, decrypt_internal, encrypt_internal,
 };
 use crate::{
-    alloy_client_trait::AlloyClient, AlloyMetadata, DerivationPath, SecretPath,
-    StandaloneConfiguration, TenantId,
+    AlloyMetadata, DerivationPath, SecretPath, StandaloneConfiguration, TenantId,
+    alloy_client_trait::AlloyClient,
 };
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
@@ -221,15 +221,14 @@ impl VectorOps for StandaloneVectorClient {
             .0
             .into_iter()
             .map(|(vector_id, plaintext_vector)| {
-                let vector_secret =
-                    self.config
-                        .get(&plaintext_vector.secret_path)
-                        .ok_or_else(|| AlloyError::InvalidConfiguration {
-                            msg: format!(
+                let vector_secret = self.config.get(&plaintext_vector.secret_path).ok_or_else(
+                    || AlloyError::InvalidConfiguration {
+                        msg: format!(
                             "Provided secret path `{}` does not exist in the vector configuration.",
                             &plaintext_vector.secret_path.0
                         ),
-                        })?;
+                    },
+                )?;
                 let RotatableSecret {
                     current_secret,
                     in_rotation_secret,
@@ -336,9 +335,9 @@ impl VectorOps for StandaloneVectorClient {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::vector::VectorId;
     use crate::TenantId;
-    use crate::{standalone::config::StandaloneSecret, Secret};
+    use crate::vector::VectorId;
+    use crate::{Secret, standalone::config::StandaloneSecret};
     use approx::assert_ulps_eq;
 
     fn get_default_client() -> StandaloneVectorClient {
