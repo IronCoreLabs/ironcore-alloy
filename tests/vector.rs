@@ -92,7 +92,7 @@ mod tests {
             .vector()
             .encrypt_batch(vectors, &metadata)
             .await?;
-        assert_eq!(encrypted.successes.len(), 2);
+        assert_eq!(encrypted.successes.0.len(), 2);
         assert_eq!(encrypted.failures.len(), 0);
         let bad_encrypted = EncryptedVector {
             encrypted_vector: vec![1.0, 1.0, 1.0],
@@ -102,14 +102,14 @@ mod tests {
         };
         let encrypted_vectors = EncryptedVectors(
             iter::once((VectorId("bad_vector".to_string()), bad_encrypted))
-                .chain(encrypted.successes)
+                .chain(encrypted.successes.0)
                 .collect(),
         );
         let decrypted = get_client()
             .vector()
             .decrypt_batch(encrypted_vectors, &metadata)
             .await?;
-        assert_eq!(decrypted.successes.len(), 2);
+        assert_eq!(decrypted.successes.0.len(), 2);
         assert_eq!(decrypted.failures.len(), 1);
         assert!(matches!(
             decrypted
@@ -120,6 +120,7 @@ mod tests {
         ));
         let result = decrypted
             .successes
+            .0
             .get(&VectorId("vector".to_string()))
             .unwrap()
             .plaintext_vector
