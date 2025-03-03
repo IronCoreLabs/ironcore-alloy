@@ -17,7 +17,7 @@ rust-version = "1.85.0"
 [dependencies]
 aes-gcm = "0.10"
 aes-siv = "0.7"
-async-trait = "0.1.83"
+async-trait = "0.1.86"
 base64 = "0.22"
 base64_type = "0.2"
 bytes = { version = "1.9.0", features = ["serde"] }
