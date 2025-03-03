@@ -134,7 +134,7 @@ mod tests {
             .standard()
             .encrypt_batch(documents, &metadata)
             .await?;
-        assert_eq!(encrypted.successes.len(), 1);
+        assert_eq!(encrypted.successes.0.len(), 1);
         assert_eq!(encrypted.failures.len(), 0);
         let second_document = get_v3_ciphertext();
         let bad_document = EncryptedDocument {
@@ -144,6 +144,7 @@ mod tests {
         let new_encrypted = EncryptedDocuments(
             encrypted
                 .successes
+                .0
                 .into_iter()
                 .chain([
                     (DocumentId("v3_doc".to_string()), second_document),
@@ -155,11 +156,12 @@ mod tests {
             .standard()
             .decrypt_batch(new_encrypted, &metadata)
             .await?;
-        assert_eq!(decrypted.successes.len(), 2);
+        assert_eq!(decrypted.successes.0.len(), 2);
         assert_eq!(decrypted.failures.len(), 1);
         assert_eq!(
             decrypted
                 .successes
+                .0
                 .get(&DocumentId("doc".to_string()))
                 .unwrap(),
             &get_plaintext()
@@ -167,6 +169,7 @@ mod tests {
         let decrypted_v3 = from_utf8(
             &decrypted
                 .successes
+                .0
                 .get(&DocumentId("v3_doc".to_string()))
                 .unwrap()
                 .0
@@ -234,13 +237,14 @@ mod tests {
             .standard()
             .encrypt_with_existing_edek_batch(plaintexts, &metadata)
             .await?;
-        assert_eq!(batch_encrypted.successes.len(), 1);
+        assert_eq!(batch_encrypted.successes.0.len(), 1);
         assert_eq!(batch_encrypted.failures.len(), 0);
         let decrypted = get_client()
             .standard()
             .decrypt(
                 batch_encrypted
                     .successes
+                    .0
                     .remove(&DocumentId("doc".to_string()))
                     .unwrap(),
                 &metadata,

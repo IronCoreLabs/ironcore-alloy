@@ -103,29 +103,33 @@ mod tests {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
         let documents: PlaintextAttachedDocuments =
-            [(DocumentId("doc".to_string()), plaintext)].into();
+            PlaintextAttachedDocuments([(DocumentId("doc".to_string()), plaintext)].into());
         let encrypted = get_client()
             .standard_attached()
             .encrypt_batch(documents, &metadata)
             .await?;
-        assert_eq!(encrypted.successes.len(), 1);
+        assert_eq!(encrypted.successes.0.len(), 1);
         assert_eq!(encrypted.failures.len(), 0);
         let bad_document =
             EncryptedAttachedDocument(EncryptedBytes(vec![0, 0, 1, 255, 2, 0, 0, 2, 10, 36]));
-        let new_encrypted: EncryptedAttachedDocuments = encrypted
-            .successes
-            .into_iter()
-            .chain([(DocumentId("bad_doc".to_string()), bad_document)])
-            .collect();
+        let new_encrypted: EncryptedAttachedDocuments = EncryptedAttachedDocuments(
+            encrypted
+                .successes
+                .0
+                .into_iter()
+                .chain([(DocumentId("bad_doc".to_string()), bad_document)])
+                .collect(),
+        );
         let decrypted = get_client()
             .standard_attached()
             .decrypt_batch(new_encrypted, &metadata)
             .await?;
-        assert_eq!(decrypted.successes.len(), 1);
+        assert_eq!(decrypted.successes.0.len(), 1);
         assert_eq!(decrypted.failures.len(), 1);
         assert_eq!(
             decrypted
                 .successes
+                .0
                 .get(&DocumentId("doc".to_string()))
                 .unwrap(),
             &get_plaintext()
@@ -212,7 +216,7 @@ mod tests {
     async fn standard_attached_rekey_v5_edek_works() -> TestResult {
         let metadata = get_metadata();
         let doc = get_ciphertext();
-        let docs = [(DocumentId("doc".to_string()), doc)].into();
+        let docs = EncryptedAttachedDocuments([(DocumentId("doc".to_string()), doc)].into());
         let mut all_rekeyed = get_client()
             .standard_attached()
             .rekey_documents(docs, &metadata, None)
@@ -243,7 +247,7 @@ mod tests {
     async fn standard_attached_rekey_new_tenant_edek_works() -> TestResult {
         let metadata = get_metadata();
         let doc = get_ciphertext();
-        let docs = [(DocumentId("doc".to_string()), doc)].into();
+        let docs = EncryptedAttachedDocuments([(DocumentId("doc".to_string()), doc)].into());
         let new_tenant = TenantId("tenant-aws".to_string());
         let mut all_rekeyed = get_client()
             .standard_attached()

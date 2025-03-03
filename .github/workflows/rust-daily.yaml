@@ -3,8 +3,12 @@ on:
   schedule:
     - cron: 0 14 * * 1-5
   workflow_dispatch:
+  # rust-daily does a more thorough check of all features and all targets.
+  # Without this, we would miss checking the tests with the `integration_tests` feature
+  # flag, which we don't run because it requires a running TSP.
+  pull_request: null
 
 jobs:
   rust-daily:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-daily.yaml@rust-daily-v0
+    uses: IronCoreLabs/workflows/.github/workflows/rust-daily.yaml@rust-daily-v1
     secrets: inherit
