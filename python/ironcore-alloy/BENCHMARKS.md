@@ -18,7 +18,7 @@ vector encrypt d=1536: Mean +- std dev: 4.00 ms +- 0.05 ms
 vector encrypt d=2048: Mean +- std dev: 5.26 ms +- 0.06 ms
 vector batch (100) encrypt d=768: Mean +- std dev: 192 ms +- 2 ms
 vector batch (1000) encrypt d=768: Mean +- std dev: 1.91 sec +- 0.01 sec
-standard_roundtrip_small: Mean +- std dev: 178 us +- 12 us
-standard_roundtrip_medium: Mean +- std dev: 3.75 ms +- 0.05 ms
-standard_roundtrip_large: Mean +- std dev: 35.2 ms +- 0.4 ms
+standard_roundtrip_10b: Mean +- std dev: 178 us +- 12 us
+standard_roundtrip_10kb: Mean +- std dev: 3.75 ms +- 0.05 ms
+standard_roundtrip_100kb: Mean +- std dev: 35.2 ms +- 0.4 ms
 ```
