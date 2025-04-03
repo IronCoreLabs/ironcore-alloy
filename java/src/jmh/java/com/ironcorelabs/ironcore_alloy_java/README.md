@@ -83,20 +83,20 @@ The benchmark is using a single tenant, and (depending on your machine and bench
 
 There are also benchmarks available in [Rust](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/benches), [Kotlin](https://github.com/IronCoreLabs/ironcore-alloy/tree/main/kotlin/benchmarks) and [Python](https://github.com/IronCoreLabs/ironcore-alloy/blob/main/python/ironcore-alloy/bench.py).
 
-The following were benchmarks run on 8/15/2024 on a Macbook M1 Max.
+The following were benchmarks run on March 24th, 2025 on a Macbook M2 Max.
 
 ```text
 Benchmark                                             Mode  Cnt       Score       Error  Units
-SaasShieldBenchmark.batchEncrypt10DocsOf100B          avgt    5    3880.803 ±   373.629  us/op
-SaasShieldBenchmark.tspDecrypt100B                    avgt    5     899.365 ±   151.952  us/op
-SaasShieldBenchmark.tspDecrypt10KB                    avgt    5    6204.417 ±   804.504  us/op
-SaasShieldBenchmark.tspDecrypt1B                      avgt    5     753.186 ±    53.981  us/op
-SaasShieldBenchmark.tspDecrypt1MB                     avgt    5  344116.886 ± 11127.442  us/op
-SaasShieldBenchmark.tspEncrypt100B                    avgt    5     919.766 ±   249.134  us/op
-SaasShieldBenchmark.tspEncrypt10KB                    avgt    5    6705.966 ±   646.834  us/op
-SaasShieldBenchmark.tspEncrypt1B                      avgt    5    1211.361 ±   900.329  us/op
-SaasShieldBenchmark.tspEncrypt1MB                     avgt    5  340480.214 ±  6824.536  us/op
-StandaloneBenchmark.standaloneRoundtripStandard100Kb  avgt    5     525.981 ±   169.361  us/op
-StandaloneBenchmark.standaloneRoundtripStandard10B    avgt    5     427.260 ±   164.509  us/op
-StandaloneBenchmark.standaloneRoundtripStandard10Kb   avgt    5     445.747 ±   161.576  us/op
+SaasShieldBenchmark.batchEncrypt10DocsOf100B          avgt    5   1004.374 ± 176.667  us/op
+SaasShieldBenchmark.tspDecrypt100B                    avgt    5    309.908 ±  58.527  us/op
+SaasShieldBenchmark.tspDecrypt10KB                    avgt    5    492.581 ± 183.462  us/op
+SaasShieldBenchmark.tspDecrypt1B                      avgt    5    299.011 ±  15.632  us/op
+SaasShieldBenchmark.tspDecrypt1MB                     avgt    5  11287.560 ± 235.532  us/op
+SaasShieldBenchmark.tspEncrypt100B                    avgt    5    303.053 ±  37.513  us/op
+SaasShieldBenchmark.tspEncrypt10KB                    avgt    5    458.719 ±  85.330  us/op
+SaasShieldBenchmark.tspEncrypt1B                      avgt    5    299.640 ±  39.078  us/op
+SaasShieldBenchmark.tspEncrypt1MB                     avgt    5  11580.426 ± 575.643  us/op
+StandaloneBenchmark.standaloneRoundtripStandard100Kb  avgt    5   2177.326 ±  83.221  us/op
+StandaloneBenchmark.standaloneRoundtripStandard10B    avgt    5    133.866 ±  50.676  us/op
+StandaloneBenchmark.standaloneRoundtripStandard10Kb   avgt    5    337.769 ±  49.548  us/op
 ```

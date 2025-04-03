@@ -54,9 +54,9 @@ public class StandaloneBenchmark {
 
         standaloneConfig = new StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets);
         standaloneSdk = new Standalone(standaloneConfig);
-        smallWord = new PlaintextBytes(randomWord(1).getBytes());
-        mediumWord = new PlaintextBytes(randomWord(10).getBytes());
-        largeWord = new PlaintextBytes(randomWord(100).getBytes());
+        smallWord = new PlaintextBytes(randomWord(10).getBytes());
+        mediumWord = new PlaintextBytes(randomWord(10 * 1000).getBytes());
+        largeWord = new PlaintextBytes(randomWord(100 * 1000).getBytes());
     }
 
     private String randomWord(int length) {

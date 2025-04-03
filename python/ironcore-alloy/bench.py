@@ -144,7 +144,7 @@ runner.bench_async_func(
 ### standalone standard
 random_small_word = random_word(10).encode("utf-8")
 runner.bench_async_func(
-    "standard_roundtrip_small",
+    "standard_roundtrip_10b",
     standard_roundtrip,
     sdk,
     random_small_word,
@@ -152,9 +152,9 @@ runner.bench_async_func(
 )
 random_medium_word = random_word(10 * 1000).encode("utf-8")
 runner.bench_async_func(
-    "standard_roundtrip_medium", standard_roundtrip, sdk, random_medium_word, metadata
+    "standard_roundtrip_10kb", standard_roundtrip, sdk, random_medium_word, metadata
 )
-random_large_word = random_word(10 * 10000).encode("utf-8")
+random_large_word = random_word(100 * 1000).encode("utf-8")
 runner.bench_async_func(
-    "standard_roundtrip_large", standard_roundtrip, sdk, random_large_word, metadata
+    "standard_roundtrip_100kb", standard_roundtrip, sdk, random_large_word, metadata
 )
