@@ -16,7 +16,9 @@ pub mod standard;
 pub mod standard_attached;
 pub mod vector;
 
-pub trait SaasShieldSecurityEventOps {
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait SaasShieldSecurityEventOps: Send + Sync {
     /// Log the security event `event` to the tenant's log sink.
     /// If the event time is unspecified the current time will be used.
     async fn log_security_event(

@@ -491,6 +491,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl SaasShieldSecurityEventOps for SaasShieldStandardClient {
     /// Log the security event `event` to the tenant's log sink.
     /// If the event time is unspecified the current time will be used.
