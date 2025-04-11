@@ -26,6 +26,7 @@ impl StandaloneStandardAttachedClient {
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
     /// Encrypt a document with the provided metadata.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key.

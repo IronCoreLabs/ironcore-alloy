@@ -54,7 +54,9 @@ create_batch_result_struct!(
 );
 
 /// API for encrypting and decrypting documents using our standard encryption.
-pub trait StandardAttachedDocumentOps {
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait StandardAttachedDocumentOps: Send + Sync {
     /// Encrypt a document with the provided metadata.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key.
     /// The result is a single blob of bytes with the edek put on the front of it.
