@@ -34,7 +34,7 @@ mod test {
             main_src_path,
             uniffi::KotlinBindingGenerator,
         )?;
-        // run the hatch test command and print the output as though it were our output
+        // run the test command and print the output as though it were our output
         let o = std::process::Command::new("./gradlew")
             .args(["test"])
             .current_dir(kotlin_dir)
