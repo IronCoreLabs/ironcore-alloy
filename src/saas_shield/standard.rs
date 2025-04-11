@@ -238,7 +238,7 @@ impl AlloyClient for SaasShieldStandardClient {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl StandardDocumentOps for SaasShieldStandardClient {
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
@@ -490,7 +490,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl SaasShieldSecurityEventOps for SaasShieldStandardClient {
     /// Log the security event `event` to the tenant's log sink.
     /// If the event time is unspecified the current time will be used.

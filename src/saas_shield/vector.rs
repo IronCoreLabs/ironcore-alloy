@@ -60,7 +60,7 @@ impl SaasShieldVectorClient {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl SaasShieldSecurityEventOps for SaasShieldVectorClient {
     /// Log the security event `event` to the tenant's log sink.
     /// If the event time is unspecified the current time will be used.
@@ -86,7 +86,7 @@ impl AlloyClient for SaasShieldVectorClient {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl VectorOps for SaasShieldVectorClient {
     /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
     /// and its values will be shuffled as part of the encryption.
