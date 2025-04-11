@@ -41,6 +41,7 @@ This project defaults to compiling with the `metadata` feature on for now, but `
 After either of the non-`--lib` `cargo` commands have been run, the Kotlin and Python project directories will be in a state that you can play around with them as though they were native libraries of that language.
 
 - `cd kotlin; ./gradlew test` will manually run only the Kotlin tests.
+- `cd java; ./gradlew test` will manually run only the Java tests.
 - `cd python/ironcore-alloy; hatch run test:test` will manually run only the Python tests.
 - See `python/ironcore-alloy/README.md` for more information about manually releasing that package and other available `hatch` commands.
 
