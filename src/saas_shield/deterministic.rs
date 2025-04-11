@@ -44,6 +44,7 @@ impl AlloyClient for SaasShieldDeterministicClient {
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl DeterministicFieldOps for SaasShieldDeterministicClient {
     /// Encrypt a field with the provided metadata.
     /// Because the field is encrypted deterministically with each call, the result will be the same for repeated calls.

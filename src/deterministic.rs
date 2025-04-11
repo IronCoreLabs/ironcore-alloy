@@ -65,7 +65,9 @@ impl DeterministicEncryptionKey {
     }
 }
 
-pub trait DeterministicFieldOps {
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait DeterministicFieldOps: Send + Sync {
     /// Encrypt a field with the provided metadata.
     /// Because the field is encrypted deterministically with each call, the result will be the same for repeated calls.
     /// This allows for exact matches and indexing of the encrypted field, but comes with some security considerations.
