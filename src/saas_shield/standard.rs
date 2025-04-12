@@ -24,6 +24,7 @@ use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
 use ironcore_documents::v4::validate_v4_header;
 use ironcore_documents::v5::key_id_header::{
     EdekType, KeyId, KeyIdHeader, PayloadType, decode_version_prefixed_value,
+    get_prefix_bytes_for_search,
 };
 use itertools::Itertools;
 use protobuf::Message;
@@ -490,6 +491,20 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             failures: combined_failures,
         }
         .into())
+    }
+
+    /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
+    /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
+    /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
+    /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
+    /// avoid pitfalls when encoding across byte boundaries.
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
+            self.get_edek_type(),
+            self.get_payload_type(),
+            KeyId(id as u32),
+        ))
+        .into()
     }
 }
 

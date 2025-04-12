@@ -6,10 +6,7 @@ use crate::{
 use ironcore_documents::{
     aes::{EncryptionKey, IvAndCiphertext, decrypt_document_with_attached_iv},
     icl_header_v4, v3,
-    v5::{
-        self,
-        key_id_header::{KeyId, KeyIdHeader, get_prefix_bytes_for_search},
-    },
+    v5::{self, key_id_header::KeyIdHeader},
 };
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -154,14 +151,7 @@ pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
-            self.get_edek_type(),
-            self.get_payload_type(),
-            KeyId(id as u32),
-        ))
-        .into()
-    }
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields

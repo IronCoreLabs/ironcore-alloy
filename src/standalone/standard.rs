@@ -15,7 +15,9 @@ use crate::{
     alloy_client_trait::{AlloyClient, DecomposedHeader},
 };
 use ironcore_documents::aes::EncryptionKey;
-use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{
+    EdekType, KeyId, PayloadType, get_prefix_bytes_for_search,
+};
 use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
 use ring::digest::SHA256_OUTPUT_LEN;
@@ -284,6 +286,20 @@ impl StandardDocumentOps for StandaloneStandardClient {
         let encrypt =
             |plaintext_document| self.encrypt_with_existing_edek_sync(plaintext_document, metadata);
         Ok(perform_batch_action(plaintext_documents.0, encrypt).into())
+    }
+
+    /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
+    /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
+    /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
+    /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
+    /// avoid pitfalls when encoding across byte boundaries.
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
+            self.get_edek_type(),
+            self.get_payload_type(),
+            KeyId(id as u32),
+        ))
+        .into()
     }
 }
 
