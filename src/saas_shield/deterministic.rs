@@ -3,6 +3,7 @@ use super::{
     derive_keys_many_paths, get_in_rotation_prefix_internal, get_keys_for_rotation,
 };
 
+use crate::alloy_client_trait::DecomposedHeader;
 use crate::deterministic::{
     DeterministicDecryptBatchResult, DeterministicEncryptBatchResult, DeterministicEncryptionKey,
     DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
@@ -34,11 +35,11 @@ impl SaasShieldDeterministicClient {
 }
 
 impl AlloyClient for SaasShieldDeterministicClient {
-    fn get_edek_type() -> EdekType {
+    fn get_edek_type(&self) -> EdekType {
         EdekType::SaasShield
     }
 
-    fn get_payload_type() -> PayloadType {
+    fn get_payload_type(&self) -> PayloadType {
         PayloadType::DeterministicField
     }
 }
@@ -74,7 +75,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             &plaintext_field.derivation_path,
             DeriveKeyChoice::Current,
         )?;
-        let key_id_header = Self::create_key_id_header(derived_key.tenant_secret_id.0);
+        let key_id_header = self.create_key_id_header(derived_key.tenant_secret_id.0);
         encrypt_internal(
             DeterministicEncryptionKey(derived_key.derived_key.0.clone()),
             key_id_header,
@@ -109,7 +110,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 &plaintext_field.derivation_path,
                 DeriveKeyChoice::Current,
             )?;
-            let key_id_header = Self::create_key_id_header(new_current_key.tenant_secret_id.0);
+            let key_id_header = self.create_key_id_header(new_current_key.tenant_secret_id.0);
             encrypt_internal(
                 DeterministicEncryptionKey(new_current_key.derived_key.0.clone()),
                 key_id_header,
@@ -125,7 +126,10 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         encrypted_field: EncryptedField,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextField, AlloyError> {
-        let (key_id, ciphertext) = Self::decompose_key_id_header(encrypted_field.encrypted_field)?;
+        let DecomposedHeader {
+            key_id,
+            remaining_bytes,
+        } = self.decompose_key_id_header(encrypted_field.encrypted_field)?;
         let paths = [(
             encrypted_field.secret_path.clone(),
             [encrypted_field.derivation_path.clone()].into(),
@@ -153,7 +157,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         } else {
             decrypt_internal(
                 DeterministicEncryptionKey(derived_key.derived_key.0.clone()),
-                ciphertext,
+                remaining_bytes.into(),
                 encrypted_field.secret_path,
                 encrypted_field.derivation_path,
             )
@@ -181,8 +185,10 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         )
         .await?;
         let decrypt_field = |encrypted_field: EncryptedField| {
-            let (original_key_id, ciphertext) =
-                Self::decompose_key_id_header(encrypted_field.encrypted_field)?;
+            let DecomposedHeader {
+                key_id: original_key_id,
+                remaining_bytes,
+            } = self.decompose_key_id_header(encrypted_field.encrypted_field)?;
             let original_key = all_keys.get_key_for_path(
                 &encrypted_field.secret_path,
                 &encrypted_field.derivation_path,
@@ -190,7 +196,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             )?;
             decrypt_internal(
                 DeterministicEncryptionKey(original_key.derived_key.0.clone()),
-                ciphertext,
+                remaining_bytes.into(),
                 encrypted_field.secret_path.clone(),
                 encrypted_field.derivation_path.clone(),
             )
@@ -231,7 +237,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 keys.iter()
                     .map(|derived_key| {
                         let key_id_header =
-                            Self::create_key_id_header(derived_key.tenant_secret_id.0);
+                            self.create_key_id_header(derived_key.tenant_secret_id.0);
                         encrypt_internal(
                             DeterministicEncryptionKey(derived_key.derived_key.0.clone()),
                             key_id_header,
@@ -272,8 +278,10 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
         )
         .await?;
         let reencrypt_field = |encrypted_field: EncryptedField| {
-            let (original_key_id, ciphertext) =
-                Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
+            let DecomposedHeader {
+                key_id: original_key_id,
+                remaining_bytes,
+            } = self.decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
             let maybe_current_key_id = new_tenant_keys
                 .get_current(
                     &encrypted_field.secret_path,
@@ -295,7 +303,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                 )?;
                 let decrypted_field = decrypt_internal(
                     DeterministicEncryptionKey(original_key.derived_key.0.clone()),
-                    ciphertext,
+                    remaining_bytes.into(),
                     encrypted_field.secret_path.clone(),
                     encrypted_field.derivation_path.clone(),
                 )?;
@@ -304,7 +312,7 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
                     &encrypted_field.derivation_path,
                     DeriveKeyChoice::Current,
                 )?;
-                let key_id_header = Self::create_key_id_header(new_current_key.tenant_secret_id.0);
+                let key_id_header = self.create_key_id_header(new_current_key.tenant_secret_id.0);
                 encrypt_internal(
                     DeterministicEncryptionKey(new_current_key.derived_key.0.clone()),
                     key_id_header,
@@ -340,8 +348,8 @@ impl DeterministicFieldOps for SaasShieldDeterministicClient {
             &derived_keys,
             secret_path,
             derivation_path,
-            Self::get_edek_type(),
-            Self::get_payload_type(),
+            self.get_edek_type(),
+            self.get_payload_type(),
         )
     }
 }
@@ -403,8 +411,8 @@ mod test {
             derivation_path: derivation_path.clone(),
         };
         let key_id_header = KeyIdHeader::new(
-            SaasShieldDeterministicClient::get_edek_type(),
-            SaasShieldDeterministicClient::get_payload_type(),
+            EdekType::SaasShield,
+            PayloadType::DeterministicField,
             KeyId(derived_key.tenant_secret_id.0),
         );
         let result = encrypt_internal(

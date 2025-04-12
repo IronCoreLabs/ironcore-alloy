@@ -96,6 +96,7 @@ impl SaasShieldStandardClient {
     }
 
     fn encrypt_document<R: RngCore + CryptoRng + Send>(
+        &self,
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,
         dek: EncryptionKey,
@@ -117,7 +118,7 @@ impl SaasShieldStandardClient {
             document,
             rng,
             dek,
-            Self::create_key_id_header(kms_config_id),
+            self.create_key_id_header(kms_config_id),
             v4_doc,
         )
     }
@@ -128,7 +129,7 @@ impl SaasShieldStandardClient {
         parsed_new_tenant_id: &TenantId,
         request_metadata: &RequestMetadata,
     ) -> Result<EdekWithKeyIdHeader, AlloyError> {
-        let edek_parts = Self::decompose_edek_header(edek)?;
+        let edek_parts = self.decompose_edek_header(edek)?;
         let edek = edek_parts.get_edek_bytes()?;
         let tsp_resp = self
             .tenant_security_client
@@ -136,7 +137,7 @@ impl SaasShieldStandardClient {
             .await?;
         let dek = tsc_dek_to_encryption_key(tsp_resp.dek.0)?;
         edek_parts.validate_signature(dek)?;
-        Self::encrypt_document(
+        self.encrypt_document(
             self.rng.clone(), // this isn't actually used because of the empty document
             tsp_resp.edek.0,
             dek,
@@ -146,12 +147,13 @@ impl SaasShieldStandardClient {
         .map(|doc| doc.edek)
     }
 
-    /// Break the EDEK into its V3, V4 or V5 parts. This should be used instead of Self::decompose_key_id_header
+    /// Break the EDEK into its V3, V4 or V5 parts. This should be used instead of self.decompose_key_id_header
     /// in order to support V3 and V4 headers.
     fn decompose_edek_header(
+        &self,
         encrypted_bytes: EdekWithKeyIdHeader,
     ) -> Result<EdekParts, AlloyError> {
-        // This doesn't just call Self::decompose_key_id_header because we still want to error on incorrect EDEK/payload type
+        // This doesn't just call self.decompose_key_id_header because we still want to error on incorrect EDEK/payload type
         let maybe_decomposed =
             decode_version_prefixed_value(Bytes::copy_from_slice(&encrypted_bytes.0.0));
         match maybe_decomposed {
@@ -167,8 +169,8 @@ impl SaasShieldStandardClient {
                 if key_id.0 == 0 {
                     Ok(v4_proto_from_bytes(&remaining_bytes).map(EdekParts::V4)?)
                 } else {
-                    let expected_edek_type = Self::get_edek_type();
-                    let expected_payload_type = Self::get_payload_type();
+                    let expected_edek_type = self.get_edek_type();
+                    let expected_payload_type = self.get_payload_type();
                     if edek_type == expected_edek_type && payload_type == expected_payload_type {
                         let v4_document_header = v4_proto_from_bytes(remaining_bytes)?;
                         Ok(EdekParts::V5(key_id, v4_document_header))
@@ -209,7 +211,7 @@ impl SaasShieldStandardClient {
     {
         let request_metadata = metadata.clone().try_into()?;
         let decompose_edek = |edek_with_header: EdekWithKeyIdHeader| {
-            let edek_parts = Self::decompose_edek_header(edek_with_header)?;
+            let edek_parts = self.decompose_edek_header(edek_with_header)?;
             edek_parts.get_edek_bytes()
         };
         let BatchResult {
@@ -229,16 +231,17 @@ impl SaasShieldStandardClient {
 }
 
 impl AlloyClient for SaasShieldStandardClient {
-    fn get_edek_type() -> EdekType {
+    fn get_edek_type(&self) -> EdekType {
         EdekType::SaasShield
     }
 
-    fn get_payload_type() -> PayloadType {
+    fn get_payload_type(&self) -> PayloadType {
         PayloadType::StandardEdek
     }
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl StandardDocumentOps for SaasShieldStandardClient {
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
@@ -263,7 +266,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             .wrap_key(&request_metadata)
             .await?;
         let enc_key = tsc_dek_to_encryption_key(dek.0)?;
-        Self::encrypt_document(
+        self.encrypt_document(
             self.rng.clone(),
             tsc_edek.0,
             enc_key,
@@ -302,7 +305,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                         msg: "TSP failed to wrap key for document.".to_string(),
                     })?;
                 let enc_key = tsc_dek_to_encryption_key(dek.0)?;
-                Self::encrypt_document(
+                self.encrypt_document(
                     self.rng.clone(),
                     edek.0,
                     enc_key,
@@ -332,7 +335,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
-        let edek_parts = Self::decompose_edek_header(encrypted_document.edek)?;
+        let edek_parts = self.decompose_edek_header(encrypted_document.edek)?;
         let edek = edek_parts.get_edek_bytes()?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
@@ -371,7 +374,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                     maybe_keys.ok_or_else(|| AlloyError::DecryptError {
                         msg: "TSP failed to wrap key for document.".to_string(),
                     })?;
-                let edek_parts = Self::decompose_edek_header(encrypted_document.edek)?;
+                let edek_parts = self.decompose_edek_header(encrypted_document.edek)?;
                 let enc_key = tsc_dek_to_encryption_key(dek.0)?;
                 edek_parts.validate_signature(enc_key)?;
                 decrypt_document_core(encrypted_document.document, enc_key).map(PlaintextDocument)
@@ -420,7 +423,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
         let request_metadata = metadata.clone().try_into()?;
-        let edek_parts = Self::decompose_edek_header(plaintext_document.edek.clone())?;
+        let edek_parts = self.decompose_edek_header(plaintext_document.edek.clone())?;
         let edek = edek_parts.get_edek_bytes()?;
         let UnwrapKeyResponse { dek } = self
             .tenant_security_client
@@ -463,10 +466,10 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             let UnwrapKeyResponse { dek } = maybe_keys.ok_or_else(|| AlloyError::DecryptError {
                 msg: "TSP failed to wrap key for document.".to_string(),
             })?;
-            let edek_parts = Self::decompose_edek_header(plaintext_document.edek)?;
+            let edek_parts = self.decompose_edek_header(plaintext_document.edek)?;
             let enc_key = tsc_dek_to_encryption_key(dek.0)?;
             edek_parts.validate_signature(enc_key)?;
-            Self::encrypt_document(
+            self.encrypt_document(
                 self.rng.clone(),
                 edek_parts.get_edek_bytes()?,
                 enc_key,
@@ -625,8 +628,12 @@ mod test {
             edek: EdekWithKeyIdHeader(EncryptedBytes(vec![0u8])),
             document: Default::default(),
         };
+        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
         assert!(matches!(
-            SaasShieldStandardClient::decompose_edek_header(encrypted_document.edek).unwrap(),
+            dont_care_client
+                .decompose_edek_header(encrypted_document.edek)
+                .unwrap(),
             EdekParts::V3(_)
         ));
     }
@@ -640,8 +647,13 @@ mod test {
             document: Default::default(),
         };
 
+        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+
         assert!(matches!(
-            SaasShieldStandardClient::decompose_edek_header(encrypted_doc.edek).unwrap_err(),
+            dont_care_client
+                .decompose_edek_header(encrypted_doc.edek)
+                .unwrap_err(),
             AlloyError::InvalidInput { msg: _ }
         ));
     }
@@ -669,7 +681,14 @@ mod test {
             document: Default::default(),
         };
 
-        assert!(SaasShieldStandardClient::decompose_edek_header(encrypted_doc.edek).is_ok());
+        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+
+        assert!(
+            dont_care_client
+                .decompose_edek_header(encrypted_doc.edek)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -690,7 +709,11 @@ mod test {
             50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97, 110,
             116, 45, 103, 99, 112, 45, 108,
         ]));
-        let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
+        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let edek_parts = dont_care_client
+            .decompose_edek_header(edek_and_header)
+            .unwrap();
         assert!(matches!(edek_parts, EdekParts::V4(_)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();
         let encrypted_deks: cmk_edek::EncryptedDeks =
@@ -719,7 +742,11 @@ mod test {
             194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97,
             110, 116, 45, 103, 99, 112, 45, 108,
         ]));
-        let edek_parts = SaasShieldStandardClient::decompose_edek_header(edek_and_header).unwrap();
+        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let edek_parts = dont_care_client
+            .decompose_edek_header(edek_and_header)
+            .unwrap();
         assert!(matches!(edek_parts, EdekParts::V5(_, _)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();
         let encrypted_deks: cmk_edek::EncryptedDeks =
@@ -735,7 +762,11 @@ mod test {
         let edek = STANDARD.decode("CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D").unwrap();
         // This type isn't true, but it's what a caller would be creating if they had old EDEKs
         let liar_type_edek = EdekWithKeyIdHeader(EncryptedBytes(edek));
-        let edek_parts = SaasShieldStandardClient::decompose_edek_header(liar_type_edek).unwrap();
+        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let edek_parts = dont_care_client
+            .decompose_edek_header(liar_type_edek)
+            .unwrap();
         assert!(matches!(edek_parts, EdekParts::V3(_)));
         let edek_bytes = edek_parts.get_edek_bytes().unwrap();
         let encrypted_deks: cmk_edek::EncryptedDeks =

@@ -1,4 +1,5 @@
 use super::config::RotatableSecret;
+use crate::alloy_client_trait::DecomposedHeader;
 use crate::deterministic::{
     DeterministicDecryptBatchResult, DeterministicEncryptBatchResult, DeterministicEncryptionKey,
     DeterministicFieldOps, DeterministicRotateResult, EncryptedField, EncryptedFields,
@@ -53,7 +54,7 @@ impl StandaloneDeterministicClient {
             tenant_id,
             &plaintext_field.derivation_path,
         );
-        let key_id_header = Self::create_key_id_header(current_secret.id);
+        let key_id_header = self.create_key_id_header(current_secret.id);
         encrypt_internal(key, key_id_header, plaintext_field)
     }
 
@@ -63,7 +64,10 @@ impl StandaloneDeterministicClient {
         encrypted_field: EncryptedField,
         tenant_id: &TenantId,
     ) -> Result<PlaintextField, AlloyError> {
-        let (key_id, ciphertext) = Self::decompose_key_id_header(encrypted_field.encrypted_field)?;
+        let DecomposedHeader {
+            key_id,
+            remaining_bytes: ciphertext,
+        } = self.decompose_key_id_header(encrypted_field.encrypted_field)?;
         let secret = self
             .config
             .get(&encrypted_field.secret_path)
@@ -89,7 +93,7 @@ impl StandaloneDeterministicClient {
         );
         decrypt_internal(
             key,
-            ciphertext,
+            ciphertext.into(),
             encrypted_field.secret_path,
             encrypted_field.derivation_path,
         )
@@ -97,11 +101,11 @@ impl StandaloneDeterministicClient {
 }
 
 impl AlloyClient for StandaloneDeterministicClient {
-    fn get_edek_type() -> EdekType {
+    fn get_edek_type(&self) -> EdekType {
         EdekType::Standalone
     }
 
-    fn get_payload_type() -> PayloadType {
+    fn get_payload_type(&self) -> PayloadType {
         PayloadType::DeterministicField
     }
 }
@@ -197,7 +201,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                             &metadata.tenant_id,
                             &plaintext_field.derivation_path,
                         );
-                        let key_id_header = Self::create_key_id_header(standalone_secret.id);
+                        let key_id_header = self.create_key_id_header(standalone_secret.id);
                         encrypt_internal(
                             key,
                             key_id_header,
@@ -221,8 +225,8 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
     ) -> Result<DeterministicRotateResult, AlloyError> {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let reencrypt_field = |encrypted_field: EncryptedField| {
-            let (key_id, _) =
-                Self::decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
+            let DecomposedHeader { key_id, .. } =
+                self.decompose_key_id_header(encrypted_field.encrypted_field.clone())?;
             let maybe_new_secret = &self
                 .config
                 .get(&encrypted_field.secret_path)
@@ -278,7 +282,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 secret_path.0
             ),
                 })?;
-        let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
+        let key_id_header = self.create_key_id_header(in_rotation_secret.id);
         Ok(
             ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header)
                 .into(),

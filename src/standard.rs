@@ -100,7 +100,9 @@ create_batch_result_struct_using_newtype!(
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
 /// encrypted value, this is likely the API you should use. Our standard encryption is fully random (or probabilistic)
 /// AES 256.
-pub trait StandardDocumentOps: AlloyClient {
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key, then each field of the
@@ -154,8 +156,8 @@ pub trait StandardDocumentOps: AlloyClient {
     /// avoid pitfalls when encoding across byte boundaries.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
+            self.get_edek_type(),
+            self.get_payload_type(),
             KeyId(id as u32),
         ))
         .into()
