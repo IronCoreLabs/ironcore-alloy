@@ -91,6 +91,7 @@ impl AlloyClient for SaasShieldVectorClient {
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl VectorOps for SaasShieldVectorClient {
     /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
     /// and its values will be shuffled as part of the encryption.
