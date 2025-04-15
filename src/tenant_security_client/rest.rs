@@ -229,7 +229,7 @@ mod tests {
             vec![DerivedKey {
                 derived_key: Base64::from_str("abc").unwrap(),
                 current: true,
-                tenant_secret_id: TenantSecretAssignmentId(*KNOWN_NUM_ID),
+                tenant_secret_id: TenantSecretAssignmentId(KNOWN_NUM_ID),
             }],
         );
         let mut derived_keys = HashMap::new();

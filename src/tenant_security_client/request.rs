@@ -248,18 +248,19 @@ pub(crate) mod tests {
     use super::super::rest::{DerivedKey, TenantSecretAssignmentId};
     use super::*;
     use crate::TenantId;
-    use lazy_static::lazy_static;
+    use std::sync::LazyLock;
     use std::{convert::TryInto, str::FromStr};
 
-    lazy_static! {
-        pub static ref KNOWN_DEK: Base64 =
-            Base64::from_str("pkg95scDyQkSadd1zhWLWDHpONGdNTaFbLawWdYefy8=").unwrap();
-        pub static ref KNOWN_EDEK: Base64 =
-            Base64::from_str("CnYKcQokAAWBd/O5LeHFtblkTBZrWnHmJeTiuYwVUNDa14OXCksgrdukEkkA8xjtHsGe1dX7gKGiEqg9jVakzvTt0lL+aePPxDajtzguOMmdfboMWcSrh7WquRmgOXm0ig/o2WonFzsXxqHL6Cw82+goE2TsEP4D").unwrap();
-        pub static ref KNOWN_SECRET_PATH: SecretPath = SecretPath("FooBarBa".to_string());
-        pub static ref KNOWN_DERIVATION_PATH: DerivationPath = DerivationPath("derivation_path".to_string());
-        pub static ref KNOWN_NUM_ID: u32 = 143;
-    }
+    pub static KNOWN_DEK: LazyLock<Base64> =
+        LazyLock::new(|| Base64::from_str("pkg95scDyQkSadd1zhWLWDHpONGdNTaFbLawWdYefy8=").unwrap());
+    pub static KNOWN_EDEK: LazyLock<Base64> = LazyLock::new(|| {
+        Base64::from_str("CnYKcQokAAWBd/O5LeHFtblkTBZrWnHmJeTiuYwVUNDa14OXCksgrdukEkkA8xjtHsGe1dX7gKGiEqg9jVakzvTt0lL+aePPxDajtzguOMmdfboMWcSrh7WquRmgOXm0ig/o2WonFzsXxqHL6Cw82+goE2TsEP4D").unwrap()
+    });
+    pub static KNOWN_SECRET_PATH: LazyLock<SecretPath> =
+        LazyLock::new(|| SecretPath("FooBarBa".to_string()));
+    pub static KNOWN_DERIVATION_PATH: LazyLock<DerivationPath> =
+        LazyLock::new(|| DerivationPath("derivation_path".to_string()));
+    pub const KNOWN_NUM_ID: u32 = 143;
 
     pub struct MockOps;
 
@@ -356,7 +357,7 @@ pub(crate) mod tests {
                                     path,
                                     vec![DerivedKey {
                                         derived_key: Base64::from_str(&secret_path.0).unwrap(),
-                                        tenant_secret_id: TenantSecretAssignmentId(*KNOWN_NUM_ID),
+                                        tenant_secret_id: TenantSecretAssignmentId(KNOWN_NUM_ID),
                                         current: true,
                                     }],
                                 )
@@ -422,14 +423,14 @@ pub(crate) mod tests {
             .tenant_key_derive(paths, &metadata, DerivationType::Sha256, SecretType::Vector)
             .await?;
         let current = derive_result
-            .get_current(&*KNOWN_SECRET_PATH, &*KNOWN_DERIVATION_PATH)
+            .get_current(&KNOWN_SECRET_PATH, &KNOWN_DERIVATION_PATH)
             .unwrap();
         assert_eq!(
             current.derived_key,
             Base64::from_str(&KNOWN_SECRET_PATH.0).unwrap()
         );
         assert!(current.current);
-        assert_eq!(current.tenant_secret_id.0, *KNOWN_NUM_ID);
+        assert_eq!(current.tenant_secret_id.0, KNOWN_NUM_ID);
         Ok(())
     }
 }

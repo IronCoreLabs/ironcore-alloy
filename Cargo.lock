@@ -1067,7 +1067,6 @@ dependencies = [
  "hmac",
  "ironcore-documents",
  "itertools 0.13.0",
- "lazy_static",
  "ndarray",
  "ndarray-rand",
  "proptest",
