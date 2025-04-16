@@ -643,7 +643,14 @@ mod test {
             edek: EdekWithKeyIdHeader(EncryptedBytes(vec![0u8])),
             document: Default::default(),
         };
-        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
         let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
         assert!(matches!(
             dont_care_client
@@ -662,7 +669,14 @@ mod test {
             document: Default::default(),
         };
 
-        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
         let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
 
         assert!(matches!(
@@ -696,7 +710,14 @@ mod test {
             document: Default::default(),
         };
 
-        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
         let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
 
         assert!(
@@ -724,7 +745,14 @@ mod test {
             50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97, 110,
             116, 45, 103, 99, 112, 45, 108,
         ]));
-        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
         let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
         let edek_parts = dont_care_client
             .decompose_edek_header(edek_and_header)
@@ -757,7 +785,14 @@ mod test {
             194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97,
             110, 116, 45, 103, 99, 112, 45, 108,
         ]));
-        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
         let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
         let edek_parts = dont_care_client
             .decompose_edek_header(edek_and_header)
@@ -777,7 +812,14 @@ mod test {
         let edek = STANDARD.decode("CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D").unwrap();
         // This type isn't true, but it's what a caller would be creating if they had old EDEKs
         let liar_type_edek = EdekWithKeyIdHeader(EncryptedBytes(edek));
-        let tsc = TenantSecurityClient::new("".to_string(), reqwest::Client::new());
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
         let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
         let edek_parts = dont_care_client
             .decompose_edek_header(liar_type_edek)

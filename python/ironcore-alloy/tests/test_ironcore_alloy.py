@@ -1,6 +1,20 @@
 import base64
 from ironcore_alloy import *  # pyright: ignore[reportWildcardImportFromLibrary]
 import pytest
+import urllib.request
+
+
+class PyHttpClient(HttpClient):
+    async def post_json(self, url, json_body, headers):
+        req = urllib.request.Request(url)
+        req.add_header("Content-Type", headers.content_type)
+        req.add_header("Authorization", headers.authorization)
+        # may need to parse the body into a dict then dump it first
+        data = json_body.encode("utf-8")
+        response = urllib.request.urlopen(req, data)
+        return AlloyHttpClientResponse(
+            json_body=response.data, status_code=response.status
+        )
 
 
 class TestIroncoreAlloy:
@@ -592,7 +606,7 @@ class TestIroncoreAlloy:
         with pytest.raises(AlloyError.RequestError) as request_error:
             bad_integration_sdk = SaasShield(
                 SaasShieldConfiguration(
-                    "http://bad-url", "0WUaXesNgbTAuLwn", False, 1.1
+                    "http://bad-url", "0WUaXesNgbTAuLwn", 1.1, PyHttpClient()
                 )
             )
             metadata = AlloyMetadata.new_simple("fake_tenant")

@@ -15,11 +15,15 @@ use uniffi_bindgen::BindingGenerator;
 pub type TestResult = Result<(), AlloyError>;
 
 pub fn get_client() -> Arc<SaasShield> {
+    let http_client = reqwest::ClientBuilder::new()
+        .danger_accept_invalid_certs(false)
+        .build()
+        .expect("Failed to create test reqwest client.");
     let config = SaasShieldConfiguration::new(
         "http://localhost:32804".to_string(),
         "0WUaXesNgbTAuLwn".to_string(),
-        false,
         Some(1.1),
+        Arc::new(http_client),
     )
     .unwrap();
     SaasShield::new(&config)

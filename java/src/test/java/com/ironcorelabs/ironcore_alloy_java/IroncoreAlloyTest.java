@@ -10,8 +10,30 @@ import java.util.stream.Collectors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CompletableFuture;
 
+
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class IroncoreAlloyTest {
+    class JavaHttpClient implements HttpClient {
+        java.net.http.HttpClient client;
+
+        public JavaHttpClient() {
+            this.client = java.net.http.HttpClient.newHttpClient();        
+        }
+
+        @Override
+        public CompletableFuture<AlloyHttpClientResponse> postJson(String url, String jsonBody, AlloyHttpClientHeaders headers) {
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .header("Content-Type", headers.contentType())
+                .header("Authorization", headers.authorization())
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+            return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString()).thenApply(response ->
+                new AlloyHttpClientResponse(response.body(), (short) response.statusCode())
+            );
+        }
+    }
+    
     private byte[] keyByteArray = "hJdwvEeg5mxTu9qWcWrljfKs1ga4MpQ9MzXgLxtlkwX//yA=".getBytes();
     private float approximationFactor = 1.1f;
     // TODO(java): 0.000_000_000_1f is the delta for Kotlin, but Java requires this, why so much worse accuracy?
@@ -37,8 +59,9 @@ public class IroncoreAlloyTest {
             )));
         config = new StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets);
         sdk = new Standalone(config);
-        integrationSdk = new SaasShield(new SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", false, 1.1f));
-    }
+        IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
+        integrationSdk = new SaasShield(new SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1f, httpClient));
+    } 
     
     @Test
     public void sdkVectorRoundtrip() throws InterruptedException, ExecutionException {

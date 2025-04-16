@@ -7,6 +7,11 @@ import kotlin.system.*
 import kotlin.test.*
 import kotlin.time.*
 import kotlinx.coroutines.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.client.call.*
+import io.ktor.http.*
 
 fun ByteArray.toBase64(): String = String(Base64.getEncoder().encode(this))
 
@@ -14,6 +19,22 @@ fun String.base64ToByteArray(): ByteArray = Base64.getDecoder().decode(this)
 
 fun Float.sameValueAs(other: Float): Boolean {
     return (abs(this - other) < 0.0000001)
+}
+
+class KotlinHttpClient: HttpClient {
+    val client = io.ktor.client.HttpClient()
+
+    override suspend fun postJson(url: String, jsonBody: String, headers: AlloyHttpClientHeaders): AlloyHttpClientResponse {
+        val response = client.post(url) {
+            setBody(jsonBody)
+            headers {
+                append(HttpHeaders.Authorization, headers.authorization)
+                append(HttpHeaders.ContentType, headers.contentType)
+            }
+        }
+
+        return AlloyHttpClientResponse(response.body(), response.status.value as UShort)
+    }
 }
 
 class IroncoreAlloyTest {
@@ -42,13 +63,14 @@ class IroncoreAlloyTest {
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
 
+    val httpClient = KotlinHttpClient()
     val integrationSdk =
             SaasShield(
                     SaasShieldConfiguration(
                             "http://localhost:32804",
                             "0WUaXesNgbTAuLwn",
-                            false,
-                            1.1f
+                            1.1f,
+                            httpClient
                     )
             )
 

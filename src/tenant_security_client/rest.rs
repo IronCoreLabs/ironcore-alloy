@@ -2,7 +2,6 @@ use super::{DerivationPath, RequestMetadata, SecretPath, errors::TenantSecurityP
 use crate::errors::AlloyError;
 use base64_type::Base64;
 use ironcore_documents::v5::key_id_header::KeyId;
-use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -83,13 +82,12 @@ pub struct TspErrorResponse {
 }
 
 impl TspErrorResponse {
-    pub fn try_from_value(value: Value, status: StatusCode) -> Result<Self, AlloyError> {
+    pub fn try_from_value(value: Value, status: u16) -> Result<Self, AlloyError> {
         serde_json::from_value::<TspErrorResponse>(value.clone()).map_err(|_| {
             AlloyError::RequestError {
                 msg: format!(
                     "TSP gave an invalid response: `{}`. Status: {}",
-                    value,
-                    status.as_str()
+                    value, status
                 ),
             }
         })
