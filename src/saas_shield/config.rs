@@ -27,8 +27,6 @@ impl SaasShieldConfiguration {
             content_type: "application/json".to_string(),
             authorization: format!("cmk {}", parsed_api_key.0),
         };
-        // TODO(murph): need to put this on our rust calls? probably need to document that this setting should be on for any HttpClient
-        // .danger_accept_invalid_certs(accept_invalid_certs)
         Ok(Arc::new(Self {
             approximation_factor,
             tenant_security_client: Arc::new(TenantSecurityClient::new(

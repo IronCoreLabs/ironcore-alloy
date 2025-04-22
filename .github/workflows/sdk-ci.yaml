@@ -148,5 +148,5 @@ jobs:
         # The arm machines have a permissions error if we don't use sudo
         run: sudo pipx install hatch
       - name: Run Python tests
-        run: hatch run test:test
+        run: hatch run test:test -s
         working-directory: python/ironcore-alloy
