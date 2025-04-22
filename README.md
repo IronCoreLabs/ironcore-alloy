@@ -52,7 +52,7 @@ Running tests with the `integration_tests` feature flag enables SaaS Shield inte
 Run tests:
 
 ```bash
-cargo test --features integration_tests
+cargo test --features integration_tests -- --nocapture
 ```
 
 ## Benchmarks

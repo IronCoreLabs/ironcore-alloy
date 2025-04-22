@@ -11,8 +11,6 @@ mod test {
     ///   It will copy our dynamic library and generated Python code to the Python project structure.
     #[test]
     fn foreign_tests_py() -> Result<(), Box<dyn Error>> {
-        use std::io::Write;
-
         // `cargo test` doesn't build the cdylib targets, so we need to manually build them to make sure they're there
         build_dynamic_library()?;
         // copy the just compiled dynamic library to the python directory
@@ -32,14 +30,13 @@ mod test {
             uniffi::PythonBindingGenerator,
         )?;
         // run the hatch test command and print the output as though it were our output
-        let o = Command::new("hatch")
-            .args(["run", "test:test", "--color=yes"])
+        let mut handle = Command::new("hatch")
+            .args(["run", "test:test", "--color=yes", "-s"])
             .current_dir(python_dir)
-            .output()
+            .spawn()
             .unwrap();
-        std::io::stdout().write_all(&o.stdout)?;
-        std::io::stderr().write_all(&o.stderr)?;
-        assert!(o.status.success());
+        let exit_code = handle.wait().unwrap();
+        assert!(exit_code.success());
 
         Ok(())
     }

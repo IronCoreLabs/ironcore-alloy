@@ -97,7 +97,7 @@ pub(crate) fn generate_bindings<T: BindingGenerator>(
         &config_supplier,
         None,
         &camino_out_dir,
-        true,
+        false,
     )?;
 
     Ok(())

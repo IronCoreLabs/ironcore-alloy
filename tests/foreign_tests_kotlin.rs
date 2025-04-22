@@ -12,7 +12,6 @@ mod test {
     #[test]
     fn foreign_tests_kotlin() -> Result<(), Box<dyn Error>> {
         use crate::common::generate_bindings;
-        use std::io::Write;
 
         // `cargo test` doesn't build the cdylib targets, so we need to manually build them to make sure they're there
         build_dynamic_library()?;
@@ -35,14 +34,13 @@ mod test {
             uniffi::KotlinBindingGenerator,
         )?;
         // run the test command and print the output as though it were our output
-        let o = std::process::Command::new("./gradlew")
+        let mut handle = std::process::Command::new("./gradlew")
             .args(["test"])
             .current_dir(kotlin_dir)
-            .output()
+            .spawn()
             .unwrap();
-        std::io::stdout().write_all(&o.stdout)?;
-        std::io::stderr().write_all(&o.stderr)?;
-        assert!(o.status.success());
+        let exit_code = handle.wait().unwrap();
+        assert!(exit_code.success());
 
         Ok(())
     }

@@ -3,7 +3,7 @@ package com.ironcorelabs.not_ironcore_alloy_java;
 import com.ironcorelabs.ironcore_alloy_java.*;
 import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
-
+import okhttp3.*;
 import java.util.*;
 import java.util.Base64;
 import java.util.stream.Collectors;
@@ -14,23 +14,32 @@ import java.util.concurrent.CompletableFuture;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class IroncoreAlloyTest {
     class JavaHttpClient implements HttpClient {
-        java.net.http.HttpClient client;
+        OkHttpClient client;
 
         public JavaHttpClient() {
-            this.client = java.net.http.HttpClient.newHttpClient();        
+            this.client = new OkHttpClient();        
         }
 
         @Override
         public CompletableFuture<AlloyHttpClientResponse> postJson(String url, String jsonBody, AlloyHttpClientHeaders headers) {
-            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                .uri(java.net.URI.create(url))
+            RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json"));
+            Request request = new Request.Builder()
+                .url(url)
                 .header("Content-Type", headers.contentType())
                 .header("Authorization", headers.authorization())
-                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonBody))
+                .post(body)
                 .build();
-            return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString()).thenApply(response ->
-                new AlloyHttpClientResponse(response.body(), (short) response.statusCode())
-            );
+            CompletableFuture<AlloyHttpClientResponse> future = new CompletableFuture<>();
+            client.newCall(request).enqueue(new Callback() {
+                @Override public void onFailure(Call call, java.io.IOException e) {
+                    future.completeExceptionally(new AlloyException.RequestException("Failed to make JSON post request: " + e.getMessage()));
+                }
+
+                @Override public void onResponse(Call call, Response response) throws java.io.IOException {
+                    future.complete(new AlloyHttpClientResponse(response.body().string(), (short) response.code()));
+                }
+            });
+            return future;
         }
     }
     
@@ -404,5 +413,20 @@ public class IroncoreAlloyTest {
 
     public static byte[] base64ToByteArray(String base64String) {
         return Base64.getDecoder().decode(base64String);
+    }
+
+    @Test
+    public void badConfigurationTest() throws AlloyException, ExecutionException, InterruptedException {
+        IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
+        var badSdk = new SaasShield(new SaasShieldConfiguration("http://bad-url", "0WUaXesNgbTAuLwn", 1.1f, httpClient));
+        List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
+        PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
+        var metadata = AlloyMetadata.newSimple(new TenantId("fake_tenant"));
+        var result = badSdk.vector().encrypt(plaintext, metadata);
+        ExecutionException err = assertThrows(ExecutionException.class, result::get);
+        assertThrows(AlloyException.RequestException.class, () -> {
+            throw err.getCause(); 
+        });
+        assertTrue(err.getCause().getMessage().contains("JSON post request"));
     }
 }

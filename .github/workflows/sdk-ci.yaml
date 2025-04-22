@@ -48,7 +48,7 @@ jobs:
         with:
           cache-provider: github
       - name: Generate Kotlin files
-        run: cargo run --bin uniffi-bindgen generate --library resources/libironcore_alloy.* --language kotlin --out-dir kotlin
+        run: cargo run --bin uniffi-bindgen generate --library resources/libironcore_alloy.* --language kotlin --out-dir kotlin --no-format
         working-directory: kotlin/src/main
       - name: Run Kotlin tests
         run: ./gradlew test
@@ -121,7 +121,7 @@ jobs:
         with:
           cache-provider: github
       - name: Generate Python files
-        run: cargo run --bin uniffi-bindgen generate --library libironcore_alloy.* --language python --out-dir .
+        run: cargo run --bin uniffi-bindgen generate --library libironcore_alloy.* --language python --out-dir . --no-format
         working-directory: python/ironcore-alloy/ironcore_alloy
       - name: Install Python test matrix
         if: endsWith(matrix.runs-on, 'arm') != true && matrix.runs-on != 'macos-14'
