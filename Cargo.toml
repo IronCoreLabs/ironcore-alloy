@@ -17,21 +17,21 @@ rust-version = "1.85.0"
 [dependencies]
 aes-gcm = "0.10"
 aes-siv = "0.7"
-async-trait = "0.1.86"
+async-trait = "0.1.88"
 base64 = "0.22"
 base64_type = "0.2"
-bytes = { version = "1.9.0", features = ["serde"] }
-convert_case = "0.6.0"
+bytes = { version = "1.10.1", features = ["serde"] }
+convert_case = "0.8.0"
 futures = "0.3.31"
 hmac = { version = "0.12.1", features = ["std"] }
 ironcore-documents = "0.2.1"
-itertools = "0.13"
+itertools = "0.14"
 ndarray = "0.16.0"
 ndarray-rand = "0.15.0"
 protobuf = { version = "3.3", features = ["with-bytes"] }
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-rand_distr = "0.4.3"
+rand = "0.9.1"
+rand_chacha = "0.9.0"
+rand_distr = "0.5.1"
 rayon = "1.10.0"
 regex = "1.11.1"
 reqwest = { version = "0.12", default-features = false, features = [
@@ -39,30 +39,30 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
 ] }
 ring = "0.17"
-serde = { version = "1.0.215", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.140", features = ["float_roundtrip"] }
-thiserror = "2.0.9"
-uniffi = { version = "0.28.2", features = ["tokio", "cli"] }
-uniffi-bindgen-java = "0.1.0"
-z85 = "3.0.5"
+thiserror = "2.0.12"
+uniffi = { version = "0.29.1", features = ["tokio", "cli"] }
+uniffi-bindgen-java = "0.1.1"
+z85 = "3.0.6"
 
 [dev-dependencies]
 approx = "0.5.1"
 ascii85 = "0.2.1"
-assertables = "9.5.0"
+assertables = "9.5.2"
 base64 = "0.22.0"
 base85 = "2.0.0"
 camino = "1.1"
 # must be the same as uniffi/uniffi-bindgen-java
-cargo_metadata = "0.15.4"
+cargo_metadata = "0.19.2"
 criterion = { version = "0.5", features = ["async_tokio"] }
 hex = "0.4.3"
-hex-literal = "0.4.1"
+hex-literal = "1.0.0"
 lazy_static = "1.5"
-proptest = "1.5.0"
+proptest = "1.6.0"
 tokio = { version = "1.44", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = "0.28.1"
-z85 = "3.0.5"
+uniffi_bindgen = "0.29.1"
+z85 = "3.0.6"
 
 [features]
 integration_tests = []
