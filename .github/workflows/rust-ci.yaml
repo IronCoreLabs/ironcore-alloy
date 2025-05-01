@@ -10,7 +10,7 @@ on:
 
 jobs:
   rust-ci:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-ci.yaml@rust-ci-v1
+    uses: IronCoreLabs/workflows/.github/workflows/rust-ci.yaml@rust-ci-v2
     with:
       run_clippy: true
       minimum_coverage: "50"
