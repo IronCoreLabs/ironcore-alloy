@@ -374,6 +374,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo_metadata"
+version = "0.19.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd5eb614ed4c27c5d706420e4320fbe3216ab31fa1c33cd8246ac36dae4479ba"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1148,7 +1162,7 @@ dependencies = [
  "base85",
  "bytes",
  "camino",
- "cargo_metadata",
+ "cargo_metadata 0.19.2",
  "convert_case",
  "criterion",
  "futures",
@@ -2369,7 +2383,7 @@ checksum = "51ce6280c581045879e11b400bae14686a819df22b97171215d15549efa04ddb"
 dependencies = [
  "anyhow",
  "camino",
- "cargo_metadata",
+ "cargo_metadata 0.15.4",
  "clap",
  "uniffi_bindgen",
  "uniffi_core",
@@ -2385,7 +2399,7 @@ dependencies = [
  "anyhow",
  "askama",
  "camino",
- "cargo_metadata",
+ "cargo_metadata 0.15.4",
  "clap",
  "heck",
  "once_cell",
@@ -2407,7 +2421,7 @@ dependencies = [
  "anyhow",
  "askama",
  "camino",
- "cargo_metadata",
+ "cargo_metadata 0.15.4",
  "fs-err",
  "glob",
  "goblin",
@@ -2484,7 +2498,7 @@ checksum = "21fa171d4d258dc51bbd01893cc9608c1b62273d2f9ea55fb64f639e77824567"
 dependencies = [
  "anyhow",
  "camino",
- "cargo_metadata",
+ "cargo_metadata 0.15.4",
  "fs-err",
  "once_cell",
 ]
