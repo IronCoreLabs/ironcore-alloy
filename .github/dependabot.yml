@@ -7,7 +7,11 @@ updates:
   groups:
     dependencies:
       patterns:
-      - "*" # update all the dependencies at once
+      - "*"
+      exclude-patterns:
+      # These will get their own PRs
+      - "rand*"
+      - "uniffi*"
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
