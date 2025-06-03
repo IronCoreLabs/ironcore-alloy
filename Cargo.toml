@@ -14,6 +14,26 @@ categories = ["cryptography"]
 keywords = ["cryptography", "saas-shield", "ALE", "cloaked-ai"]
 rust-version = "1.85.0"
 
+# This is needed to allow extra options to be passed to criterion
+# https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
+[lib]
+bench = false
+crate-type = ["cdylib", "lib"]
+name = "ironcore_alloy"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+bench = false
+
+[[bin]]
+name = "uniffi-bindgen-java"
+path = "uniffi-bindgen-java.rs"
+bench = false
+
+[features]
+integration_tests = []
+
 [dependencies]
 aes-gcm = "0.10"
 aes-siv = "0.7"
@@ -64,30 +84,10 @@ tokio = { version = "1.44", features = ["macros", "rt-multi-thread"] }
 uniffi_bindgen = "0.29.2"
 z85 = "3.0.6"
 
-[features]
-integration_tests = []
-
 [[bench]]
 name = "ironcore_alloy_bench"
 path = "benches/ironcore_alloy_bench.rs"
 harness = false
-
-# This is needed to allow extra options to be passed to criterion
-# https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
-[lib]
-bench = false
-crate-type = ["cdylib", "lib"]
-name = "ironcore_alloy"
-
-[[bin]]
-name = "uniffi-bindgen"
-path = "uniffi-bindgen.rs"
-bench = false
-
-[[bin]]
-name = "uniffi-bindgen-java"
-path = "uniffi-bindgen-java.rs"
-bench = false
 
 # used to create the smallest cdylib binary we can to ship with the library in each ecosystem.
 # 6.9M vs 1.5M in initial testing. Can further have `strip` (the Unix utility) run on it to save ~0.2 MB more.
