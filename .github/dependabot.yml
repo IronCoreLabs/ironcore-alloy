@@ -4,6 +4,15 @@ updates:
   directory: "/"
   schedule:
     interval: "monthly"
+  groups:
+    dependencies:
+      patterns:
+      - "*"
+      exclude-patterns:
+      # These will get their own PRs
+      - "rand*"
+      - "uniffi*"
+      - "cargo-metadata" # must be same as uniffi uses
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:

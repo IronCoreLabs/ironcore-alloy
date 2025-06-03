@@ -1,6 +1,7 @@
 # IronCore Labs Alloy SDK
 
 [![Mentioned in Awesome Security Solutions for AI Systems](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/zmre/awesome-security-for-ai/)
+![Crates.io Version](https://img.shields.io/crates/v/ironcore-alloy)
 
 The Alloy SDK brings together a set of tools that you can use for your different Application Layer Encryption needs. It
 unifies functionality that was provided in our [SaaS Shield](https://ironcorelabs.com/products/saas-shield/) [Tenant Security Client (TSC) SDKs](https://ironcorelabs.com/docs/saas-shield/tenant-security-client/overview/) and our new [Cloaked AI](https://ironcorelabs.com/products/cloaked-ai/) tools
@@ -16,7 +17,7 @@ to protect the private or sensitive data your apps process.
 - [Java](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy-java)
 - [Kotlin](https://central.sonatype.com/artifact/com.ironcorelabs/ironcore-alloy)
 - [Python](https://pypi.org/project/ironcore-alloy)
-- Rust - Depend on this repo using a git dependency.
+- [Rust](https://crates.io/crates/ironcore-alloy)
 
 This SDK was written in Rust and is using [uniffi](https://github.com/mozilla/uniffi-rs) to generate the foreign language bindings. If your language is not listed above, feel free to open an issue and we can take a look!
 
@@ -28,7 +29,8 @@ You can see the examples on our main docs site [here](https://ironcorelabs.com/d
 ### Prerequisites
 
 Across all languages:
-- glibc 2.29+ 
+
+- glibc 2.29+
 
 ## Building Locally
 

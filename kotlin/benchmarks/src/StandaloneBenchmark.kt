@@ -2,8 +2,8 @@ package test
 
 import com.ironcorelabs.ironcore_alloy.*
 import java.util.Base64
-import java.util.concurrent.*
 import java.util.Random
+import java.util.concurrent.*
 import kotlin.ByteArray
 import kotlin.system.*
 import kotlinx.coroutines.*
@@ -58,9 +58,9 @@ class StandaloneBenchmark {
 
     @Setup
     fun setUp() {
-        smallWord = randomWord(1).toByteArray()
-        mediumWord = randomWord(10).toByteArray()
-        largeWord = randomWord(100).toByteArray()
+        smallWord = randomWord(10).toByteArray()
+        mediumWord = randomWord(10 * 1000).toByteArray()
+        largeWord = randomWord(100 * 1000).toByteArray()
     }
 
     @State(Scope.Thread)
@@ -70,9 +70,7 @@ class StandaloneBenchmark {
 
     @Benchmark
     fun standaloneVectorEncrypt384d(s: Vector384State) {
-        runBlocking {
-            standaloneSdk.vector().encrypt(PlaintextVector(s.vector, "", ""), metadata)
-        }
+        runBlocking { standaloneSdk.vector().encrypt(PlaintextVector(s.vector, "", ""), metadata) }
     }
 
     @Benchmark
