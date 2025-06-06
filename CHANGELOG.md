@@ -1,8 +1,10 @@
-## Unreleased
+## 0.12.0
+
+- Dependency updates
+- Async functionality now runs fully in the host languages async runtime, there is no longer (sometimes) a Tokio (a Rust async runtime) runtime created to manage async tasks.
 
 ### Breaking Changes
 - Updated SaaS Shield Clients to take a native http client as an argument. The client must implement HttpClient, which requires only a `postJson` function. See tests in the various languages for example implementations.
-- Async functionality now runs fully in the host languages async runtime, there is no longer (sometimes) a Tokio (a Rust async runtime) runtime created to manage async tasks.
 
 ## 0.11.2
 

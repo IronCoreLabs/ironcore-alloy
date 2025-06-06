@@ -40,8 +40,7 @@
                 java = openjdk21;
               })
               (pkgs.google-cloud-sdk.withExtraComponents [ pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin ])
-            ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin
-              [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ];
+            ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
           JAVA_HOME = if pkgs.stdenv.isDarwin then "${pkgs.openjdk21}" else "${pkgs.openjdk21}/lib/openjdk";
           RUST_TEST_NOCAPTURE = 1;
