@@ -69,18 +69,18 @@ z85 = "3.0.6"
 [dev-dependencies]
 approx = "0.5.1"
 ascii85 = "0.2.1"
-assertables = "9.5.2"
+assertables = "9.5.5"
 base64 = "0.22.0"
 base85 = "2.0.0"
 camino = "1.1"
 # must be the same as uniffi/uniffi-bindgen-java
-cargo_metadata = "0.19"
-criterion = { version = "0.5", features = ["async_tokio"] }
+cargo_metadata = "0.20"
+criterion = { version = "0.6", features = ["async_tokio"] }
 hex = "0.4.3"
 hex-literal = "1.0.0"
 lazy_static = "1.5"
 proptest = "1.6.0"
-tokio = { version = "1.44", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.45", features = ["macros", "rt-multi-thread"] }
 uniffi_bindgen = "0.29.2"
 z85 = "3.0.6"
 
