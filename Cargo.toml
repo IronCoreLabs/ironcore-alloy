@@ -74,7 +74,7 @@ base64 = "0.22.0"
 base85 = "2.0.0"
 camino = "1.1"
 # must be the same as uniffi/uniffi-bindgen-java
-cargo_metadata = "0.20"
+cargo_metadata = "0.19"
 criterion = { version = "0.6", features = ["async_tokio"] }
 hex = "0.4.3"
 hex-literal = "1.0.0"
