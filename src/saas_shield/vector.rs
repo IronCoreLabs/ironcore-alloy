@@ -12,7 +12,10 @@ use crate::vector::{
     PlaintextVectors, VectorDecryptBatchResult, VectorEncryptBatchResult, VectorOps,
     VectorRotateResult, decrypt_internal, encrypt_internal, get_approximation_factor,
 };
-use crate::{AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey};
+use crate::{
+    AlloyMetadata, DerivationPath, SecretPath, TenantId, VectorEncryptionKey,
+    alloy_client_trait::DecomposedHeader,
+};
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -53,14 +56,15 @@ impl SaasShieldVectorClient {
             approximation_factor,
             key,
             key_id,
-            Self::get_edek_type(),
+            self.get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
         )
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
+#[async_trait::async_trait]
 impl SaasShieldSecurityEventOps for SaasShieldVectorClient {
     /// Log the security event `event` to the tenant's log sink.
     /// If the event time is unspecified the current time will be used.
@@ -78,15 +82,16 @@ impl SaasShieldSecurityEventOps for SaasShieldVectorClient {
 }
 
 impl AlloyClient for SaasShieldVectorClient {
-    fn get_edek_type() -> EdekType {
+    fn get_edek_type(&self) -> EdekType {
         EdekType::SaasShield
     }
-    fn get_payload_type() -> PayloadType {
+    fn get_payload_type(&self) -> PayloadType {
         PayloadType::VectorMetadata
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
+#[async_trait::async_trait]
 impl VectorOps for SaasShieldVectorClient {
     /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
     /// and its values will be shuffled as part of the encryption.
@@ -153,7 +158,7 @@ impl VectorOps for SaasShieldVectorClient {
                 approximation_factor,
                 &new_vector_key,
                 new_key_id,
-                Self::get_edek_type(),
+                self.get_edek_type(),
                 plaintext_vector,
                 self.rng.clone(),
             )
@@ -169,8 +174,10 @@ impl VectorOps for SaasShieldVectorClient {
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
         let approximation_factor = get_approximation_factor(self.approximation_factor)?;
-        let (key_id, icl_metadata_bytes) =
-            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+        let DecomposedHeader {
+            key_id,
+            remaining_bytes: icl_metadata_bytes,
+        } = self.decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
         let paths = [(
             encrypted_vector.secret_path.clone(),
@@ -202,7 +209,7 @@ impl VectorOps for SaasShieldVectorClient {
                 approximation_factor,
                 &key,
                 encrypted_vector,
-                icl_metadata_bytes,
+                icl_metadata_bytes.into(),
             )
         }
     }
@@ -231,8 +238,10 @@ impl VectorOps for SaasShieldVectorClient {
         .await?;
 
         let decrypt_vector = |encrypted_vector: EncryptedVector| {
-            let (original_key_id, icl_metadata_bytes) =
-                Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+            let DecomposedHeader {
+                key_id: original_key_id,
+                remaining_bytes: icl_metadata_bytes,
+            } = self.decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
             let original_key = all_keys.get_key_for_path(
                 &encrypted_vector.secret_path,
                 &encrypted_vector.derivation_path,
@@ -243,7 +252,7 @@ impl VectorOps for SaasShieldVectorClient {
                 approximation_factor,
                 &original_vector_key,
                 encrypted_vector,
-                icl_metadata_bytes,
+                icl_metadata_bytes.into(),
             )
         };
         Ok(perform_batch_action(encrypted_vectors.0, decrypt_vector).into())
@@ -316,8 +325,10 @@ impl VectorOps for SaasShieldVectorClient {
         )
         .await?;
         let reencrypt_vector = |encrypted_vector: EncryptedVector| {
-            let (original_key_id, icl_metadata_bytes) =
-                Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+            let DecomposedHeader {
+                key_id: original_key_id,
+                remaining_bytes: icl_metadata_bytes,
+            } = self.decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
             let maybe_current_key_id = new_tenant_keys
                 .get_current(
                     &encrypted_vector.secret_path,
@@ -343,7 +354,7 @@ impl VectorOps for SaasShieldVectorClient {
                     approximation_factor,
                     &original_vector_key,
                     encrypted_vector,
-                    icl_metadata_bytes,
+                    icl_metadata_bytes.into(),
                 )?;
                 let new_derived_key = new_tenant_keys.get_key_for_path(
                     &decrypted_vector.secret_path,
@@ -356,7 +367,7 @@ impl VectorOps for SaasShieldVectorClient {
                     approximation_factor,
                     &new_vector_key,
                     new_key_id,
-                    Self::get_edek_type(),
+                    self.get_edek_type(),
                     decrypted_vector,
                     self.rng.clone(),
                 )
@@ -388,8 +399,8 @@ impl VectorOps for SaasShieldVectorClient {
             &derived_keys,
             secret_path,
             derivation_path,
-            Self::get_edek_type(),
-            Self::get_payload_type(),
+            self.get_edek_type(),
+            self.get_payload_type(),
         )
     }
 }

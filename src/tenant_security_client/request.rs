@@ -10,10 +10,11 @@ use crate::errors::AlloyError;
 use crate::{DerivationPath, SecretPath};
 use async_trait::async_trait;
 use base64_type::Base64;
-use reqwest::{Client, Response, StatusCode};
-use serde::Serialize;
+use reqwest::header::{HeaderMap, HeaderValue};
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 const TSP_API_PREFIX: &str = "/api/1/";
 const WRAP_ENDPOINT: &str = "document/wrap";
@@ -24,44 +25,123 @@ const REKEY_ENDPOINT: &str = "document/rekey";
 const TENANT_KEY_DERIVE_ENDPOINT: &str = "key/derive-with-secret-path";
 const SECURITY_EVENT_ENDPOINT: &str = "event/security-event";
 
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct AlloyHttpClientHeaders {
+    pub content_type: String,
+    pub authorization: String,
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct AlloyHttpClientResponse {
+    pub json_body: String,
+    pub status_code: u16,
+}
+
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+/// Trait describing the functionality ironcore-alloy needs from a client to make SaaS Shield requests.
+pub trait HttpClient: Send + Sync {
+    /// Makes a call with a JSON body and returns a string of the JSON result. Only JSON requests and responses
+    /// are supported, the provided headers will include a correct content type.
+    async fn post_json(
+        &self,
+        url: String,
+        json_body: String,
+        headers: AlloyHttpClientHeaders,
+    ) -> Result<AlloyHttpClientResponse, AlloyError>;
+}
+
+#[async_trait::async_trait]
+impl HttpClient for reqwest::Client {
+    async fn post_json(
+        &self,
+        url: String,
+        json_body: String,
+        headers: AlloyHttpClientHeaders,
+    ) -> Result<AlloyHttpClientResponse, AlloyError> {
+        let mut reqwest_header_map = HeaderMap::new();
+        reqwest_header_map.insert(
+            "Content-Type",
+            HeaderValue::from_str(&headers.content_type).map_err(|_| AlloyError::RequestError {
+                msg: format!(
+                    "Bad Content-Type value provided to the HTTP client: {}",
+                    headers.content_type
+                ),
+            })?,
+        );
+        let mut auth_header =
+            HeaderValue::from_str(&headers.content_type).map_err(|_| AlloyError::RequestError {
+                msg: format!(
+                    "Bad Authorization header provided to the HTTP client: {}",
+                    headers.content_type
+                ),
+            })?;
+        auth_header.set_sensitive(true);
+        reqwest_header_map.insert("Authorization", auth_header);
+
+        let resp = self
+            .post(url)
+            .headers(reqwest_header_map)
+            .body(json_body)
+            .send()
+            .await?;
+
+        Ok(AlloyHttpClientResponse {
+            status_code: resp.status().as_u16(),
+            json_body: resp.text().await?,
+        })
+    }
+}
+
 pub struct TspRequest {
     tsp_address: String,
-    client: Client,
+    client: Arc<dyn HttpClient>,
+    headers: AlloyHttpClientHeaders,
 }
 
 impl TspRequest {
-    pub fn new(tsp_address: String, client: Client) -> TspRequest {
+    pub fn new(
+        tsp_address: String,
+        client: Arc<dyn HttpClient>,
+        headers: AlloyHttpClientHeaders,
+    ) -> TspRequest {
         TspRequest {
             tsp_address,
             client,
+            headers,
         }
     }
 
-    async fn make_json_request<A: Serialize>(
+    async fn make_json_request<A: Serialize, T: DeserializeOwned>(
         &self,
         endpoint: String,
         post_data: A,
-    ) -> Result<Response, AlloyError> {
+    ) -> Result<T, AlloyError> {
         let url = format!("{}{}{}", self.tsp_address, TSP_API_PREFIX, endpoint);
-        let resp = self.client.post(url).json(&post_data).send().await?;
-        match resp.status() {
-            StatusCode::OK => Ok(resp),
-            status => {
-                let parsed_error = resp
-                    .json::<Value>()
-                    .await
+        let resp = self
+            .client
+            .post_json(
+                url,
+                serde_json::to_string(&post_data)?,
+                self.headers.clone(),
+            )
+            .await?;
+        match serde_json::from_str::<T>(&resp.json_body) {
+            Ok(t) => Ok(t),
+            Err(_) => {
+                let parsed_error = serde_json::from_str::<Value>(&resp.json_body)
                     .map_err(|_| AlloyError::RequestError {
                         msg: format!(
                             "Response from the TSP URL was not valid JSON. Status: {}",
-                            status.as_str()
+                            resp.status_code
                         ),
                     })
-                    .and_then(|json| TspErrorResponse::try_from_value(json, status))?;
+                    .and_then(|json| TspErrorResponse::try_from_value(json, resp.status_code))?;
                 let error_variant = TenantSecurityProxyError::code_to_error(parsed_error.code);
                 Err(AlloyError::TspError {
                     msg: error_variant.to_string(),
                     error: error_variant,
-                    http_code: status.as_u16(),
+                    http_code: resp.status_code,
                     tsp_code: parsed_error.code,
                 })
             }
@@ -116,8 +196,6 @@ impl DocumentKeyOps for TspRequest {
     async fn wrap_key(&self, metadata: &RequestMetadata) -> Result<WrapKeyResponse, AlloyError> {
         Ok(self
             .make_json_request(WRAP_ENDPOINT.to_string(), metadata)
-            .await?
-            .json::<WrapKeyResponse>()
             .await?)
     }
 
@@ -132,8 +210,6 @@ impl DocumentKeyOps for TspRequest {
         })?;
         Ok(self
             .make_json_request(UNWRAP_ENDPOINT.to_string(), post_data)
-            .await?
-            .json::<UnwrapKeyResponse>()
             .await?)
     }
 
@@ -148,8 +224,6 @@ impl DocumentKeyOps for TspRequest {
         })?;
         Ok(self
             .make_json_request(BATCH_WRAP_ENDPOINT.to_string(), post_data)
-            .await?
-            .json::<BatchWrapKeyResponse>()
             .await?)
     }
 
@@ -164,8 +238,6 @@ impl DocumentKeyOps for TspRequest {
         })?;
         Ok(self
             .make_json_request(BATCH_UNWRAP_ENDPOINT.to_string(), post_data)
-            .await?
-            .json::<BatchUnwrapKeyResponse>()
             .await?)
     }
 
@@ -182,8 +254,6 @@ impl DocumentKeyOps for TspRequest {
         })?;
         Ok(self
             .make_json_request(REKEY_ENDPOINT.to_string(), post_data)
-            .await?
-            .json::<RekeyResponse>()
             .await?)
     }
 }
@@ -216,8 +286,6 @@ impl TenantKeyOps for TspRequest {
         })?;
         Ok(self
             .make_json_request(TENANT_KEY_DERIVE_ENDPOINT.to_string(), post_data)
-            .await?
-            .json::<KeyDeriveResponse>()
             .await?)
     }
 }
@@ -235,8 +303,6 @@ impl EventOps for TspRequest {
         })?;
         Ok(self
             .make_json_request(SECURITY_EVENT_ENDPOINT.to_string(), post_data)
-            .await?
-            .json::<()>()
             .await?)
     }
 }
@@ -248,18 +314,19 @@ pub(crate) mod tests {
     use super::super::rest::{DerivedKey, TenantSecretAssignmentId};
     use super::*;
     use crate::TenantId;
-    use lazy_static::lazy_static;
+    use std::sync::LazyLock;
     use std::{convert::TryInto, str::FromStr};
 
-    lazy_static! {
-        pub static ref KNOWN_DEK: Base64 =
-            Base64::from_str("pkg95scDyQkSadd1zhWLWDHpONGdNTaFbLawWdYefy8=").unwrap();
-        pub static ref KNOWN_EDEK: Base64 =
-            Base64::from_str("CnYKcQokAAWBd/O5LeHFtblkTBZrWnHmJeTiuYwVUNDa14OXCksgrdukEkkA8xjtHsGe1dX7gKGiEqg9jVakzvTt0lL+aePPxDajtzguOMmdfboMWcSrh7WquRmgOXm0ig/o2WonFzsXxqHL6Cw82+goE2TsEP4D").unwrap();
-        pub static ref KNOWN_SECRET_PATH: SecretPath = SecretPath("FooBarBa".to_string());
-        pub static ref KNOWN_DERIVATION_PATH: DerivationPath = DerivationPath("derivation_path".to_string());
-        pub static ref KNOWN_NUM_ID: u32 = 143;
-    }
+    pub static KNOWN_DEK: LazyLock<Base64> =
+        LazyLock::new(|| Base64::from_str("pkg95scDyQkSadd1zhWLWDHpONGdNTaFbLawWdYefy8=").unwrap());
+    pub static KNOWN_EDEK: LazyLock<Base64> = LazyLock::new(|| {
+        Base64::from_str("CnYKcQokAAWBd/O5LeHFtblkTBZrWnHmJeTiuYwVUNDa14OXCksgrdukEkkA8xjtHsGe1dX7gKGiEqg9jVakzvTt0lL+aePPxDajtzguOMmdfboMWcSrh7WquRmgOXm0ig/o2WonFzsXxqHL6Cw82+goE2TsEP4D").unwrap()
+    });
+    pub static KNOWN_SECRET_PATH: LazyLock<SecretPath> =
+        LazyLock::new(|| SecretPath("FooBarBa".to_string()));
+    pub static KNOWN_DERIVATION_PATH: LazyLock<DerivationPath> =
+        LazyLock::new(|| DerivationPath("derivation_path".to_string()));
+    pub const KNOWN_NUM_ID: u32 = 143;
 
     pub struct MockOps;
 
@@ -356,7 +423,7 @@ pub(crate) mod tests {
                                     path,
                                     vec![DerivedKey {
                                         derived_key: Base64::from_str(&secret_path.0).unwrap(),
-                                        tenant_secret_id: TenantSecretAssignmentId(*KNOWN_NUM_ID),
+                                        tenant_secret_id: TenantSecretAssignmentId(KNOWN_NUM_ID),
                                         current: true,
                                     }],
                                 )
@@ -422,14 +489,14 @@ pub(crate) mod tests {
             .tenant_key_derive(paths, &metadata, DerivationType::Sha256, SecretType::Vector)
             .await?;
         let current = derive_result
-            .get_current(&*KNOWN_SECRET_PATH, &*KNOWN_DERIVATION_PATH)
+            .get_current(&KNOWN_SECRET_PATH, &KNOWN_DERIVATION_PATH)
             .unwrap();
         assert_eq!(
             current.derived_key,
             Base64::from_str(&KNOWN_SECRET_PATH.0).unwrap()
         );
         assert!(current.current);
-        assert_eq!(current.tenant_secret_id.0, *KNOWN_NUM_ID);
+        assert_eq!(current.tenant_secret_id.0, KNOWN_NUM_ID);
         Ok(())
     }
 }

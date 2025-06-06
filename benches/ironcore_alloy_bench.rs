@@ -185,9 +185,17 @@ fn tsp_benches(c: &mut Criterion) {
     let tenant_id = env::var("TENANT_ID").unwrap_or("tenant-gcp-l".to_string());
     let api_key = env::var("API_KEY").unwrap_or("0WUaXesNgbTAuLwn".to_string());
 
-    let config =
-        SaasShieldConfiguration::new(format!("{tsp_uri}:{tsp_port}"), api_key, true, Some(2.5))
-            .unwrap();
+    let http_client = reqwest::ClientBuilder::new()
+        .danger_accept_invalid_certs(true)
+        .build()
+        .expect("Failed to create bench reqwest client.");
+    let config = SaasShieldConfiguration::new(
+        format!("{tsp_uri}:{tsp_port}"),
+        api_key,
+        Some(2.5),
+        Arc::new(http_client),
+    )
+    .unwrap();
     let sdk = SaasShield::new(&config);
     let metadata = AlloyMetadata::new_simple(TenantId(tenant_id));
 

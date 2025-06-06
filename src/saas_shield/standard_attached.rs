@@ -28,7 +28,8 @@ impl SaasShieldStandardAttachedClient {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
+#[async_trait::async_trait]
 impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     /// Encrypt a document with the provided metadata.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key.
@@ -101,7 +102,8 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     }
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
+#[async_trait::async_trait]
 impl SaasShieldSecurityEventOps for SaasShieldStandardAttachedClient {
     /// Log the security event `event` to the tenant's log sink.
     /// If the event time is unspecified the current time will be used.

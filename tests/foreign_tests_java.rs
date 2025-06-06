@@ -12,7 +12,6 @@ mod test {
     #[test]
     fn foreign_tests_java() -> Result<(), Box<dyn Error>> {
         use crate::common::generate_bindings;
-        use std::io::Write;
         use uniffi_bindgen_java::JavaBindingGenerator;
 
         // `cargo test` doesn't build the cdylib targets, so we need to manually build them to make sure they're there
@@ -36,14 +35,13 @@ mod test {
             JavaBindingGenerator,
         )?;
         // run the hatch test command and print the output as though it were our output
-        let o = std::process::Command::new("./gradlew")
+        let mut handle = std::process::Command::new("./gradlew")
             .args(["test"])
             .current_dir(java_dir)
-            .output()
+            .spawn()
             .unwrap();
-        std::io::stdout().write_all(&o.stdout)?;
-        std::io::stderr().write_all(&o.stderr)?;
-        assert!(o.status.success());
+        let exit_code = handle.wait().unwrap();
+        assert!(exit_code.success());
 
         Ok(())
     }

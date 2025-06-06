@@ -20,6 +20,7 @@ plugins {
 dependencies {
     // Use the JUnit 5 integration.
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
+    testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("net.java.dev.jna:jna:5.14.0")
 }

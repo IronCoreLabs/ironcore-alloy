@@ -49,12 +49,14 @@ sourceSets.all {
 }
 
 val benchmarksImplementation by configurations
-
+val ktor_version="2.3.13"
 dependencies {
     // Use the Kotlin JUnit 5 integration.
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     // Use the JUnit 5 integration.
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
+    testImplementation("io.ktor:ktor-client-core:$ktor_version")
+    testImplementation("io.ktor:ktor-client-cio:$ktor_version")
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")

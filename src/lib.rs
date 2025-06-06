@@ -1,7 +1,6 @@
 #![allow(async_fn_in_trait)]
 
 use crate::errors::AlloyError;
-use bytes::Bytes;
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
@@ -270,6 +269,35 @@ impl SaasShield {
     }
 }
 
+uniffi::custom_type!(KeyId, u32, {
+   remote,
+   lower: |s| s.0,
+   try_lift: |n| Ok(KeyId(n))
+});
+
+#[uniffi::remote(Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EdekType {
+    Standalone,
+    SaasShield,
+    DataControlPlatform,
+}
+
+#[uniffi::remote(Enum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PayloadType {
+    DeterministicField,
+    VectorMetadata,
+    StandardEdek,
+}
+#[uniffi::remote(Record)]
+#[derive(Debug, PartialEq)]
+pub struct KeyIdHeader {
+    pub key_id: KeyId,
+    pub edek_type: EdekType,
+    pub payload_type: PayloadType,
+}
+
 /// This module exists to prevent leaking AlloyClient functions to the various client traits
 /// while still allowing them to extend it.
 /// See thread here https://github.com/rust-lang/rust/issues/34537#issuecomment-1510807523
@@ -277,18 +305,25 @@ impl SaasShield {
 pub(crate) mod alloy_client_trait {
     use super::*;
 
-    pub trait AlloyClient {
+    #[derive(Clone, Debug, uniffi::Record)]
+    pub struct DecomposedHeader {
+        pub key_id: KeyId,
+        pub remaining_bytes: Vec<u8>,
+    }
+
+    #[uniffi::export]
+    pub trait AlloyClient: Send + Sync {
         /// Returns the only EdekType this Alloy client deals with.
-        fn get_edek_type() -> EdekType;
+        fn get_edek_type(&self) -> EdekType;
 
         /// Returns the only PayloadType this Alloy client deals with.
-        fn get_payload_type() -> PayloadType;
+        fn get_payload_type(&self) -> PayloadType;
 
-        fn create_key_id_header(key_id: u32) -> KeyIdHeader {
+        fn create_key_id_header(&self, key_id: u32) -> KeyIdHeader {
             KeyIdHeader {
                 key_id: KeyId(key_id),
-                edek_type: Self::get_edek_type(),
-                payload_type: Self::get_payload_type(),
+                edek_type: self.get_edek_type(),
+                payload_type: self.get_payload_type(),
             }
         }
 
@@ -296,8 +331,9 @@ pub(crate) mod alloy_client_trait {
         /// decoded EdekType or PayloadType is incorrect for this AlloyClient.
         /// Returns the decoded key ID and remaining non-header bytes.
         fn decompose_key_id_header(
+            &self,
             encrypted_bytes: EncryptedBytes,
-        ) -> Result<(KeyId, Bytes), AlloyError> {
+        ) -> Result<DecomposedHeader, AlloyError> {
             let (
                 KeyIdHeader {
                     key_id,
@@ -311,10 +347,13 @@ pub(crate) mod alloy_client_trait {
             .map_err(|_| AlloyError::InvalidInput {
                 msg: "Encrypted header was invalid.".to_string(),
             })?;
-            let expected_edek_type = Self::get_edek_type();
-            let expected_payload_type = Self::get_payload_type();
+            let expected_edek_type = self.get_edek_type();
+            let expected_payload_type = self.get_payload_type();
             if edek_type == expected_edek_type && payload_type == expected_payload_type {
-                Ok((key_id, remaining_bytes))
+                Ok(DecomposedHeader {
+                    key_id,
+                    remaining_bytes: remaining_bytes.to_vec(),
+                })
             } else {
                 Err(AlloyError::InvalidInput {
                     msg: format!(

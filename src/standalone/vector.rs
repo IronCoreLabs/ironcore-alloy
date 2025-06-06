@@ -1,4 +1,5 @@
 use super::config::VectorSecret;
+use crate::alloy_client_trait::DecomposedHeader;
 use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
 use crate::util::perform_batch_action;
@@ -36,8 +37,10 @@ impl StandaloneVectorClient {
         metadata: &AlloyMetadata,
         new_metadata: &AlloyMetadata,
     ) -> Result<EncryptedVector, AlloyError> {
-        let (original_key_id, _) =
-            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+        let DecomposedHeader {
+            key_id: original_key_id,
+            ..
+        } = self.decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
 
         // check if we have a current secret for this path before doing significant work
         // and that the current secret isn't the one this was encrypted with
@@ -97,7 +100,7 @@ impl StandaloneVectorClient {
             vector_secret.approximation_factor,
             &key,
             KeyId(standalone_secret.id),
-            Self::get_edek_type(),
+            self.get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
         )
@@ -108,8 +111,10 @@ impl StandaloneVectorClient {
         encrypted_vector: EncryptedVector,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextVector, AlloyError> {
-        let (key_id, icl_metadata_bytes) =
-            Self::decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
+        let DecomposedHeader {
+            key_id,
+            remaining_bytes: icl_metadata_bytes,
+        } = self.decompose_key_id_header(encrypted_vector.paired_icl_info.clone())?;
         let vector_secret = self
             .config
             .get(&encrypted_vector.secret_path)
@@ -137,22 +142,23 @@ impl StandaloneVectorClient {
             vector_secret.approximation_factor,
             &key,
             encrypted_vector,
-            icl_metadata_bytes,
+            icl_metadata_bytes.into(),
         )
     }
 }
 
 impl AlloyClient for StandaloneVectorClient {
-    fn get_edek_type() -> EdekType {
+    fn get_edek_type(&self) -> EdekType {
         EdekType::Standalone
     }
 
-    fn get_payload_type() -> PayloadType {
+    fn get_payload_type(&self) -> PayloadType {
         PayloadType::VectorMetadata
     }
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl VectorOps for StandaloneVectorClient {
     /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
     /// and its values will be shuffled as part of the encryption.
@@ -254,7 +260,7 @@ impl VectorOps for StandaloneVectorClient {
                             vector_secret.approximation_factor,
                             &key,
                             KeyId(standalone_secret.id),
-                            StandaloneVectorClient::get_edek_type(),
+                            EdekType::Standalone,
                             plaintext_vector.clone(),
                             self.rng.clone(),
                         )
@@ -293,7 +299,7 @@ impl VectorOps for StandaloneVectorClient {
             .ok_or_else(|| AlloyError::InvalidConfiguration {
                 msg: "There is no in-rotation secret in the vector configuration.".to_string(),
             })?;
-        let key_id_header = Self::create_key_id_header(in_rotation_secret.id);
+        let key_id_header = self.create_key_id_header(in_rotation_secret.id);
         Ok(
             ironcore_documents::v5::key_id_header::get_prefix_bytes_for_search(key_id_header)
                 .into(),

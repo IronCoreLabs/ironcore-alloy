@@ -118,7 +118,9 @@ impl VectorEncryptionKey {
     }
 }
 
-pub trait VectorOps {
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait VectorOps: Send + Sync {
     /// Encrypt a vector embedding with the provided metadata. The provided embedding is assumed to be normalized
     /// and its values will be shuffled as part of the encryption.
     /// The same tenant ID must be provided in the metadata when decrypting the embedding.

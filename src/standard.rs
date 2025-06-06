@@ -6,10 +6,7 @@ use crate::{
 use ironcore_documents::{
     aes::{EncryptionKey, IvAndCiphertext, decrypt_document_with_attached_iv},
     icl_header_v4, v3,
-    v5::{
-        self,
-        key_id_header::{KeyId, KeyIdHeader, get_prefix_bytes_for_search},
-    },
+    v5::{self, key_id_header::KeyIdHeader},
 };
 use protobuf::Message;
 use rand::{CryptoRng, RngCore};
@@ -100,7 +97,9 @@ create_batch_result_struct_using_newtype!(
 /// broadly useful and secure. If you don't have a need to match on or preserve the distance properties of the
 /// encrypted value, this is likely the API you should use. Our standard encryption is fully random (or probabilistic)
 /// AES 256.
-pub trait StandardDocumentOps: AlloyClient {
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// A DEK (document encryption key) will be generated and encrypted using a derived key, then each field of the
@@ -152,14 +151,7 @@ pub trait StandardDocumentOps: AlloyClient {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
-            Self::get_edek_type(),
-            Self::get_payload_type(),
-            KeyId(id as u32),
-        ))
-        .into()
-    }
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields

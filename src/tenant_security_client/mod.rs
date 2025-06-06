@@ -4,8 +4,7 @@ use crate::errors::AlloyError;
 use crate::saas_shield::SecurityEvent;
 use crate::{DerivationPath, SecretPath};
 use base64_type::Base64;
-use request::{TenantSecurityRequest, TspRequest};
-use reqwest::Client;
+use request::{AlloyHttpClientHeaders, HttpClient, TenantSecurityRequest, TspRequest};
 pub use rest::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, DerivationType, DeriveKeyChoice, DerivedKey,
     KeyDeriveResponse, SecretType, UnwrapKeyResponse, WrapKeyResponse,
@@ -22,7 +21,7 @@ use std::{
 pub use rest::TenantSecretAssignmentId;
 
 pub(crate) mod errors;
-mod request;
+pub(crate) mod request;
 mod rest;
 
 #[derive(Debug)]
@@ -54,9 +53,13 @@ pub struct TenantSecurityClient {
 }
 
 impl TenantSecurityClient {
-    pub fn new(tsp_address: String, client: Client) -> TenantSecurityClient {
+    pub fn new(
+        tsp_address: String,
+        client: Arc<dyn HttpClient>,
+        headers: AlloyHttpClientHeaders,
+    ) -> TenantSecurityClient {
         TenantSecurityClient {
-            request: Arc::new(TspRequest::new(tsp_address, client)),
+            request: Arc::new(TspRequest::new(tsp_address, client, headers)),
         }
     }
 

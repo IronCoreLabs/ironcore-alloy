@@ -52,6 +52,7 @@ dependencies = [
     "pytest-cov==4.1.0",
     "pytest-metadata==3.0.0",
     "pytest-asyncio==0.21.1",
+    "aiohttp==3.11.16"
 ]
 
 [tool.hatch.envs.test.scripts]

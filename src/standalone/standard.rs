@@ -1,7 +1,6 @@
 // Standard standalone works for V4 and V5 documents. There is no suport for V3 since Standalone wasn't
 // available in V3.
 use super::config::{StandaloneConfiguration, StandardSecrets};
-use crate::DocumentId;
 use crate::errors::AlloyError;
 use crate::standard::{
     EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
@@ -11,9 +10,14 @@ use crate::standard::{
     verify_sig,
 };
 use crate::util::{OurReseedingRng, hash256, perform_batch_action};
-use crate::{AlloyMetadata, Secret, TenantId, alloy_client_trait::AlloyClient};
+use crate::{
+    AlloyMetadata, DocumentId, Secret, TenantId,
+    alloy_client_trait::{AlloyClient, DecomposedHeader},
+};
 use ironcore_documents::aes::EncryptionKey;
-use ironcore_documents::v5::key_id_header::{EdekType, PayloadType};
+use ironcore_documents::v5::key_id_header::{
+    EdekType, KeyId, PayloadType, get_prefix_bytes_for_search,
+};
 use ironcore_documents::{icl_header_v4, v5};
 use itertools::Itertools;
 use ring::digest::SHA256_OUTPUT_LEN;
@@ -69,7 +73,7 @@ impl StandaloneStandardClient {
             plaintext_document.0,
             self.rng.clone(),
             aes_dek,
-            Self::create_key_id_header(secret_id),
+            self.create_key_id_header(secret_id),
             v4_doc,
         )
     }
@@ -80,7 +84,7 @@ impl StandaloneStandardClient {
         encrypted_document: EncryptedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextDocument, AlloyError> {
-        let dek = Self::decrypt_document_dek(
+        let dek = self.decrypt_document_dek(
             encrypted_document.edek,
             &self.config.secrets,
             &metadata.tenant_id,
@@ -91,11 +95,15 @@ impl StandaloneStandardClient {
     /// Given the edek, the secrets and the metadata, try to decrypt the per tenant_kek using the secret.
     /// Then decrypt the per document EncryptionKey using that per tenant kek.
     fn decrypt_document_dek(
+        &self,
         edek: EdekWithKeyIdHeader,
         config_secrets: &HashMap<u32, Secret>,
         tenant_id: &TenantId,
     ) -> Result<EncryptionKey, AlloyError> {
-        let (key_id, edek_bytes) = Self::decompose_key_id_header(edek.0)?;
+        let DecomposedHeader {
+            key_id,
+            remaining_bytes: edek_bytes,
+        } = self.decompose_key_id_header(edek.0)?;
 
         // Key id should never be 0. If it is we'll try all the keys we have.
         let secrets = if key_id.0 == 0 {
@@ -148,7 +156,7 @@ impl StandaloneStandardClient {
         plaintext_document: PlaintextDocumentWithEdek,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedDocument, AlloyError> {
-        let dek = Self::decrypt_document_dek(
+        let dek = self.decrypt_document_dek(
             plaintext_document.edek.clone(),
             &self.config.secrets,
             &metadata.tenant_id,
@@ -163,16 +171,17 @@ impl StandaloneStandardClient {
 }
 
 impl AlloyClient for StandaloneStandardClient {
-    fn get_edek_type() -> EdekType {
+    fn get_edek_type(&self) -> EdekType {
         EdekType::Standalone
     }
 
-    fn get_payload_type() -> PayloadType {
+    fn get_payload_type(&self) -> PayloadType {
         PayloadType::StandardEdek
     }
 }
 
 #[uniffi::export]
+#[async_trait::async_trait]
 impl StandardDocumentOps for StandaloneStandardClient {
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
@@ -236,7 +245,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
     ) -> Result<RekeyEdeksBatchResult, AlloyError> {
         let parsed_new_tenant_id = new_tenant_id.as_ref().unwrap_or(&metadata.tenant_id);
         let rekey_edek = |edek: EdekWithKeyIdHeader| {
-            let dek = Self::decrypt_document_dek(edek, &self.config.secrets, &metadata.tenant_id)?;
+            let dek = self.decrypt_document_dek(edek, &self.config.secrets, &metadata.tenant_id)?;
             let (current_secret_id, current_secret) = self.get_current_secret_and_id()?;
             let encryption_key =
                 derive_aes_encryption_key(&current_secret.secret, parsed_new_tenant_id);
@@ -247,7 +256,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
                 current_secret_id.to_string().as_str(),
             )?;
             Ok(EdekWithKeyIdHeader::new(
-                Self::create_key_id_header(current_secret_id),
+                self.create_key_id_header(current_secret_id),
                 v4_doc,
             ))
         };
@@ -277,6 +286,20 @@ impl StandardDocumentOps for StandaloneStandardClient {
         let encrypt =
             |plaintext_document| self.encrypt_with_existing_edek_sync(plaintext_document, metadata);
         Ok(perform_batch_action(plaintext_documents.0, encrypt).into())
+    }
+
+    /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
+    /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
+    /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
+    /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
+    /// avoid pitfalls when encoding across byte boundaries.
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
+            self.get_edek_type(),
+            self.get_payload_type(),
+            KeyId(id as u32),
+        ))
+        .into()
     }
 }
 

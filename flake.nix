@@ -7,7 +7,7 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+  outputs = { nixpkgs, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
@@ -44,6 +44,7 @@
               [ pkgs.darwin.apple_sdk.frameworks.SystemConfiguration ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
           JAVA_HOME = if pkgs.stdenv.isDarwin then "${pkgs.openjdk21}" else "${pkgs.openjdk21}/lib/openjdk";
+          RUST_TEST_NOCAPTURE = 1;
         };
 
       });
