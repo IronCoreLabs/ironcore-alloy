@@ -70,7 +70,16 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-nexusPublishing { repositories { sonatype() } }
+// Until there is official support, we can use the Portal OSSRH Staging API.
+// See https://central.sonatype.org/publish/publish-portal-gradle/
+nexusPublishing {
+    repositories {
+        sonatype {
+            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
+        }
+    }
+}
 
 publishing {
     publications {
