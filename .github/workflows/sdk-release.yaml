@@ -48,7 +48,7 @@ jobs:
         run: cargo run --bin uniffi-bindgen generate --library resources/linux-x86-64/libironcore_alloy.so --language kotlin --out-dir kotlin
         working-directory: kotlin/src/main
       - name: Publish
-        run: ./gradlew publish
+        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
         working-directory: kotlin
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.SONATYPE_USERNAME }}
@@ -91,7 +91,7 @@ jobs:
         run: cargo run --bin uniffi-bindgen-java generate --library resources/linux-x86-64/libironcore_alloy.so --out-dir java
         working-directory: java/src/main
       - name: Publish
-        run: ./gradlew publish
+        run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
         working-directory: java
         env:
           ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.SONATYPE_USERNAME }}
