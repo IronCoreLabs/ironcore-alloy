@@ -10,8 +10,6 @@ Ensure the library and source have been created, typically done by running `carg
 
 ## Benchmarking
 
-You can run the benchmarks `./gradlew bench`.
-
 More information about the benchmarks is in its [README](/java/src/jmh/java/com/ironcorelabs/ironcore_alloy_java/README.md).
 
 ## Publishing
