@@ -103,6 +103,7 @@ impl StandaloneVectorClient {
             self.get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
+            vector_secret.use_scaling_factor,
         )
     }
 
@@ -263,6 +264,7 @@ impl VectorOps for StandaloneVectorClient {
                             EdekType::Standalone,
                             plaintext_vector.clone(),
                             self.rng.clone(),
+                            vector_secret.use_scaling_factor,
                         )
                     })
                     .try_collect()
@@ -366,6 +368,7 @@ mod test {
         let vector_secret = VectorSecret {
             approximation_factor: 4.0f32,
             secret: Arc::new(rotatable_secret),
+            use_scaling_factor: true,
         };
 
         StandaloneVectorClient {
@@ -410,6 +413,7 @@ mod test {
         let vector_secret = VectorSecret {
             approximation_factor: 4.0f32,
             secret: Arc::new(rotatable_secret),
+            use_scaling_factor: true,
         };
 
         StandaloneVectorClient {

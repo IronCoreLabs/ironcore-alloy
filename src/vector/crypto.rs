@@ -107,7 +107,13 @@ fn generate_normalized_vector(
     iv: [u8; 12],
     approximation_factor: f32,
     message_dimensionality: usize,
+    use_scaling_factor: bool,
 ) -> Array1<f32> {
+    let scaling_factor = if use_scaling_factor {
+        key.scaling_factor
+    } else {
+        ScalingFactor(1.)
+    };
     let mut coin_rng = create_rng(&key.key.0, iv);
     // u
     let multivariate_normal_sample = sample_normal_vector(&mut coin_rng, message_dimensionality);
@@ -115,7 +121,7 @@ fn generate_normalized_vector(
     let uniform_point = sample_uniform_point(&mut coin_rng);
     // x
     let uniform_point_in_ball = calculate_uniform_point_in_ball(
-        key.scaling_factor,
+        scaling_factor,
         approximation_factor,
         uniform_point,
         message_dimensionality,
@@ -129,8 +135,9 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng>(
     approximation_factor: f32,
     message: Array1<f32>, // m in the paper, vector
     rng: Arc<Mutex<R>>,
+    use_scaling_factor: bool,
 ) -> Result<EncryptResult, EncryptError> {
-    if key.scaling_factor.0 == 0. || key.scaling_factor.0 == -0. {
+    if use_scaling_factor && (key.scaling_factor.0 == 0. || key.scaling_factor.0 == -0.) {
         return Err(EncryptError::InvalidKey(
             "Scaling factor cannot be zero".to_string(),
         ));
@@ -152,10 +159,21 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng>(
         Array1::zeros(message.raw_dim())
     } else {
         // λ_m
-        let ball_normalized_vector =
-            generate_normalized_vector(key, iv, approximation_factor, message_dimensionality);
+        let ball_normalized_vector = generate_normalized_vector(
+            key,
+            iv,
+            approximation_factor,
+            message_dimensionality,
+            use_scaling_factor,
+        );
+
+        let scaling_factor = if use_scaling_factor {
+            key.scaling_factor.0
+        } else {
+            1.
+        };
         // c <-- sm + λ_m
-        key.scaling_factor.0 * message + ball_normalized_vector
+        scaling_factor * message + ball_normalized_vector
     };
     if ciphertext.iter().any(|f| !f.is_finite()) {
         Err(EncryptError::OverflowError)
@@ -173,8 +191,9 @@ pub(crate) fn decrypt(
     key: &VectorEncryptionKey, // K + s
     approximation_factor: f32,
     encrypted_result: EncryptResult, // n + c
+    use_scaling_factor: bool,
 ) -> Result<Array1<f32>, DecryptError> {
-    if key.scaling_factor.0 == 0. || key.scaling_factor.0 == -0. {
+    if use_scaling_factor && (key.scaling_factor.0 == 0. || key.scaling_factor.0 == -0.) {
         return Err(DecryptError::InvalidKey(
             "Scaling factor cannot be zero".to_string(),
         ));
@@ -199,9 +218,15 @@ pub(crate) fn decrypt(
             encrypted_result.iv,
             approximation_factor,
             message_dimensionality,
+            use_scaling_factor,
         );
+        let scaling_factor = if use_scaling_factor {
+            key.scaling_factor.0
+        } else {
+            1.
+        };
         // m <-- (c - λ_m) / s
-        let message = (encrypted_result.ciphertext - ball_normalized_vector) / key.scaling_factor.0;
+        let message = (encrypted_result.ciphertext - ball_normalized_vector) / scaling_factor;
         Ok(message)
     } else {
         Err(DecryptError::InvalidAuthHash)
@@ -272,6 +297,7 @@ pub(crate) mod tests {
             NEW_APPROX_FACTOR,
             vec![1., 2., 3., 4., 5.].into(),
             Arc::new(Mutex::new(k)),
+            true,
         )
         .unwrap();
         assert_eq!(
@@ -308,6 +334,7 @@ pub(crate) mod tests {
             ORIGINAL_APPROX_FACTOR,
             vec![1., 2., 3., 4., 5.].into(),
             Arc::new(Mutex::new(k)),
+            true,
         )
         .unwrap();
         assert_eq!(
@@ -344,6 +371,7 @@ pub(crate) mod tests {
             ORIGINAL_APPROX_FACTOR,
             vec![].into(),
             Arc::new(Mutex::new(k)),
+            true,
         )
         .unwrap();
         assert_eq!(result.ciphertext.len(), 0);
@@ -369,6 +397,7 @@ pub(crate) mod tests {
             ORIGINAL_APPROX_FACTOR,
             vec![].into(),
             Arc::new(Mutex::new(k)),
+            true,
         )
     }
 
@@ -412,6 +441,7 @@ pub(crate) mod tests {
                 iv: [154, 69, 198, 125, 62, 150, 167, 229, 0, 124, 17, 14],
                 auth_hash: AuthHash([0u8; 32]),
             },
+            true,
         )
         .unwrap_err();
         assert_eq!(result, DecryptError::InvalidAuthHash);
@@ -439,6 +469,7 @@ pub(crate) mod tests {
                     155, 49, 52, 152, 171, 74, 80, 216, 8, 171, 249, 21, 162, 101, 59,
                 ]),
             },
+            true,
         )
         .unwrap();
         assert_eq!(result.to_vec(), vec![1., 2., 3., 4., 5.]);
@@ -462,6 +493,7 @@ pub(crate) mod tests {
                 iv: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                 auth_hash: AuthHash([0u8; 32]),
             },
+            true,
         )
     }
 
@@ -498,9 +530,10 @@ pub(crate) mod tests {
             ORIGINAL_APPROX_FACTOR,
             message.clone(),
             Arc::new(Mutex::new(rand::thread_rng())),
+            true,
         )
         .unwrap();
-        let decrypt_result = decrypt(&key, ORIGINAL_APPROX_FACTOR, encrypt_result).unwrap();
+        let decrypt_result = decrypt(&key, ORIGINAL_APPROX_FACTOR, encrypt_result, true).unwrap();
 
         assert_eq!(message, decrypt_result);
     }
@@ -514,8 +547,21 @@ pub(crate) mod tests {
             };
             let approximation_factor = 5.;
             let message: Array1<f32> = arb_msg.into_iter().map(|u| u as f32).collect();
-            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  Arc::new(Mutex::new(rand::thread_rng()))).unwrap();
-            let decrypt_result = decrypt(&key, approximation_factor, encrypt_result).unwrap();
+            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  Arc::new(Mutex::new(rand::thread_rng())), true).unwrap();
+            let decrypt_result = decrypt(&key, approximation_factor, encrypt_result, true).unwrap();
+            assert_ulps_eq!(message.as_slice().unwrap(), decrypt_result.as_slice().unwrap());
+        }
+
+        #[test]
+        fn roundtrip_no_scaling(arb_msg: Vec<u16>, key: [u8; 32], scaling_factor in 1..16777215) {
+            let key = VectorEncryptionKey {
+                scaling_factor: ScalingFactor(scaling_factor as f32),
+                key: EncryptionKey(key.to_vec().into()),
+            };
+            let approximation_factor = 5.;
+            let message: Array1<f32> = arb_msg.into_iter().map(|u| u as f32).collect();
+            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  Arc::new(Mutex::new(rand::thread_rng())), false).unwrap();
+            let decrypt_result = decrypt(&key, approximation_factor, encrypt_result, false).unwrap();
             assert_ulps_eq!(message.as_slice().unwrap(), decrypt_result.as_slice().unwrap());
         }
     );

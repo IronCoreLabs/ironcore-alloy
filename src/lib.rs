@@ -252,6 +252,7 @@ impl SaasShield {
             vector: Arc::new(SaasShieldVectorClient::new(
                 config.tenant_security_client.clone(),
                 config.approximation_factor,
+                config.use_scaling_factor,
             )),
         })
     }
