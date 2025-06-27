@@ -134,6 +134,7 @@ impl StandaloneVectorClient {
                     key_id.0
                 ),
             })?;
+        let use_scaling_factor = vector_secret.use_scaling_factor;
         let key = VectorEncryptionKey::derive_from_secret(
             standalone_secret.secret.as_ref(),
             &metadata.tenant_id,
@@ -144,6 +145,7 @@ impl StandaloneVectorClient {
             &key,
             encrypted_vector,
             icl_metadata_bytes.into(),
+            use_scaling_factor,
         )
     }
 }

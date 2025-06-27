@@ -53,6 +53,8 @@ public class IroncoreAlloyTest {
     private Map<SecretPath, VectorSecret> vectorSecrets;
     private StandaloneConfiguration config; 
     private Standalone sdk;
+    // SDK which will use the scaling factor
+    private Standalone sdkWithScaling;
     private SaasShield integrationSdk;
 
     @BeforeAll
@@ -68,6 +70,10 @@ public class IroncoreAlloyTest {
             )));
         config = new StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets);
         sdk = new Standalone(config);
+        sdkWithScaling = new Standalone(new StandaloneConfiguration(standardSecrets, deterministicSecrets,
+                Map.of(new SecretPath(""), VectorSecret.newWithScalingFactor(approximationFactor, new RotatableSecret(
+                        new StandaloneSecret(2, new Secret(keyByteArray)),
+                        new StandaloneSecret(1, new Secret(keyByteArray)))))));
         IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
         integrationSdk = new SaasShield(new SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1f, httpClient));
     } 
@@ -93,7 +99,7 @@ public class IroncoreAlloyTest {
         EncryptedVector encrypted = new EncryptedVector(ciphertext, new SecretPath(""), new DerivationPath(""), new EncryptedBytes(iclMetadata));
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
 
-        PlaintextVector decrypted = sdk.vector().decrypt(encrypted, metadata).get();
+        PlaintextVector decrypted = sdkWithScaling.vector().decrypt(encrypted, metadata).get();
         assertEquals(Arrays.asList(1.0f, 2.0f, 3.0f), decrypted.plaintextVector());
     }
 
@@ -127,13 +133,13 @@ public class IroncoreAlloyTest {
         EncryptedVectors vectors = new EncryptedVectors(Map.of(new VectorId("vector"), encrypted));
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
 
-        VectorRotateResult rotated = sdk.vector().rotateVectors(vectors, metadata, new TenantId("tenant2")).get();
+        VectorRotateResult rotated = sdkWithScaling.vector().rotateVectors(vectors, metadata, new TenantId("tenant2")).get();
         assertEquals(1, rotated.successes().size());
         assertEquals(0, rotated.failures().size());
         assertTrue(rotated.successes().containsKey(new VectorId("vector")));
 
         AlloyMetadata newMetadata = AlloyMetadata.newSimple(new TenantId("tenant2"));
-        PlaintextVector decrypted = sdk.vector().decrypt(rotated.successes().get(new VectorId("vector")), newMetadata).get();
+        PlaintextVector decrypted = sdkWithScaling.vector().decrypt(rotated.successes().get(new VectorId("vector")), newMetadata).get();
         List<Float> expected = Arrays.asList(1.0f, 2.0f, 3.0f);
         for (int i = 0; i < decrypted.plaintextVector().size(); i++) {
             var roundtripped = decrypted.plaintextVector().get(i);

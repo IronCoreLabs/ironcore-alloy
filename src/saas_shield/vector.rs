@@ -215,6 +215,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &key,
                 encrypted_vector,
                 icl_metadata_bytes.into(),
+                self.use_scaling_factor,
             )
         }
     }
@@ -258,6 +259,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &original_vector_key,
                 encrypted_vector,
                 icl_metadata_bytes.into(),
+                self.use_scaling_factor,
             )
         };
         Ok(perform_batch_action(encrypted_vectors.0, decrypt_vector).into())
@@ -360,6 +362,7 @@ impl VectorOps for SaasShieldVectorClient {
                     &original_vector_key,
                     encrypted_vector,
                     icl_metadata_bytes.into(),
+                    self.use_scaling_factor,
                 )?;
                 let new_derived_key = new_tenant_keys.get_key_for_path(
                     &decrypted_vector.secret_path,

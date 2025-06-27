@@ -251,6 +251,7 @@ pub(crate) fn decrypt_internal(
     key: &VectorEncryptionKey,
     encrypted_vector: EncryptedVector,
     icl_metadata_bytes: Bytes,
+    use_scaling_factor: bool,
 ) -> Result<PlaintextVector, AlloyError> {
     let (iv, auth_hash) = get_iv_and_auth_hash(&icl_metadata_bytes)?;
     Ok(crypto::decrypt(
@@ -261,7 +262,7 @@ pub(crate) fn decrypt_internal(
             iv,
             auth_hash,
         },
-        true,
+        use_scaling_factor,
     )
     .map(|r| unshuffle(&key.key, r))?)
     .map(|dec| PlaintextVector {

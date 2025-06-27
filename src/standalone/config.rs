@@ -138,8 +138,9 @@ impl VectorSecret {
             use_scaling_factor: false,
         })
     }
+
     #[uniffi::constructor]
-    pub fn new_with_scalingfactor(
+    pub fn new_with_scaling_factor(
         approximation_factor: f32,
         secret: Arc<RotatableSecret>,
     ) -> Arc<Self> {
