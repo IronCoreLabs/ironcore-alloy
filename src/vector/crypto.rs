@@ -84,9 +84,15 @@ fn calculate_uniform_point_in_ball(
     approximation_factor: f32,
     uniform_point: f32,
     message_dimensionality: usize,
+    use_scaling_factor: bool,
 ) -> f32 {
     // with scaling factor 2^30 and approximation_factor 2^16, we fit under 2^53
-    let d_dimensional_ball_radius = scaling_factor.0 / 4. * approximation_factor;
+    let d_dimensional_ball_radius = if use_scaling_factor {
+        scaling_factor.0 / 4. * approximation_factor
+    } else {
+        // If the scaling factor were 1, it'd be 1/4 * approximation factor
+        0.25 * approximation_factor
+    };
     // x in the paper
     d_dimensional_ball_radius * uniform_point.powf(1. / message_dimensionality as f32)
 }
@@ -109,11 +115,6 @@ fn generate_normalized_vector(
     message_dimensionality: usize,
     use_scaling_factor: bool,
 ) -> Array1<f32> {
-    let scaling_factor = if use_scaling_factor {
-        key.scaling_factor
-    } else {
-        ScalingFactor(1.)
-    };
     let mut coin_rng = create_rng(&key.key.0, iv);
     // u
     let multivariate_normal_sample = sample_normal_vector(&mut coin_rng, message_dimensionality);
@@ -121,10 +122,11 @@ fn generate_normalized_vector(
     let uniform_point = sample_uniform_point(&mut coin_rng);
     // x
     let uniform_point_in_ball = calculate_uniform_point_in_ball(
-        scaling_factor,
+        key.scaling_factor,
         approximation_factor,
         uniform_point,
         message_dimensionality,
+        use_scaling_factor,
     );
     // λ_m
     calculate_normalized_vector(multivariate_normal_sample, uniform_point_in_ball)
@@ -167,13 +169,12 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng>(
             use_scaling_factor,
         );
 
-        let scaling_factor = if use_scaling_factor {
-            key.scaling_factor.0
+        if use_scaling_factor {
+            // c <-- sm + λ_m
+            key.scaling_factor.0 * message + ball_normalized_vector
         } else {
-            1.
-        };
-        // c <-- sm + λ_m
-        scaling_factor * message + ball_normalized_vector
+            message + ball_normalized_vector
+        }
     };
     if ciphertext.iter().any(|f| !f.is_finite()) {
         Err(EncryptError::OverflowError)
@@ -220,13 +221,12 @@ pub(crate) fn decrypt(
             message_dimensionality,
             use_scaling_factor,
         );
-        let scaling_factor = if use_scaling_factor {
-            key.scaling_factor.0
-        } else {
-            1.
-        };
         // m <-- (c - λ_m) / s
-        let message = (encrypted_result.ciphertext - ball_normalized_vector) / scaling_factor;
+        let message = if use_scaling_factor {
+            (encrypted_result.ciphertext - ball_normalized_vector) / key.scaling_factor.0
+        } else {
+            encrypted_result.ciphertext - ball_normalized_vector
+        };
         Ok(message)
     } else {
         Err(DecryptError::InvalidAuthHash)
