@@ -32,15 +32,8 @@ impl SaasShieldConfiguration {
         api_key: String,
         approximation_factor: Option<f32>,
         http_client: Arc<dyn HttpClient>,
-        use_scaling_factor: bool,
     ) -> Result<Arc<Self>, AlloyError> {
-        new_core(
-            tsp_uri,
-            api_key,
-            approximation_factor,
-            http_client,
-            use_scaling_factor,
-        )
+        new_core(tsp_uri, api_key, approximation_factor, http_client, true)
     }
 }
 
