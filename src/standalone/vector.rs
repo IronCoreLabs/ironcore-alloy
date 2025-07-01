@@ -103,6 +103,7 @@ impl StandaloneVectorClient {
             self.get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
+            vector_secret.use_scaling_factor,
         )
     }
 
@@ -133,6 +134,7 @@ impl StandaloneVectorClient {
                     key_id.0
                 ),
             })?;
+        let use_scaling_factor = vector_secret.use_scaling_factor;
         let key = VectorEncryptionKey::derive_from_secret(
             standalone_secret.secret.as_ref(),
             &metadata.tenant_id,
@@ -143,6 +145,7 @@ impl StandaloneVectorClient {
             &key,
             encrypted_vector,
             icl_metadata_bytes.into(),
+            use_scaling_factor,
         )
     }
 }
@@ -263,6 +266,7 @@ impl VectorOps for StandaloneVectorClient {
                             EdekType::Standalone,
                             plaintext_vector.clone(),
                             self.rng.clone(),
+                            vector_secret.use_scaling_factor,
                         )
                     })
                     .try_collect()
@@ -366,6 +370,7 @@ mod test {
         let vector_secret = VectorSecret {
             approximation_factor: 4.0f32,
             secret: Arc::new(rotatable_secret),
+            use_scaling_factor: true,
         };
 
         StandaloneVectorClient {
@@ -410,6 +415,7 @@ mod test {
         let vector_secret = VectorSecret {
             approximation_factor: 4.0f32,
             secret: Arc::new(rotatable_secret),
+            use_scaling_factor: true,
         };
 
         StandaloneVectorClient {

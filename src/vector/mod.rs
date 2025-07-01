@@ -220,6 +220,7 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
     edek_type: EdekType,
     plaintext_vector: PlaintextVector,
     rng: Arc<Mutex<R>>,
+    use_scaling_factor: bool,
 ) -> Result<EncryptedVector, AlloyError> {
     let result = crypto::encrypt(
         key,
@@ -228,6 +229,7 @@ pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
             .into_iter()
             .collect(),
         rng,
+        use_scaling_factor,
     )?;
     let (header, vector_metadata) = v5::key_id_header::create_vector_metadata(
         KeyIdHeader::new(edek_type, PayloadType::VectorMetadata, key_id),
@@ -249,6 +251,7 @@ pub(crate) fn decrypt_internal(
     key: &VectorEncryptionKey,
     encrypted_vector: EncryptedVector,
     icl_metadata_bytes: Bytes,
+    use_scaling_factor: bool,
 ) -> Result<PlaintextVector, AlloyError> {
     let (iv, auth_hash) = get_iv_and_auth_hash(&icl_metadata_bytes)?;
     Ok(crypto::decrypt(
@@ -259,6 +262,7 @@ pub(crate) fn decrypt_internal(
             iv,
             auth_hash,
         },
+        use_scaling_factor,
     )
     .map(|r| unshuffle(&key.key, r))?)
     .map(|dec| PlaintextVector {

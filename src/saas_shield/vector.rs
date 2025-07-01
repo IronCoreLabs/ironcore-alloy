@@ -26,17 +26,20 @@ pub struct SaasShieldVectorClient {
     approximation_factor: Option<f32>,
     tenant_security_client: Arc<TenantSecurityClient>,
     rng: Arc<Mutex<OurReseedingRng>>,
+    use_scaling_factor: bool,
 }
 
 impl SaasShieldVectorClient {
     pub(crate) fn new(
         client: Arc<TenantSecurityClient>,
         approximation_factor: Option<f32>,
+        use_scaling_factor: bool,
     ) -> Self {
         SaasShieldVectorClient {
             approximation_factor,
             tenant_security_client: client.clone(),
             rng: crate::util::create_reseeding_rng(),
+            use_scaling_factor,
         }
     }
 
@@ -59,6 +62,7 @@ impl SaasShieldVectorClient {
             self.get_edek_type(),
             plaintext_vector,
             self.rng.clone(),
+            self.use_scaling_factor,
         )
     }
 }
@@ -161,6 +165,7 @@ impl VectorOps for SaasShieldVectorClient {
                 self.get_edek_type(),
                 plaintext_vector,
                 self.rng.clone(),
+                self.use_scaling_factor,
             )
         };
         Ok(perform_batch_action(plaintext_vectors.0, encrypt_vector).into())
@@ -210,6 +215,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &key,
                 encrypted_vector,
                 icl_metadata_bytes.into(),
+                self.use_scaling_factor,
             )
         }
     }
@@ -253,6 +259,7 @@ impl VectorOps for SaasShieldVectorClient {
                 &original_vector_key,
                 encrypted_vector,
                 icl_metadata_bytes.into(),
+                self.use_scaling_factor,
             )
         };
         Ok(perform_batch_action(encrypted_vectors.0, decrypt_vector).into())
@@ -355,6 +362,7 @@ impl VectorOps for SaasShieldVectorClient {
                     &original_vector_key,
                     encrypted_vector,
                     icl_metadata_bytes.into(),
+                    self.use_scaling_factor,
                 )?;
                 let new_derived_key = new_tenant_keys.get_key_for_path(
                     &decrypted_vector.secret_path,
@@ -370,6 +378,7 @@ impl VectorOps for SaasShieldVectorClient {
                     self.get_edek_type(),
                     decrypted_vector,
                     self.rng.clone(),
+                    self.use_scaling_factor,
                 )
             }
         };

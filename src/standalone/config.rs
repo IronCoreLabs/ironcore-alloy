@@ -122,6 +122,7 @@ impl RotatableSecret {
 pub struct VectorSecret {
     pub(crate) approximation_factor: f32,
     pub(crate) secret: Arc<RotatableSecret>,
+    pub(crate) use_scaling_factor: bool,
 }
 #[uniffi::export]
 impl VectorSecret {
@@ -134,6 +135,19 @@ impl VectorSecret {
         Arc::new(Self {
             approximation_factor,
             secret,
+            use_scaling_factor: false,
+        })
+    }
+
+    #[uniffi::constructor]
+    pub fn new_with_scaling_factor(
+        approximation_factor: f32,
+        secret: Arc<RotatableSecret>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            approximation_factor,
+            secret,
+            use_scaling_factor: true,
         })
     }
 }

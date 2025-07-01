@@ -60,8 +60,20 @@ class IroncoreAlloyTest {
                                     )
                             )
             )
+    val vectorSecretsWithScaling =
+        mapOf(
+                "" to
+                        VectorSecret.newWithScalingFactor(
+                                approximationFactor,
+                                RotatableSecret(
+                                        StandaloneSecret(2, Secret(keyByteArray)),
+                                        StandaloneSecret(1, Secret(keyByteArray))
+                                )
+                        )
+        )
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
+    val sdkWithScaling = Standalone(StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecretsWithScaling))
 
     val httpClient = KotlinHttpClient()
     val integrationSdk =
@@ -96,7 +108,7 @@ class IroncoreAlloyTest {
         val encrypted = EncryptedVector(ciphertext, "", "", iclMetadata)
         val metadata = AlloyMetadata.newSimple("tenant")
         runBlocking {
-            val decrypted = sdk.vector().decrypt(encrypted, metadata)
+            val decrypted = sdkWithScaling.vector().decrypt(encrypted, metadata)
             assertContentEquals(
                     decrypted.plaintextVector,
                     listOf(1.0f, 2.0f, 3.0f),
@@ -155,7 +167,7 @@ class IroncoreAlloyTest {
         val vectorSecrets2 =
                 mapOf(
                         "" to
-                                VectorSecret(
+                                VectorSecret.newWithScalingFactor(
                                         approximationFactor,
                                         RotatableSecret(
                                                 // Switched current and in-rotation vs original sdk
@@ -183,7 +195,7 @@ class IroncoreAlloyTest {
             val vectorSecrets3 =
                     mapOf(
                             "" to
-                                    VectorSecret(
+                                    VectorSecret.newWithScalingFactor(
                                             approximationFactor,
                                             RotatableSecret(
                                                     StandaloneSecret(1, Secret(keyByteArray)),
