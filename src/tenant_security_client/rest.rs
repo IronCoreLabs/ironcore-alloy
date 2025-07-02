@@ -85,9 +85,7 @@ impl TspErrorResponse {
     pub fn try_from_value(value: Value, status: u16) -> Result<Self, AlloyError> {
         serde_json::from_value::<TspErrorResponse>(value.clone()).map_err(|_| {
             AlloyError::RequestError {
-                msg: format!(
-                    "TSP gave an invalid response: `{value}`. Status: {status}"
-                ),
+                msg: format!("TSP gave an invalid response: `{value}`. Status: {status}"),
             }
         })
     }
