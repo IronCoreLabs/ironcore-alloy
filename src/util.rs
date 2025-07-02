@@ -122,7 +122,7 @@ pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<i32>) -> Arc<Mutex<OurR
     maybe_seed
         //We don't care that the negative numbers turn into giant numbers for the seed we just need a static value.
         .map(|seed| create_test_seeded_rng(seed as u64))
-        .unwrap_or_else(|| create_reseeding_rng())
+        .unwrap_or_else(create_reseeding_rng)
 }
 
 pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T) -> ChaCha20Rng {
