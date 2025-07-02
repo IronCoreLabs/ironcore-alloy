@@ -132,7 +132,7 @@ fn generate_normalized_vector(
     calculate_normalized_vector(multivariate_normal_sample, uniform_point_in_ball)
 }
 
-pub(crate) fn encrypt<R: RngCore + CryptoRng>(
+pub(crate) fn encrypt<R: RngCore + CryptoRng + Send + Sync>(
     key: &VectorEncryptionKey, // K + s in the paper, key and scaling factor
     approximation_factor: f32,
     message: Array1<f32>, // m in the paper, vector
@@ -286,13 +286,10 @@ pub(crate) mod tests {
         let result = encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
-                key: EncryptionKey(
-                    vec![
-                        69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150,
-                        190, 245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
+                    245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
+                ]),
             },
             NEW_APPROX_FACTOR,
             vec![1., 2., 3., 4., 5.].into(),
@@ -323,13 +320,10 @@ pub(crate) mod tests {
         let result = encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
-                key: EncryptionKey(
-                    vec![
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ]),
             },
             ORIGINAL_APPROX_FACTOR,
             vec![1., 2., 3., 4., 5.].into(),
@@ -360,13 +354,10 @@ pub(crate) mod tests {
         let result = encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
-                key: EncryptionKey(
-                    vec![
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ]),
             },
             ORIGINAL_APPROX_FACTOR,
             vec![].into(),
@@ -386,13 +377,10 @@ pub(crate) mod tests {
         encrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(s),
-                key: EncryptionKey(
-                    vec![
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ]),
             },
             ORIGINAL_APPROX_FACTOR,
             vec![].into(),
@@ -420,13 +408,10 @@ pub(crate) mod tests {
         let result = decrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
-                key: EncryptionKey(
-                    vec![
-                        69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150,
-                        190, 245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
+                    245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
+                ]),
             },
             ORIGINAL_APPROX_FACTOR,
             EncryptResult {
@@ -452,13 +437,10 @@ pub(crate) mod tests {
         let result = decrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(1235.),
-                key: EncryptionKey(
-                    vec![
-                        69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150,
-                        190, 245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
+                    245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
+                ]),
             },
             NEW_APPROX_FACTOR,
             EncryptResult {
@@ -479,13 +461,10 @@ pub(crate) mod tests {
         decrypt(
             &VectorEncryptionKey {
                 scaling_factor: ScalingFactor(s),
-                key: EncryptionKey(
-                    vec![
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0,
-                    ]
-                    .into(),
-                ),
+                key: EncryptionKey(vec![
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0,
+                ]),
             },
             ORIGINAL_APPROX_FACTOR,
             EncryptResult {
@@ -515,21 +494,18 @@ pub(crate) mod tests {
     fn roundtrip_small_value() {
         let key = VectorEncryptionKey {
             scaling_factor: ScalingFactor(1.),
-            key: EncryptionKey(
-                vec![
-                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0,
-                ]
-                .into(),
-            ),
+            key: EncryptionKey(vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ]),
         };
         // let mut prf_rng = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
-        let message: Array1<f32> = vec![-6.593513538421856e-163].into();
+        let message: Array1<f32> = vec![-0.0].into();
         let encrypt_result = encrypt(
             &key,
             ORIGINAL_APPROX_FACTOR,
             message.clone(),
-            Arc::new(Mutex::new(rand::thread_rng())),
+            new_rng(),
             true,
         )
         .unwrap();
@@ -543,11 +519,11 @@ pub(crate) mod tests {
         fn roundtrip(arb_msg: Vec<u16>, key: [u8; 32], scaling_factor in 1..16777215) {
             let key = VectorEncryptionKey {
                 scaling_factor: ScalingFactor(scaling_factor as f32),
-                key: EncryptionKey(key.to_vec().into()),
+                key: EncryptionKey(key.to_vec()),
             };
             let approximation_factor = 5.;
             let message: Array1<f32> = arb_msg.into_iter().map(|u| u as f32).collect();
-            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  Arc::new(Mutex::new(rand::thread_rng())), true).unwrap();
+            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  new_rng(), true).unwrap();
             let decrypt_result = decrypt(&key, approximation_factor, encrypt_result, true).unwrap();
             assert_ulps_eq!(message.as_slice().unwrap(), decrypt_result.as_slice().unwrap());
         }
@@ -556,11 +532,11 @@ pub(crate) mod tests {
         fn roundtrip_no_scaling(arb_msg: Vec<u16>, key: [u8; 32], scaling_factor in 1..16777215) {
             let key = VectorEncryptionKey {
                 scaling_factor: ScalingFactor(scaling_factor as f32),
-                key: EncryptionKey(key.to_vec().into()),
+                key: EncryptionKey(key.to_vec()),
             };
             let approximation_factor = 5.;
             let message: Array1<f32> = arb_msg.into_iter().map(|u| u as f32).collect();
-            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  Arc::new(Mutex::new(rand::thread_rng())), false).unwrap();
+            let encrypt_result = encrypt(&key, approximation_factor, message.clone(),  new_rng(), false).unwrap();
             let decrypt_result = decrypt(&key, approximation_factor, encrypt_result, false).unwrap();
             assert_ulps_eq!(message.as_slice().unwrap(), decrypt_result.as_slice().unwrap());
         }
@@ -569,13 +545,10 @@ pub(crate) mod tests {
     fn get_key() -> VectorEncryptionKey {
         VectorEncryptionKey {
             scaling_factor: ScalingFactor(1235.),
-            key: EncryptionKey(
-                vec![
-                    69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
-                    245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
-                ]
-                .into(),
-            ),
+            key: EncryptionKey(vec![
+                69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
+                245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
+            ]),
         }
     }
     fn shuffle_with_static_key<A>(values: Array1<A>) -> Array1<A> {
@@ -637,7 +610,7 @@ pub(crate) mod tests {
         );
 
         // Shuffle twice and unshuffle twice
-        let one: Array1<_> = (1..100).into_iter().collect();
+        let one: Array1<_> = (1..100).collect();
         assert_eq!(
             unshuffle_with_static_key(unshuffle_with_static_key(shuffle_with_static_key(
                 shuffle_with_static_key(one.clone())
@@ -645,5 +618,13 @@ pub(crate) mod tests {
             .to_vec(),
             one.to_vec()
         );
+    }
+    fn new_rng() -> Arc<Mutex<ChaCha20Rng>> {
+        let mut entropy_source = rand::rngs::OsRng;
+        let rng =
+            ChaCha20Rng::from_rng(&mut entropy_source).expect("Failed to seed RNG from OsRng");
+
+        // Wrap in Arc<Mutex> to make it Send + Sync
+        Arc::new(Mutex::new(rng))
     }
 }

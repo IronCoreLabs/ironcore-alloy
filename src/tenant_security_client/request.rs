@@ -372,9 +372,7 @@ pub(crate) mod tests {
             encrypted_document_keys: HashMap<&str, Base64>,
             _metadata: &RequestMetadata,
         ) -> Result<BatchUnwrapKeyResponse, AlloyError> {
-            let keys = encrypted_document_keys
-                .into_iter()
-                .map(|(key, _)| {
+            let keys = encrypted_document_keys.into_keys().map(|key| {
                     (
                         key.to_string(),
                         UnwrapKeyResponse {

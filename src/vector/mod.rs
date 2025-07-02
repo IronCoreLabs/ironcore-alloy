@@ -213,7 +213,7 @@ pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), All
     ))
 }
 
-pub(crate) fn encrypt_internal<R: RngCore + CryptoRng>(
+pub(crate) fn encrypt_internal<R: RngCore + CryptoRng + Send + Sync>(
     approximation_factor: f32,
     key: &VectorEncryptionKey,
     key_id: KeyId,

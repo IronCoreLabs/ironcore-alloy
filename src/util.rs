@@ -233,7 +233,7 @@ pub(crate) mod tests {
     #[test]
     fn test_hash_empty_key() {
         assert_eq!(
-            hash256(&Bytes::default(), &[1u8]).to_vec(),
+            hash256(Bytes::default(), [1u8]).to_vec(),
             vec![
                 61, 122, 251, 102, 49, 36, 236, 191, 44, 149, 63, 134, 61, 79, 200, 121, 110, 235,
                 45, 55, 43, 100, 170, 213, 134, 151, 236, 82, 100, 100, 156, 219
@@ -253,7 +253,7 @@ pub(crate) mod tests {
             };
             let key = VectorEncryptionKey {
                 scaling_factor: ScalingFactor(f32_scaling_factor),
-                key: EncryptionKey(key.to_vec().into()),
+                key: EncryptionKey(key.to_vec()),
             };
 
             let first_hash = compute_auth_hash(&key, &1.2f32, iv, arb_msg.iter());
@@ -274,7 +274,7 @@ pub(crate) mod tests {
                 // have a full 4 byte input.
                 // Note that this test is different because it's using 2 random bytes as the padding
                 // here showing that it's not relevant what the padding was, just that it's present.
-                let prefix_padded = [&prefix_bytes[..], &arb_msg[..]].concat();
+                let prefix_padded = [prefix_bytes, &arb_msg[..]].concat();
                 let mut starting = ascii85::encode(prefix_padded.as_slice());
                 // drop the last 2 chars as they're the padding `~>` in the case of ascii85
                 starting.pop();
@@ -300,7 +300,7 @@ pub(crate) mod tests {
                 // so that the algorithm produces the correct character in the 2nd position.
                 // This is due to the way 85 bit encodings change the last character if you don't
                 // have a full 4 byte input.
-                let prefix_padded = [&prefix_bytes[..], &[0,0]].concat();
+                let prefix_padded = [prefix_bytes, &[0,0]].concat();
                 let mut starting = z85::encode(prefix_padded.as_slice());
                 // drop the last 3 characters of the produced string
                 // as they could be affected by the random bytes
@@ -323,7 +323,7 @@ pub(crate) mod tests {
                 // so that the algorithm produces the correct character in the 2nd position.
                 // This is due to the way 85 bit encodings change the last character if you don't
                 // have a full 4 byte input.
-                let prefix_padded = [&prefix_bytes[..], &[0, 0]].concat();
+                let prefix_padded = [prefix_bytes, &[0, 0]].concat();
                 let mut starting = base85::encode(prefix_padded.as_slice());
                 // drop the last 3 characters of the produced string
                 // as they could be affected by the random bytes
@@ -392,7 +392,7 @@ pub(crate) mod tests {
             let prefix = encode_prefix(prefix_bytes.as_slice());
             let full_vec = prefix_bytes
                 .into_iter()
-                .chain(arb_msg.to_vec().into_iter())
+                .chain(arb_msg.iter().copied())
                 .collect_vec();
             // String encoded prefix + arbitrary bytes.
             let encoded_string = encode_message(full_vec.as_slice());
