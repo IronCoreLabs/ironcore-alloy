@@ -86,8 +86,7 @@ impl TspErrorResponse {
         serde_json::from_value::<TspErrorResponse>(value.clone()).map_err(|_| {
             AlloyError::RequestError {
                 msg: format!(
-                    "TSP gave an invalid response: `{}`. Status: {}",
-                    value, status
+                    "TSP gave an invalid response: `{value}`. Status: {status}"
                 ),
             }
         })

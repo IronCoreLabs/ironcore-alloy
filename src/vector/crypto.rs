@@ -29,7 +29,7 @@ pub(crate) enum EncryptError {
 impl Display for EncryptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EncryptError::InvalidKey(msg) => write!(f, "{}", msg),
+            EncryptError::InvalidKey(msg) => write!(f, "{msg}"),
             EncryptError::OverflowError => {
                 write!(f, "Embedding or approximation factor too large.")
             }
@@ -48,7 +48,7 @@ pub(crate) enum DecryptError {
 impl Display for DecryptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecryptError::InvalidKey(msg) => write!(f, "{}", msg),
+            DecryptError::InvalidKey(msg) => write!(f, "{msg}"),
             DecryptError::InvalidAuthHash => write!(f, "Auth Hash verification failed."),
         }
     }
@@ -393,14 +393,14 @@ pub(crate) mod tests {
     fn encrypt_errors_zero_scaling_factor() {
         let result = encrypt_with_scaling_factor(0.0).unwrap_err();
         assert!(matches!(result, EncryptError::InvalidKey(_)));
-        assert!(format!("{:?}", result).contains("Scaling factor"));
+        assert!(format!("{result:?}").contains("Scaling factor"));
     }
 
     #[test]
     fn encrypt_errors_neg_zero_scaling_factor() {
         let result = encrypt_with_scaling_factor(0.0).unwrap_err();
         assert!(matches!(result, EncryptError::InvalidKey(_)));
-        assert!(format!("{:?}", result).contains("Scaling factor"));
+        assert!(format!("{result:?}").contains("Scaling factor"));
     }
 
     #[test]
@@ -480,13 +480,13 @@ pub(crate) mod tests {
     fn decrypt_errors_zero_scaling_factor() {
         let result = decrypt_with_scaling_factor(0.0).unwrap_err();
         assert!(matches!(result, DecryptError::InvalidKey(_)));
-        assert!(format!("{:?}", result).contains("Scaling factor"));
+        assert!(format!("{result:?}").contains("Scaling factor"));
     }
     #[test]
     fn decrypt_errors_neg_zero_scaling_factor() {
         let result = decrypt_with_scaling_factor(-0.0).unwrap_err();
         assert!(matches!(result, DecryptError::InvalidKey(_)));
-        assert!(format!("{:?}", result).contains("Scaling factor"));
+        assert!(format!("{result:?}").contains("Scaling factor"));
     }
 
     #[ignore]
