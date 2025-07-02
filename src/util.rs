@@ -118,8 +118,9 @@ pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
     )))
 }
 
-pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<u32>) -> Arc<Mutex<OurReseedingRng>> {
+pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<i32>) -> Arc<Mutex<OurReseedingRng>> {
     maybe_seed
+        //We don't care that the negative numbers turn into giant numbers for the seed we just need a static value.
         .map(|seed| create_test_seeded_rng(seed as u64))
         .unwrap_or_else(|| create_reseeding_rng())
 }
