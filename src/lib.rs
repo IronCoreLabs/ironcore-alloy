@@ -439,7 +439,7 @@ pub(crate) mod tests {
 
         let key = VectorEncryptionKey::derive_from_secret(&secret, &tenant_id, &derivation_path);
 
-        let expected_sha512 = vec![
+        let expected_sha512 = [
             82u8, 186, 45, 83, 222, 56, 178, 42, 61, 227, 197, 219, 58, 108, 227, 124, 186, 43,
             149, 126, 147, 7, 251, 173, 250, 201, 142, 180, 213, 120, 13, 80, 15, 151, 154, 116,
             33, 229, 191, 200, 97, 74, 54, 48, 196, 84, 213, 202, 84, 12, 202, 225, 20, 18, 2, 102,
@@ -447,7 +447,7 @@ pub(crate) mod tests {
         ];
 
         let expected_scaling_factor: [u8; 4] = std::iter::once(0u8)
-            .chain(expected_sha512[0..3].into_iter().cloned())
+            .chain(expected_sha512[0..3].iter().cloned())
             .collect_vec()
             .try_into()
             .unwrap();

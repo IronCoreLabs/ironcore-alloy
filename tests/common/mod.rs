@@ -59,7 +59,7 @@ pub(crate) fn get_dynamic_library_paths() -> Result<Vec<PathBuf>, Box<dyn Error>
     .map(|dir_entry| dir_entry.path())
     // Filter out all paths with extensions other than `so` or `dylib`
     .filter_map(|path| {
-        if path.extension().map_or(false, |ext| {
+        if path.extension().is_some_and(|ext| {
             (ext == "dylib" || ext == "so")
                 && path
                     .file_name()

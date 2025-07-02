@@ -373,8 +373,8 @@ pub(crate) mod tests {
             _metadata: &RequestMetadata,
         ) -> Result<BatchUnwrapKeyResponse, AlloyError> {
             let keys = encrypted_document_keys
-                .into_iter()
-                .map(|(key, _)| {
+                .into_keys()
+                .map(|key| {
                     (
                         key.to_string(),
                         UnwrapKeyResponse {

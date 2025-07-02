@@ -61,7 +61,7 @@ pub enum AdminEvent {
 
 impl Display for AdminEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = format!("ADMIN_{:?}", self).to_case(convert_case::Case::UpperSnake);
+        let formatted = format!("ADMIN_{self:?}").to_case(convert_case::Case::UpperSnake);
         write!(f, "{formatted}")
     }
 }
@@ -89,7 +89,7 @@ pub enum UserEvent {
 
 impl Display for UserEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = format!("USER_{:?}", self).to_case(convert_case::Case::UpperSnake);
+        let formatted = format!("USER_{self:?}").to_case(convert_case::Case::UpperSnake);
         write!(f, "{formatted}")
     }
 }
@@ -108,7 +108,7 @@ pub enum DataEvent {
 
 impl Display for DataEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = format!("DATA_{:?}", self).to_case(convert_case::Case::UpperSnake);
+        let formatted = format!("DATA_{self:?}").to_case(convert_case::Case::UpperSnake);
         write!(f, "{formatted}")
     }
 }
@@ -121,7 +121,7 @@ pub enum PeriodicEvent {
 
 impl Display for PeriodicEvent {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let formatted = format!("PERIODIC_{:?}", self).to_case(convert_case::Case::UpperSnake);
+        let formatted = format!("PERIODIC_{self:?}").to_case(convert_case::Case::UpperSnake);
         write!(f, "{formatted}")
     }
 }

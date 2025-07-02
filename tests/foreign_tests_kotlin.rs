@@ -26,7 +26,7 @@ mod test {
                 main_resources_path.join(library_file.file_name().unwrap()),
             )?;
         }
-        println!("{:?}", main_src_path);
+        println!("{main_src_path:?}");
         // generate the bindings to go with the just compiled binary
         generate_bindings(
             dynamic_library_paths[0].clone(),

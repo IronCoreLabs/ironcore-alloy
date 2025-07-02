@@ -355,7 +355,7 @@ fn tsp_benches(c: &mut Criterion) {
                 let field_size = 10;
                 PlaintextDocuments((0..num_documents).fold(HashMap::new(), |mut acc, i| {
                     let doc = generate_plaintext(field_size, num_fields, &mut rng);
-                    acc.insert(DocumentId(format!("doc{}", i)), doc);
+                    acc.insert(DocumentId(format!("doc{i}")), doc);
                     acc
                 }))
             },
@@ -377,7 +377,7 @@ fn generate_plaintext(
 ) -> PlaintextDocument {
     PlaintextDocument((0..num_fields).fold(HashMap::new(), |mut acc, i| {
         acc.insert(
-            FieldId(format!("field{}", i)),
+            FieldId(format!("field{i}")),
             random_bytes(rng, bytes_per_field),
         );
         acc
