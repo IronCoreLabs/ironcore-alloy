@@ -2,7 +2,7 @@ use super::config::VectorSecret;
 use crate::alloy_client_trait::DecomposedHeader;
 use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
-use crate::util::perform_batch_action;
+use crate::util::{self, OurReseedingRng, perform_batch_action};
 use crate::vector::{
     EncryptedVector, EncryptedVectors, GenerateVectorQueryResult, PlaintextVector,
     PlaintextVectors, VectorDecryptBatchResult, VectorEncryptBatchResult, VectorEncryptionKey,
@@ -14,21 +14,19 @@ use crate::{
 };
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, PayloadType};
 use itertools::Itertools;
-use rand::SeedableRng;
-use rand_chacha::ChaCha20Rng;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(uniffi::Object)]
 pub struct StandaloneVectorClient {
     config: Arc<HashMap<SecretPath, Arc<VectorSecret>>>,
-    rng: Arc<Mutex<ChaCha20Rng>>,
+    rng: Arc<Mutex<OurReseedingRng>>,
 }
 impl StandaloneVectorClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {
         Self {
             config: config.vector.clone(),
-            rng: Arc::new(Mutex::new(ChaCha20Rng::from_entropy())),
+            rng: util::create_reseeding_rng(),
         }
     }
     pub(crate) fn rotate_vector(
@@ -351,7 +349,7 @@ mod test {
     use approx::assert_ulps_eq;
 
     fn get_default_client() -> StandaloneVectorClient {
-        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let k = util::create_test_seeded_rng(1);
         let secret = Secret {
             secret: vec![
                 69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
@@ -374,7 +372,7 @@ mod test {
         };
 
         StandaloneVectorClient {
-            rng: Arc::new(Mutex::new(k)),
+            rng: k,
             config: Arc::new(
                 [(
                     SecretPath("secret_path".to_string()),
@@ -386,7 +384,7 @@ mod test {
     }
 
     fn get_in_rotation_client() -> StandaloneVectorClient {
-        let k = rand_chacha::ChaCha20Rng::seed_from_u64(1u64);
+        let rng = util::create_test_seeded_rng(1u64);
         let old_secret = Secret {
             secret: vec![
                 69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
@@ -419,7 +417,7 @@ mod test {
         };
 
         StandaloneVectorClient {
-            rng: Arc::new(Mutex::new(k)),
+            rng,
             config: Arc::new(
                 [(
                     SecretPath("secret_path".to_string()),

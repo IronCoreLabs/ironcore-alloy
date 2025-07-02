@@ -107,8 +107,8 @@ pub(crate) fn create_reseeding_rng() -> Arc<Mutex<OurReseedingRng>> {
     )))
 }
 
-/// Creates a seeded RNG that won't actually ever reseed to use in test functions from the FFI.
-#[cfg(test)]
+/// Creates a seeded RNG that won't actually ever reseed to use in test functions from the FFI and in the case
+/// that users are creating a client for testing
 pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
     //Note that this will never actually reseed because the threshold is 0.
     Arc::new(Mutex::new(ReseedingRng::new(
@@ -116,6 +116,12 @@ pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
         0,
         OsRng,
     )))
+}
+
+pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<u32>) -> Arc<Mutex<OurReseedingRng>> {
+    maybe_seed
+        .map(|seed| create_test_seeded_rng(seed as u64))
+        .unwrap_or_else(|| create_reseeding_rng())
 }
 
 pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T) -> ChaCha20Rng {
