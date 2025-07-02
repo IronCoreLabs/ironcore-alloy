@@ -26,7 +26,7 @@ impl StandaloneVectorClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {
         Self {
             config: config.vector.clone(),
-            rng: util::create_reseeding_rng(),
+            rng: util::create_rng_maybe_seeded(config.test_rng_seed),
         }
     }
     pub(crate) fn rotate_vector(
