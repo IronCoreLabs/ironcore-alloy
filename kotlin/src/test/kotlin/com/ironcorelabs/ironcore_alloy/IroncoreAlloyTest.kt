@@ -73,6 +73,7 @@ class IroncoreAlloyTest {
         )
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
+    val seededSdk = Standalone(StandaloneConfiguration.newSeededForTesting(standardSecrets, deterministicSecrets, vectorSecrets,1))
     val sdkWithScaling = Standalone(StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecretsWithScaling))
 
     val httpClient = KotlinHttpClient()
@@ -113,6 +114,18 @@ class IroncoreAlloyTest {
                     decrypted.plaintextVector,
                     listOf(1.0f, 2.0f, 3.0f),
             )
+        }
+    }
+
+    @Test
+    fun seededSdkVectorEncrypt() {
+        val data = listOf(0.1f, -0.2f)
+        val plaintext = PlaintextVector(data, "", "")
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = seededSdk.vector().encrypt(plaintext, metadata)
+            // Note that these values should be the same in all the tests from different languages.
+            assertContentEquals(encrypted.encryptedVector, listOf(0.1299239844083786f, -0.3532053828239441f))
         }
     }
 
