@@ -70,6 +70,9 @@ class TestIroncoreAlloy:
     config_with_scaling = StandaloneConfiguration(
         standard_secrets, deterministic_secrets, vector_secrets_with_scaling
     )
+    seeded_config = StandaloneConfiguration.new_seeded_for_testing(
+        standard_secrets, deterministic_secrets, vector_secrets, 1
+    )
 
     @pytest.fixture
     def standalone_sdk(self):
@@ -78,6 +81,10 @@ class TestIroncoreAlloy:
     @pytest.fixture
     def standalone_sdk_with_scaling(self):
         return Standalone(self.config_with_scaling)
+
+    @pytest.fixture
+    def standalone_seeded_sdk(self):
+        return Standalone(self.seeded_config)
 
     @pytest.fixture
     async def integration_sdk(self):
@@ -91,6 +98,14 @@ class TestIroncoreAlloy:
 
     def test_floating_point_math(self, standalone_sdk):
         pass
+
+    @pytest.mark.asyncio
+    async def test_seeded_sdk_vector_encrypt(self, standalone_seeded_sdk):
+        plaintext = PlaintextVector(plaintext_vector=[0.1,-0.2],
+                                    secret_path="", derivation_path="")  # fmt: skip
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await standalone_seeded_sdk.vector().encrypt(plaintext, metadata)
+        assert encrypted.encrypted_vector == [0.1299239844083786, -0.3532053828239441]
 
     @pytest.mark.asyncio
     async def test_roundtrip_vector(self, standalone_sdk):
@@ -260,6 +275,17 @@ class TestIroncoreAlloy:
         assert encrypted.document["foo"] != document["foo"]
         decrypted = await standalone_sdk.standard().decrypt(encrypted, metadata)
         assert decrypted == document
+
+    @pytest.mark.asyncio
+    async def test_seeded_sdk_standard_encrypt(self, standalone_seeded_sdk):
+        document = {"foo": b"My data"}
+        metadata = AlloyMetadata.new_simple("tenant")
+        encrypted = await standalone_seeded_sdk.standard().encrypt(document, metadata)
+        assert len(encrypted.document["foo"]) == 40
+        assert (
+            encrypted.document["foo"]
+            == b"\x00IRON\x0e\x17\x1f`\xde\x9eSA4\x88\x19\xa2kP\xfb\xaa\xef\xd0\xe2\xf49\x91\xd2\xe2\xb9\xfe~\xa5\\\x08\xac\xe4\x8ax\xe5"
+        )
 
     @pytest.mark.asyncio
     async def test_batch_roundtrip_standard(self, standalone_sdk):
