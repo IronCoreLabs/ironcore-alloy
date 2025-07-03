@@ -251,6 +251,17 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun seededSdkStandardEncrypt() {
+        val plaintextDocument = mapOf("foo" to "My data".toByteArray())
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = seededSdk.standard().encrypt(plaintextDocument, metadata)
+            // Same value as tests from other languages with the same seed
+            assertEquals(encrypted.document.get("foo")!!.toBase64(), "AElST04OFx9g3p5TQTSIGaJrUPuq79Di9DmR0uK5/n6lXAis5Ip45Q==")
+        }
+    }
+
+    @Test
     fun sdkStandardBatchRoundtrip() {
         val plaintextDocument = mapOf("foo" to "My data".toByteArray())
         val plaintextDocuments = mapOf("doc" to plaintextDocument)

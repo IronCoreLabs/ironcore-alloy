@@ -220,6 +220,18 @@ public class IroncoreAlloyTest {
     }
 
     @Test
+    public void seededSdkStandardEncrypt() throws InterruptedException, ExecutionException {
+        FieldId testFieldId = new FieldId("foo");
+        PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(testFieldId, new PlaintextBytes("My data".getBytes())));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+
+        EncryptedDocument encrypted = seededSdk.standard().encrypt(plaintextDocument, metadata).get();
+        assertTrue(encrypted.document().containsKey(testFieldId));
+        // Same value as tests from other languages with the same seed
+        assertEquals(toBase64(encrypted.document().get(testFieldId).value()),"AElST04OFx9g3p5TQTSIGaJrUPuq79Di9DmR0uK5/n6lXAis5Ip45Q==");
+    }
+
+    @Test
     public void sdkStandardBatchRoundtrip() throws InterruptedException, ExecutionException {
         PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(new FieldId("foo"), new PlaintextBytes("My data".getBytes())));
         PlaintextDocuments plaintextDocuments = new PlaintextDocuments(Map.of(new DocumentId("doc"), plaintextDocument));
