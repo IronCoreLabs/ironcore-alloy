@@ -34,7 +34,7 @@ impl StandaloneStandardClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {
         Self {
             config: config.standard.clone(),
-            rng: crate::util::create_reseeding_rng(),
+            rng: crate::util::create_rng_maybe_seeded(config.test_rng_seed),
         }
     }
 

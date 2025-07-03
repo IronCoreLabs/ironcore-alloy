@@ -73,6 +73,7 @@ class IroncoreAlloyTest {
         )
     val config = StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets)
     val sdk = Standalone(config)
+    val seededSdk = Standalone(StandaloneConfiguration.newSeededForTesting(standardSecrets, deterministicSecrets, vectorSecrets,1))
     val sdkWithScaling = Standalone(StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecretsWithScaling))
 
     val httpClient = KotlinHttpClient()
@@ -113,6 +114,18 @@ class IroncoreAlloyTest {
                     decrypted.plaintextVector,
                     listOf(1.0f, 2.0f, 3.0f),
             )
+        }
+    }
+
+    @Test
+    fun seededSdkVectorEncrypt() {
+        val data = listOf(0.1f, -0.2f)
+        val plaintext = PlaintextVector(data, "", "")
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = seededSdk.vector().encrypt(plaintext, metadata)
+            // Note that these values should be the same in all the tests from different languages.
+            assertContentEquals(encrypted.encryptedVector, listOf(0.1299239844083786f, -0.3532053828239441f))
         }
     }
 
@@ -234,6 +247,17 @@ class IroncoreAlloyTest {
             assertContains(encrypted.document, "foo")
             val decrypted = sdk.standard().decrypt(encrypted, metadata)
             assertContentEquals(decrypted.get("foo"), plaintextDocument.get("foo"))
+        }
+    }
+
+    @Test
+    fun seededSdkStandardEncrypt() {
+        val plaintextDocument = mapOf("foo" to "My data".toByteArray())
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encrypted = seededSdk.standard().encrypt(plaintextDocument, metadata)
+            // Same value as tests from other languages with the same seed
+            assertEquals(encrypted.document.get("foo")!!.toBase64(), "AElST04OFx9g3p5TQTSIGaJrUPuq79Di9DmR0uK5/n6lXAis5Ip45Q==")
         }
     }
 
