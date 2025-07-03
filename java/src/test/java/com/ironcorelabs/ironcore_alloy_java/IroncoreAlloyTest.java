@@ -100,6 +100,7 @@ public class IroncoreAlloyTest {
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
 
         EncryptedVector encrypted = seededSdk.vector().encrypt(plaintext, metadata).get();
+        // Values match other tests using the same seed.
         assertEquals(encrypted.encryptedVector(), Arrays.asList(0.1299239844083786f, -0.3532053828239441f));
     }
 

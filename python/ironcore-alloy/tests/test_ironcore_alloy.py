@@ -105,6 +105,7 @@ class TestIroncoreAlloy:
                                     secret_path="", derivation_path="")  # fmt: skip
         metadata = AlloyMetadata.new_simple("tenant")
         encrypted = await standalone_seeded_sdk.vector().encrypt(plaintext, metadata)
+        # Values match other tests using the same seed.
         assert encrypted.encrypted_vector == [0.1299239844083786, -0.3532053828239441]
 
     @pytest.mark.asyncio
