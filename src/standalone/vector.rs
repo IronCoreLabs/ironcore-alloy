@@ -345,7 +345,10 @@ mod test {
     use super::*;
     use crate::TenantId;
     use crate::vector::VectorId;
-    use crate::{Secret, standalone::config::StandaloneSecret};
+    use crate::{
+        Secret,
+        standalone::config::{StandaloneSecret, StandardSecrets},
+    };
     use approx::assert_ulps_eq;
 
     fn get_default_client() -> StandaloneVectorClient {
@@ -435,6 +438,63 @@ mod test {
     #[tokio::test]
     async fn encrypt_produces_known_value() {
         let ironcore_alloy = get_default_client();
+        let plaintext = PlaintextVector {
+            plaintext_vector: vec![1., 2., 3., 4., 5.],
+            secret_path: SecretPath("secret_path".to_string()),
+            derivation_path: DerivationPath("deriv_path".to_string()),
+        };
+        let result = ironcore_alloy
+            .encrypt(plaintext, &get_metadata())
+            .await
+            .unwrap();
+        assert_eq!(
+            result.encrypted_vector.to_vec(),
+            vec![13681085.0, 42081104.0, 82401560.0, 19847844.0, 60127316.0]
+        );
+        assert_eq!(
+            result.paired_icl_info.0,
+            [
+                0, 0, 0, 1, 129, 0, 10, 12, 154, 55, 68, 80, 69, 96, 99, 158, 198, 112, 183, 161,
+                18, 32, 125, 78, 5, 108, 187, 19, 103, 206, 124, 199, 184, 212, 208, 35, 61, 45, 6,
+                130, 55, 85, 125, 210, 5, 126, 145, 45, 240, 250, 63, 45, 168, 104
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn seeded_constructor_produces_known_values() {
+        let secret = Secret {
+            secret: vec![
+                69, 96, 99, 158, 198, 112, 183, 161, 125, 73, 43, 39, 62, 7, 123, 10, 150, 190,
+                245, 139, 167, 118, 7, 121, 229, 68, 84, 110, 0, 14, 254, 200,
+            ],
+        };
+        let standalone_secret = StandaloneSecret {
+            id: 1,
+            secret: Arc::new(secret),
+        };
+        let rotatable_secret = RotatableSecret {
+            current_secret: Some(Arc::new(standalone_secret)),
+            in_rotation_secret: None,
+        };
+
+        let vector_secret = VectorSecret {
+            approximation_factor: 4.0f32,
+            secret: Arc::new(rotatable_secret),
+            use_scaling_factor: true,
+        };
+
+        let seeded_config = StandaloneConfiguration::new_seeded_for_testing(
+            StandardSecrets::new(None, vec![]).unwrap(),
+            Default::default(),
+            [(
+                SecretPath("secret_path".to_string()),
+                Arc::new(vector_secret),
+            )]
+            .into(),
+            1,
+        );
+        let ironcore_alloy = StandaloneVectorClient::new(Arc::try_unwrap(seeded_config).unwrap());
         let plaintext = PlaintextVector {
             plaintext_vector: vec![1., 2., 3., 4., 5.],
             secret_path: SecretPath("secret_path".to_string()),
