@@ -1,6 +1,7 @@
 ## 0.13.0 (unreleased)
 
 - Dependency updates
+- Added a `new_seeded_for_testing` constructor for `StandaloneConfiguration` which allows for testing with deterministic known values. DO NOT USE IN PRODUCTION CODE.
 
 ### Breaking Changes
 
