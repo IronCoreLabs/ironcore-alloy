@@ -345,7 +345,10 @@ mod test {
     use super::*;
     use crate::TenantId;
     use crate::vector::VectorId;
-    use crate::{Secret, standalone::config::{StandaloneSecret, StandardSecrets}};
+    use crate::{
+        Secret,
+        standalone::config::{StandaloneSecret, StandardSecrets},
+    };
     use approx::assert_ulps_eq;
 
     fn get_default_client() -> StandaloneVectorClient {
