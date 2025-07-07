@@ -5,7 +5,6 @@ import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 import okhttp3.*;
 import java.util.*;
-import java.util.Base64;
 import java.util.stream.Collectors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CompletableFuture;
@@ -53,6 +52,7 @@ public class IroncoreAlloyTest {
     private Map<SecretPath, VectorSecret> vectorSecrets;
     private StandaloneConfiguration config; 
     private Standalone sdk;
+    private Standalone seededSdk;
     // SDK which will use the scaling factor
     private Standalone sdkWithScaling;
     private SaasShield integrationSdk;
@@ -70,6 +70,7 @@ public class IroncoreAlloyTest {
             )));
         config = new StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets);
         sdk = new Standalone(config);
+        seededSdk = new Standalone(StandaloneConfiguration.newSeededForTesting(standardSecrets, deterministicSecrets, vectorSecrets,1));
         sdkWithScaling = new Standalone(new StandaloneConfiguration(standardSecrets, deterministicSecrets,
                 Map.of(new SecretPath(""), VectorSecret.newWithScalingFactor(approximationFactor, new RotatableSecret(
                         new StandaloneSecret(2, new Secret(keyByteArray)),
@@ -90,6 +91,17 @@ public class IroncoreAlloyTest {
         for (int i = 0; i < data.size(); i++) {
             assertEquals(data.get(i), decrypted.plaintextVector().get(i), floatComparisonDelta);
         }
+    }
+
+    @Test
+    public void seededSdkVectorEncrypt() throws InterruptedException, ExecutionException {
+        List<Float> data = Arrays.asList(0.1f, -0.2f);
+        PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+
+        EncryptedVector encrypted = seededSdk.vector().encrypt(plaintext, metadata).get();
+        // Values match other tests using the same seed.
+        assertEquals(encrypted.encryptedVector(), Arrays.asList(0.1299239844083786f, -0.3532053828239441f));
     }
 
     @Test
@@ -205,6 +217,18 @@ public class IroncoreAlloyTest {
         assertTrue(encrypted.document().containsKey(testFieldId));
         PlaintextDocument decrypted = sdk.standard().decrypt(encrypted, metadata).get();
         assertArrayEquals(plaintextDocument.value().get(testFieldId).value(), decrypted.value().get(testFieldId).value());
+    }
+
+    @Test
+    public void seededSdkStandardEncrypt() throws InterruptedException, ExecutionException {
+        FieldId testFieldId = new FieldId("foo");
+        PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(testFieldId, new PlaintextBytes("My data".getBytes())));
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+
+        EncryptedDocument encrypted = seededSdk.standard().encrypt(plaintextDocument, metadata).get();
+        assertTrue(encrypted.document().containsKey(testFieldId));
+        // Same value as tests from other languages with the same seed
+        assertEquals(toBase64(encrypted.document().get(testFieldId).value()),"AElST04OFx9g3p5TQTSIGaJrUPuq79Di9DmR0uK5/n6lXAis5Ip45Q==");
     }
 
     @Test

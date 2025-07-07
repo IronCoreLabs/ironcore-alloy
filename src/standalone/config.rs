@@ -161,6 +161,7 @@ pub struct StandaloneConfiguration {
     pub(crate) standard: Arc<StandardSecrets>,
     pub(crate) deterministic: Arc<HashMap<SecretPath, Arc<RotatableSecret>>>,
     pub(crate) vector: Arc<HashMap<SecretPath, Arc<VectorSecret>>>,
+    pub(crate) test_rng_seed: Option<i32>,
 }
 #[uniffi::export]
 impl StandaloneConfiguration {
@@ -174,6 +175,22 @@ impl StandaloneConfiguration {
             standard,
             deterministic: Arc::new(deterministic),
             vector: Arc::new(vector),
+            test_rng_seed: None,
+        })
+    }
+
+    #[uniffi::constructor]
+    pub fn new_seeded_for_testing(
+        standard: Arc<StandardSecrets>,
+        deterministic: HashMap<SecretPath, Arc<RotatableSecret>>,
+        vector: HashMap<SecretPath, Arc<VectorSecret>>,
+        test_rng_seed: i32,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            standard,
+            deterministic: Arc::new(deterministic),
+            vector: Arc::new(vector),
+            test_rng_seed: Some(test_rng_seed),
         })
     }
 }
