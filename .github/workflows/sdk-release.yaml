@@ -1,4 +1,4 @@
-name: Python/Kotlin/Java Release
+name: Python/Kotlin/Java/Rust Release
 on:
   # https://docs.github.com/en/developers/webhooks-and-events/webhook-events-and-payloads#release
   # The Bump Version workflow will make a Github release if it isn't a prerelease version
@@ -133,9 +133,13 @@ jobs:
         run: hatch publish --repo main --user __token__ --auth "${{ secrets.PYPI_TOKEN }}"
         working-directory: python/ironcore-alloy/ironcore_alloy
 
+  rust-release:
+    uses: IronCoreLabs/workflows/.github/workflows/rust-release.yaml@rust-release-v1
+    secrets: inherit
+
   mark-github-release:
     if: github.event.release != null
-    needs: [kotlin-release, python-release]
+    needs: [kotlin-release, python-release, java-release, rust-release]
     runs-on: buildjet-2vcpu-ubuntu-2204
     steps:
       - uses: actions/checkout@v4
