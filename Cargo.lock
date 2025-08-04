@@ -2383,9 +2383,9 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-java"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47eaf6d040d7d9d5838a51a843f0c548a63fe4d02c494a61c2967d6763f5a853"
+checksum = "b3cdb5158754598a4cde5c62c94d5172f405bd1b5b1bfbe7c4025956b657e905"
 dependencies = [
  "anyhow",
  "askama",
