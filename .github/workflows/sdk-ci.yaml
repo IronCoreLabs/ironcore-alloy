@@ -35,7 +35,7 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "17"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/kotlin/src/main/resources/
@@ -73,7 +73,7 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "21"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/java/src/main/resources/
@@ -108,7 +108,7 @@ jobs:
           ]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy

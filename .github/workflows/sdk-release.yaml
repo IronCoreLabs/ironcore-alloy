@@ -20,7 +20,7 @@ jobs:
     runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
       - name: Rename directories
@@ -63,7 +63,7 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "21"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: ${{ github.workspace }}/java/src/main/resources/
       - name: Rename directories
@@ -102,7 +102,7 @@ jobs:
     runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: ${{ github.workspace }}/python/ironcore-alloy
       - name: Rename directories
