@@ -19,7 +19,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
@@ -58,7 +58,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-java@v4
         with:
           distribution: "temurin"
@@ -101,7 +101,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: buildjet-2vcpu-ubuntu-2004
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with:
           path: ${{ github.workspace }}/python/ironcore-alloy
@@ -142,7 +142,7 @@ jobs:
     needs: [kotlin-release, python-release, java-release, rust-release]
     runs-on: buildjet-2vcpu-ubuntu-2204
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Mark GitHub release as not prerelease
