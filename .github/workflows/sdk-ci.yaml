@@ -12,7 +12,7 @@ jobs:
     uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
     with:
       # This should stay in sync with the `runs-on` from the other jobs in this file
-      os_matrix: '["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-13", "macos-14"]'
+      os_matrix: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-13", "macos-14"]'
       build_profile: "release"
     secrets: inherit
 
@@ -22,13 +22,7 @@ jobs:
     strategy:
       matrix:
         # This should stay in sync with the `os_matrix` above
-        runs-on:
-          [
-            "buildjet-2vcpu-ubuntu-2004",
-            "buildjet-4vcpu-ubuntu-2204-arm",
-            "macos-13",
-            "macos-14",
-          ]
+        runs-on: ["ubuntu-24.04", "ubuntu-24.04-arm", "macos-13", "macos-14"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v4
@@ -39,12 +33,7 @@ jobs:
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/kotlin/src/main/resources/
-      - if: startsWith(matrix.runs-on, 'buildjet')
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-provider: buildjet
-      - if: startsWith(matrix.runs-on, 'macos')
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-provider: github
       - name: Generate Kotlin files
@@ -53,20 +42,14 @@ jobs:
       - name: Run Kotlin tests
         run: ./gradlew test
         working-directory: kotlin
-        
+
   java-test:
     needs: generate-cdylibs
     runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
         # This should stay in sync with the `os_matrix` above
-        runs-on:
-          [
-            "buildjet-2vcpu-ubuntu-2004",
-            "buildjet-4vcpu-ubuntu-2204-arm",
-            "macos-13",
-            "macos-14",
-          ]
+        runs-on: ["ubuntu-24.04", "ubuntu-24.04-arm", "macos-13", "macos-14"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v4
@@ -77,12 +60,7 @@ jobs:
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/java/src/main/resources/
-      - if: startsWith(matrix.runs-on, 'buildjet')
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-provider: buildjet
-      - if: startsWith(matrix.runs-on, 'macos')
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-provider: github
       - name: Generate Java files
@@ -99,25 +77,14 @@ jobs:
       fail-fast: false
       matrix:
         # This should stay in sync with the `os_matrix` above and the `runs-on` from the other jobs in this file
-        runs-on:
-          [
-            "buildjet-2vcpu-ubuntu-2004",
-            "buildjet-4vcpu-ubuntu-2204-arm",
-            "macos-13",
-            "macos-14",
-          ]
+        runs-on: ["ubuntu-24.04", "ubuntu-24.04-arm", "macos-13", "macos-14"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
         with:
           name: ${{ join(matrix.runs-on) }}-
           path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy
-      - if: startsWith(matrix.runs-on, 'buildjet')
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-provider: buildjet
-      - if: startsWith(matrix.runs-on, 'macos')
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-provider: github
       - name: Generate Python files
@@ -141,10 +108,10 @@ jobs:
             3.10
             3.11
       - name: Install hatch
-        if: matrix.runs-on != 'buildjet-4vcpu-ubuntu-2204-arm' && matrix.runs-on != 'macos-14'
+        if: matrix.runs-on != 'ubuntu-24.04-arm' && matrix.runs-on != 'macos-14'
         run: pipx install hatch
       - name: Install hatch (ARM)
-        if: matrix.runs-on == 'buildjet-4vcpu-ubuntu-2204-arm' || matrix.runs-on == 'macos-14'
+        if: matrix.runs-on == 'ubuntu-24.04-arm' || matrix.runs-on == 'macos-14'
         # The arm machines have a permissions error if we don't use sudo
         run: sudo pipx install hatch
       - name: Run Python tests

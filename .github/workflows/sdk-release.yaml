@@ -11,13 +11,13 @@ jobs:
   generate-cdylibs:
     uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
     with:
-      os_matrix: '["buildjet-2vcpu-ubuntu-2004", "buildjet-4vcpu-ubuntu-2204-arm", "macos-13", "macos-14"]'
+      os_matrix: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-13", "macos-14"]'
       build_profile: "release"
     secrets: inherit
 
   kotlin-release:
     needs: generate-cdylibs
-    runs-on: buildjet-2vcpu-ubuntu-2004
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
@@ -25,8 +25,8 @@ jobs:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
       - name: Rename directories
         run: |
-          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
-          mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
+          mv ubuntu-24.04- linux-x86-64
+          mv ubuntu-24.04-arm- linux-arm
           mv macos-13- darwin-x86-64
           mv macos-14- darwin-aarch64
         working-directory: kotlin/src/main/resources/
@@ -41,9 +41,6 @@ jobs:
         run: gpg --batch --import .github/9FA43559.asc
       - name: Export GPG signing key
         run: gpg --export-secret-keys > /tmp/9FA43559.asc
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-provider: buildjet
       - name: Generate Kotlin files
         run: cargo run --bin uniffi-bindgen generate --library resources/linux-x86-64/libironcore_alloy.so --language kotlin --out-dir kotlin
         working-directory: kotlin/src/main
@@ -56,7 +53,7 @@ jobs:
 
   java-release:
     needs: generate-cdylibs
-    runs-on: buildjet-2vcpu-ubuntu-2004
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v4
@@ -68,8 +65,8 @@ jobs:
           path: ${{ github.workspace }}/java/src/main/resources/
       - name: Rename directories
         run: |
-          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
-          mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
+          mv ubuntu-24.04- linux-x86-64
+          mv ubuntu-24.04-arm- linux-arm
           mv macos-13- darwin-x86-64
           mv macos-14- darwin-aarch64
         working-directory: java/src/main/resources/
@@ -84,9 +81,6 @@ jobs:
         run: gpg --batch --import .github/9FA43559.asc
       - name: Export GPG signing key
         run: gpg --export-secret-keys > /tmp/9FA43559.asc
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-provider: buildjet
       - name: Generate Java files
         run: cargo run --bin uniffi-bindgen-java generate --library resources/linux-x86-64/libironcore_alloy.so --out-dir java
         working-directory: java/src/main
@@ -99,7 +93,7 @@ jobs:
 
   python-release:
     needs: generate-cdylibs
-    runs-on: buildjet-2vcpu-ubuntu-2004
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v5
@@ -107,14 +101,11 @@ jobs:
           path: ${{ github.workspace }}/python/ironcore-alloy
       - name: Rename directories
         run: |
-          mv buildjet-2vcpu-ubuntu-2004- linux-x86-64
-          mv buildjet-4vcpu-ubuntu-2204-arm- linux-arm
+          mv ubuntu-24.04- linux-x86-64
+          mv ubuntu-24.04-arm- linux-arm
           mv macos-13- darwin-x86-64
           mv macos-14- darwin-aarch64
         working-directory: python/ironcore-alloy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-provider: buildjet
       - name: Generate Python files
         run: cargo run --bin uniffi-bindgen generate --library ../linux-x86-64/libironcore_alloy.so --language python --out-dir .
         working-directory: python/ironcore-alloy/ironcore_alloy
@@ -140,7 +131,7 @@ jobs:
   mark-github-release:
     if: github.event.release != null
     needs: [kotlin-release, python-release, java-release, rust-release]
-    runs-on: buildjet-2vcpu-ubuntu-2204
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
