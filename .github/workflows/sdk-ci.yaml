@@ -92,7 +92,7 @@ jobs:
         working-directory: python/ironcore-alloy/ironcore_alloy
       - name: Install Python test matrix
         if: endsWith(matrix.runs-on, 'arm') != true && matrix.runs-on != 'macos-14'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # there are no builds for arm linux at all, so we'll make do with the system ones
           python-version: |
@@ -101,7 +101,7 @@ jobs:
             3.11
       - name: Install Python test matrix (macos-14)
         if: matrix.runs-on == 'macos-14'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # arm mac builds don't exist for pre-3.10
           python-version: |
