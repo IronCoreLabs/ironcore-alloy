@@ -45,6 +45,7 @@ dependencies = ["mkdocs.material==9.4.8", "mkdocstrings-python==1.10.8"]
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build --clean --strict {args}"
 serve = "mkdocs serve --dev-addr localhost:8000 {args}"
+# added because ReadTheDocs was having issues with passing args
 buildRtd = "mkdocs build --clean --strict --site-dir $READTHEDOCS_OUTPUT/html"
 
 [tool.hatch.envs.test]
