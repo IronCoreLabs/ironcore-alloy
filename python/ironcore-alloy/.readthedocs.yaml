@@ -17,6 +17,4 @@ build:
   - env | grep -i hatch || true
   - env | grep -i filter || true
   - hatch --version
-  - hatch env create docs
-  - hatch env show
-  - cd python/ironcore-alloy && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
+  - cd python/ironcore-alloy && hatch env create docs && hatch env show && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
