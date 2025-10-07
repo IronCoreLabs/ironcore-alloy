@@ -11,10 +11,6 @@ build:
   - ./python/ironcore-alloy/rust-toolchain-from-file.sh
   - ~/.cargo/bin/cargo b --release
   - ~/.cargo/bin/cargo run --bin uniffi-bindgen generate --library ./target/release/libironcore_alloy.so --language python  --out-dir python/ironcore-alloy/ironcore_alloy
-  # actual doc building part
   - pip install -v "hatch==1.14.1"
-  - echo $READTHEDOCS_OUTPUT
-  - env | grep -i hatch || true
-  - env | grep -i filter || true
-  - hatch --version
-  - cd python/ironcore-alloy && hatch env create docs && hatch env show && hatch run docs:build --site-dir $READTHEDOCS_OUTPUT/html
+  # actual doc building part
+  - cd python/ironcore-alloy && hatch run docs:buildRtd
