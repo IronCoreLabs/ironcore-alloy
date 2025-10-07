@@ -13,4 +13,4 @@ build:
   - ~/.cargo/bin/cargo run --bin uniffi-bindgen generate --library ./target/release/libironcore_alloy.so --language python  --out-dir python/ironcore-alloy/ironcore_alloy
   - pip install -v "hatch==1.14.1"
   # actual doc building part
-  - cd python/ironcore-alloy && hatch run docs:buildRtd
+  - cd python/ironcore-alloy && hatch env run -e docs buildRtd
