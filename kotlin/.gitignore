@@ -5,3 +5,4 @@ build
 src/main/kotlin/com/ironcorelabs/ironcore_alloy/ironcore_alloy.kt
 src/main/resources/libironcore_alloy.*
 gradle.properties
+bin
