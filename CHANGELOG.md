@@ -1,3 +1,7 @@
+## 0.13.1
+
+- Fix a bug in SaaS Shield clients using the default HttpClient that would cause TSP requests to fail with a bad auth header.
+
 ## 0.13.0
 
 - Dependency updates

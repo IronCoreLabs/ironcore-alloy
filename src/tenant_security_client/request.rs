@@ -69,13 +69,14 @@ impl HttpClient for reqwest::Client {
                 ),
             })?,
         );
-        let mut auth_header =
-            HeaderValue::from_str(&headers.content_type).map_err(|_| AlloyError::RequestError {
+        let mut auth_header = HeaderValue::from_str(&headers.authorization).map_err(|_| {
+            AlloyError::RequestError {
                 msg: format!(
                     "Bad Authorization header provided to the HTTP client: {}",
                     headers.content_type
                 ),
-            })?;
+            }
+        })?;
         auth_header.set_sensitive(true);
         reqwest_header_map.insert("Authorization", auth_header);
 

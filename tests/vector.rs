@@ -38,13 +38,13 @@ mod tests {
 
     fn get_ciphertext() -> EncryptedVector {
         EncryptedVector {
-            encrypted_vector: vec![6603509.0, 3720753.8, 11410740.0],
+            encrypted_vector: vec![1.9443791, 1.0083799, 2.8500426],
             secret_path: SecretPath("secret".to_string()),
             derivation_path: DerivationPath("deriv".to_string()),
             paired_icl_info: vec![
-                0, 0, 20, 0, 1, 0, 10, 12, 93, 90, 137, 229, 59, 92, 49, 169, 195, 149, 119, 254,
-                18, 32, 89, 97, 57, 184, 245, 149, 102, 216, 193, 211, 108, 152, 133, 173, 42, 183,
-                134, 13, 200, 254, 170, 233, 12, 54, 187, 169, 191, 177, 33, 22, 195, 110,
+                0, 0, 20, 0, 1, 0, 10, 12, 34, 82, 15, 231, 178, 250, 195, 106, 119, 167, 225, 189,
+                18, 32, 155, 124, 97, 213, 47, 71, 125, 3, 233, 86, 104, 12, 76, 209, 230, 60, 252,
+                149, 48, 220, 1, 143, 77, 176, 162, 115, 159, 156, 88, 155, 193, 7,
             ]
             .into(),
         }
@@ -54,11 +54,15 @@ mod tests {
     async fn vector_encrypt_works() -> TestResult {
         let plaintext = get_plaintext();
         let metadata = get_metadata();
-        let encrypted = get_client().vector().encrypt(plaintext, &metadata).await?;
+        let encrypted = get_client()
+            .vector()
+            .encrypt(plaintext.clone(), &metadata)
+            .await?;
         assert_eq!(encrypted.encrypted_vector.len(), 3);
         assert_eq!(encrypted.paired_icl_info.0.len(), 54);
         assert_eq!(encrypted.secret_path.0, "secret");
         assert_eq!(encrypted.derivation_path.0, "deriv");
+        assert_ne!(plaintext.plaintext_vector, encrypted.encrypted_vector);
         Ok(())
     }
 
