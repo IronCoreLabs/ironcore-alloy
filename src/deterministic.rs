@@ -6,7 +6,7 @@ use crate::{
 use aes_gcm::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
-use ironcore_documents::v5::key_id_header::KeyIdHeader;
+use ironcore_documents::{impl_secret_debug, v5::key_id_header::KeyIdHeader};
 use std::collections::HashMap;
 use uniffi::custom_newtype;
 
@@ -46,8 +46,9 @@ create_batch_result_struct_using_newtype!(
 );
 
 /// Key used for deterministic operations.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct DeterministicEncryptionKey(pub Vec<u8>);
+impl_secret_debug!(DeterministicEncryptionKey);
 
 impl DeterministicEncryptionKey {
     /// A way to generate a key from the secret, tenant_id and derivation_path. This is done in the context of

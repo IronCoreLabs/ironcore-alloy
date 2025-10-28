@@ -4,6 +4,7 @@ use crate::errors::AlloyError;
 use crate::saas_shield::SecurityEvent;
 use crate::{DerivationPath, SecretPath};
 use base64_type::Base64;
+use ironcore_documents::impl_secret_debug;
 use request::{AlloyHttpClientHeaders, HttpClient, TenantSecurityRequest, TspRequest};
 pub use rest::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, DerivationType, DeriveKeyChoice, DerivedKey,
@@ -24,8 +25,8 @@ pub(crate) mod errors;
 pub(crate) mod request;
 mod rest;
 
-#[derive(Debug)]
 pub(crate) struct ApiKey(pub(crate) String);
+impl_secret_debug!(ApiKey);
 
 impl TryFrom<String> for ApiKey {
     type Error = AlloyError;

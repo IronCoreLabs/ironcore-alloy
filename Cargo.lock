@@ -1134,28 +1134,19 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa3f9b0cb178f9448ea1e10a66ab71438a3faa4105d7b61eafa1b008a17eb21"
+version = "0.2.2-pre.2"
+source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?branch=add-secret-debug#d8348a085e2f3015590bc9f117ae1b18d117bb8b"
 dependencies = [
  "aes-gcm",
  "bytes",
+ "hex",
  "hmac",
- "itertools 0.12.1",
+ "itertools 0.14.0",
  "protobuf",
  "protobuf-codegen",
  "rand 0.8.5",
  "sha2",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "itertools"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
-dependencies = [
- "either",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

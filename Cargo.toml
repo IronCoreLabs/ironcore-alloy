@@ -43,8 +43,9 @@ base64_type = "0.2"
 bytes = { version = "1.10.1", features = ["serde"] }
 convert_case = "0.8.0"
 futures = "0.3.31"
+hex = "0.4"
 hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = "0.2.1"
+ironcore-documents = { git = "https://github.com/IronCoreLabs/ironcore-documents.git", branch = "add-secret-debug" }
 itertools = "0.14"
 ndarray = "0.16.0"
 ndarray-rand = "0.15.0"

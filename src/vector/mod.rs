@@ -7,6 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use ironcore_documents::{
+    impl_secret_debug,
     v5::{
         self,
         key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType},
@@ -78,8 +79,9 @@ pub(crate) struct VectorEncryptionKey {
 #[derive(Debug, Serialize, Clone, Copy)]
 pub(crate) struct ScalingFactor(pub f32); // Based on page 135 having a size 2^30
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Serialize, Clone)]
 pub(crate) struct EncryptionKey(pub Vec<u8>);
+impl_secret_debug!(EncryptionKey);
 
 impl VectorEncryptionKey {
     /// A way to generate a key from the secret, tenant_id and derivation_path. This is done in the context of
