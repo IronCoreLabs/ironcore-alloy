@@ -1134,8 +1134,9 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.2.2-pre.2"
-source = "git+https://github.com/IronCoreLabs/ironcore-documents.git?branch=add-secret-debug#d8348a085e2f3015590bc9f117ae1b18d117bb8b"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee7d858b7c4b183f77c95ce6e3c8057fb8959ce8e4c46269b4594c9558bb599"
 dependencies = [
  "aes-gcm",
  "bytes",
