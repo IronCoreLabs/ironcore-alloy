@@ -1,6 +1,7 @@
 #![allow(async_fn_in_trait)]
 
 use crate::errors::AlloyError;
+use ironcore_documents::impl_secret_debug_named;
 use ironcore_documents::v5::key_id_header::{EdekType, KeyId, KeyIdHeader, PayloadType};
 use saas_shield::config::SaasShieldConfiguration;
 use saas_shield::deterministic::SaasShieldDeterministicClient;
@@ -400,10 +401,11 @@ pub fn encode_prefix_z85(prefix_bytes: Vec<u8>) -> String {
 }
 
 // Like an EncryptionKey but not used directly for encryption
-#[derive(Debug, Serialize, Clone, uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct Secret {
     pub(crate) secret: Vec<u8>,
 }
+impl_secret_debug_named!(Secret, secret);
 
 #[uniffi::export]
 impl Secret {
