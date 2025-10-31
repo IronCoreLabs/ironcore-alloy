@@ -854,6 +854,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d3d0e0f38255e7fa3cf31335b3a56f05febd18025f4db5ef7a0cfb4f8da651f"
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "hex-literal"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1112,7 +1118,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 
 [[package]]
 name = "ironcore-alloy"
-version = "0.13.2-pre"
+version = "0.13.2-rc.0"
 dependencies = [
  "aes-gcm",
  "aes-siv",
@@ -1145,19 +1151,20 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa3f9b0cb178f9448ea1e10a66ab71438a3faa4105d7b61eafa1b008a17eb21"
+checksum = "0ee7d858b7c4b183f77c95ce6e3c8057fb8959ce8e4c46269b4594c9558bb599"
 dependencies = [
  "aes-gcm",
  "bytes",
+ "hex",
  "hmac",
- "itertools 0.12.1",
+ "itertools 0.14.0",
  "protobuf",
  "protobuf-codegen",
  "rand",
  "sha2",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -1165,15 +1172,6 @@ name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -1585,7 +1583,7 @@ dependencies = [
 
 [[package]]
 name = "qdrant-example"
-version = "0.13.2-pre"
+version = "0.13.2-rc.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
