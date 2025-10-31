@@ -401,7 +401,7 @@ pub fn encode_prefix_z85(prefix_bytes: Vec<u8>) -> String {
 }
 
 // Like an EncryptionKey but not used directly for encryption
-#[derive(Serialize, Clone, uniffi::Object)]
+#[derive(Clone, uniffi::Object)]
 pub struct Secret {
     pub(crate) secret: Vec<u8>,
 }

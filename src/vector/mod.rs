@@ -68,7 +68,7 @@ create_batch_result_struct_using_newtype!(
 );
 
 /// Key used to for vector encryption.
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct VectorEncryptionKey {
     /// The amount to scale embedding values during encryption
     pub scaling_factor: ScalingFactor,
@@ -79,7 +79,7 @@ pub(crate) struct VectorEncryptionKey {
 #[derive(Debug, Serialize, Clone, Copy)]
 pub(crate) struct ScalingFactor(pub f32); // Based on page 135 having a size 2^30
 
-#[derive(Serialize, Clone)]
+#[derive(Clone)]
 pub(crate) struct EncryptionKey(pub Vec<u8>);
 impl_secret_debug!(EncryptionKey);
 
