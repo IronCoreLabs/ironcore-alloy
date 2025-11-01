@@ -53,7 +53,7 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_distr = "0.4.3"
 rayon = "1.11.0"
-regex = "1.11.3"
+regex = "1.12.2"
 reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
@@ -77,10 +77,10 @@ camino = "1.2"
 cargo_metadata = "0.19"
 criterion = { version = "0.7", features = ["async_tokio"] }
 hex = "0.4.3"
-hex-literal = "1.0.0"
+hex-literal = "1.1.0"
 lazy_static = "1.5"
-proptest = "1.8.0"
-tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+proptest = "1.9.0"
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
 uniffi_bindgen = "0.29.2"
 z85 = "3.0.6"
 
