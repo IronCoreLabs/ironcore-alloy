@@ -81,7 +81,7 @@ hex-literal = "1.1.0"
 lazy_static = "1.5"
 proptest = "1.9.0"
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = "0.29.2"
+uniffi_bindgen = "0.30.0"
 z85 = "3.0.6"
 
 [[bench]]
