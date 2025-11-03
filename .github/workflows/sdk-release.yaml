@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
       - name: Rename directories
@@ -60,7 +60,7 @@ jobs:
         with:
           distribution: "temurin"
           java-version: "21"
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           path: ${{ github.workspace }}/java/src/main/resources/
       - name: Rename directories
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           path: ${{ github.workspace }}/python/ironcore-alloy
       - name: Rename directories
