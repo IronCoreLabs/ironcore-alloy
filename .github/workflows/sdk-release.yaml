@@ -11,7 +11,7 @@ jobs:
   generate-cdylibs:
     uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
     with:
-      os_matrix: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-13", "macos-14"]'
+      os_matrix: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "macos-14"]'
       build_profile: "release"
     secrets: inherit
 
@@ -27,7 +27,7 @@ jobs:
         run: |
           mv ubuntu-24.04- linux-x86-64
           mv ubuntu-24.04-arm- linux-arm
-          mv macos-13- darwin-x86-64
+          mv macos-15-intel- darwin-x86-64
           mv macos-14- darwin-aarch64
         working-directory: kotlin/src/main/resources/
       - name: Decrypt GPG key and gradle.properties
@@ -67,7 +67,7 @@ jobs:
         run: |
           mv ubuntu-24.04- linux-x86-64
           mv ubuntu-24.04-arm- linux-arm
-          mv macos-13- darwin-x86-64
+          mv macos-15-intel- darwin-x86-64
           mv macos-14- darwin-aarch64
         working-directory: java/src/main/resources/
       - name: Decrypt GPG key and gradle.properties
@@ -103,7 +103,7 @@ jobs:
         run: |
           mv ubuntu-24.04- linux-x86-64
           mv ubuntu-24.04-arm- linux-arm
-          mv macos-13- darwin-x86-64
+          mv macos-15-intel- darwin-x86-64
           mv macos-14- darwin-aarch64
         working-directory: python/ironcore-alloy
       - name: Generate Python files
