@@ -1,11 +1,37 @@
 package test
 
 import com.ironcorelabs.ironcore_alloy.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import java.util.concurrent.*
 import kotlin.random.Random
 import kotlin.system.*
 import kotlinx.coroutines.*
 import org.openjdk.jmh.annotations.*
+
+class KotlinHttpClient : HttpClient {
+    val client = io.ktor.client.HttpClient()
+
+    override suspend fun postJson(
+            url: String,
+            jsonBody: String,
+            headers: AlloyHttpClientHeaders
+    ): AlloyHttpClientResponse {
+        val response =
+                client.post(url) {
+                    setBody(jsonBody)
+                    headers {
+                        append(HttpHeaders.Authorization, headers.authorization)
+                        append(HttpHeaders.ContentType, headers.contentType)
+                    }
+                }
+
+        return AlloyHttpClientResponse(response.body(), response.status.value.toUShort())
+    }
+}
 
 @State(Scope.Benchmark)
 @Fork(1)
@@ -24,14 +50,15 @@ class SaasShieldBenchmark {
     var largeEncrypted: EncryptedDocument = EncryptedDocument("".toByteArray(), emptyMap())
     var extraLargeEncrypted: EncryptedDocument = EncryptedDocument("".toByteArray(), emptyMap())
     var batchPlaintexts: PlaintextDocuments = emptyMap()
+    var client: KotlinHttpClient = KotlinHttpClient()
 
     val approximationFactor = 1.1f
     val tspUri = System.getenv("TSP_ADDRESS") ?: "http://localhost"
-    val tspPort = System.getenv("TSP_PORT") ?: "32804"
+    val tspPort = System.getenv("TSP_PORT") ?: "7777"
     val tenantId = System.getenv("TENANT_ID") ?: "tenant-gcp-l"
     val apiKey = System.getenv("API_KEY") ?: "0WUaXesNgbTAuLwn"
     val saasShieldConfig =
-            SaasShieldConfiguration(tspUri + ":" + tspPort, apiKey, true, approximationFactor)
+            SaasShieldConfiguration(tspUri + ":" + tspPort, apiKey, approximationFactor, client)
     val saasShieldSdk = SaasShield(saasShieldConfig)
     val metadata = AlloyMetadata.newSimple(tenantId)
 

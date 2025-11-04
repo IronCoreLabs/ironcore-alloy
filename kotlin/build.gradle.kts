@@ -61,6 +61,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
     benchmarksImplementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.9")
+    benchmarksImplementation("io.ktor:ktor-client-core:$ktor_version")
+    benchmarksImplementation("io.ktor:ktor-client-cio:$ktor_version")
     benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
 }
 
