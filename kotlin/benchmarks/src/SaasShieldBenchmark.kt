@@ -1,11 +1,36 @@
 package test
 
 import com.ironcorelabs.ironcore_alloy.*
+import java.net.URI
+import java.net.http.HttpClient as JavaHttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
 import java.util.concurrent.*
 import kotlin.random.Random
 import kotlin.system.*
 import kotlinx.coroutines.*
 import org.openjdk.jmh.annotations.*
+
+class KotlinHttpClient : HttpClient {
+    val client: JavaHttpClient = JavaHttpClient.newHttpClient()
+
+    override suspend fun postJson(
+            url: String,
+            jsonBody: String,
+            headers: AlloyHttpClientHeaders
+    ): AlloyHttpClientResponse {
+        val request =
+                HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                        .header("Authorization", headers.authorization)
+                        .header("Content-Type", headers.contentType)
+                        .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+
+        return AlloyHttpClientResponse(response.body(), response.statusCode().toUShort())
+    }
+}
 
 @State(Scope.Benchmark)
 @Fork(1)
@@ -27,13 +52,14 @@ class SaasShieldBenchmark {
 
     val approximationFactor = 1.1f
     val tspUri = System.getenv("TSP_ADDRESS") ?: "http://localhost"
-    val tspPort = System.getenv("TSP_PORT") ?: "32804"
+    val tspPort = System.getenv("TSP_PORT") ?: "7777"
     val tenantId = System.getenv("TENANT_ID") ?: "tenant-gcp-l"
     val apiKey = System.getenv("API_KEY") ?: "0WUaXesNgbTAuLwn"
-    val saasShieldConfig =
-            SaasShieldConfiguration(tspUri + ":" + tspPort, apiKey, true, approximationFactor)
-    val saasShieldSdk = SaasShield(saasShieldConfig)
     val metadata = AlloyMetadata.newSimple(tenantId)
+    val client = KotlinHttpClient()
+    val saasShieldConfig =
+            SaasShieldConfiguration("$tspUri:$tspPort", apiKey, approximationFactor, client)
+    val saasShieldSdk = SaasShield(saasShieldConfig)
 
     @Setup
     fun setUp() {
