@@ -42,4 +42,5 @@ jobs:
           cargo build --release
           TSP_HTTP_BIND_ADDRESS="0.0.0.0:32804" env $(cat .env.integration) cargo run --release &
           timeout 700 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:9000/ready)" =~ ''[01346-9][0-9][0-9]'' ]]; do sleep 5; done' || false
+          cd ..
           cargo test --features integration_tests -- --nocapture
