@@ -36,6 +36,8 @@ jobs:
           input: tenant-security-proxy/.env.integration.iron
       - name: install zmq
         run: sudo apt update && sudo apt install -y --no-install-recommends libzmq3-dev
+      - name: Install hatch
+        run: pipx install hatch
       - name: integration test
         run: |
           cd tenant-security-proxy
