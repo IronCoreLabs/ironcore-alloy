@@ -6,17 +6,3 @@ services:
       - 32804:7777
       - 32805:9000
     image: gcr.io/ironcore-images/tenant-security-proxy:4
-    links:
-      - tenant-security-logdriver
-  tenant-security-logdriver:
-    environment:
-      - LOGDRIVER_EVENT_PRODUCER_URL=tcp://tenant-security-proxy:5555
-    env_file:
-      - ./demo-tsp.conf
-    ports:
-      - 32806:9001
-    image: gcr.io/ironcore-images/tenant-security-logdriver:4
-    volumes:
-      - type: bind
-        source: /tmp
-        target: /logdriver
