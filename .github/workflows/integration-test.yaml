@@ -10,7 +10,7 @@ on:
 jobs:
   # Look for a comment telling us what TSP ref to use.
   get_ref:
-    uses: IronCoreLabs/workflows/.github/workflows/get-tsp-ref.yaml@get-tsp-ref
+    uses: IronCoreLabs/workflows/.github/workflows/get-tsp-ref.yaml@get-tsp-ref-v1
     secrets: inherit
 
   integration_test:
