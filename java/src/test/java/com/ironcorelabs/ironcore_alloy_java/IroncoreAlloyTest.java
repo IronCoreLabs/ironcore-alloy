@@ -76,7 +76,7 @@ public class IroncoreAlloyTest {
                         new StandaloneSecret(2, new Secret(keyByteArray)),
                         new StandaloneSecret(1, new Secret(keyByteArray)))))));
         IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
-        integrationSdk = new SaasShield(new SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1f, httpClient));
+        integrationSdk = new SaasShield(new SaasShieldConfiguration("http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1f, httpClient, true));
     } 
     
     @Test
@@ -448,7 +448,7 @@ public class IroncoreAlloyTest {
     @Test
     public void badConfigurationTest() throws AlloyException, ExecutionException, InterruptedException {
         IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
-        var badSdk = new SaasShield(new SaasShieldConfiguration("http://bad-url", "0WUaXesNgbTAuLwn", 1.1f, httpClient));
+        var badSdk = new SaasShield(new SaasShieldConfiguration("https://bad-url", "0WUaXesNgbTAuLwn", 1.1f, httpClient, false));
         List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
         PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
         var metadata = AlloyMetadata.newSimple(new TenantId("fake_tenant"));
@@ -458,5 +458,14 @@ public class IroncoreAlloyTest {
             throw err.getCause(); 
         });
         assertTrue(err.getCause().getMessage().contains("JSON post request"));
+    }
+    
+    @Test
+    public void httpNotAllowed() throws AlloyException, ExecutionException, InterruptedException {
+        IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
+        AlloyException err = assertThrows(AlloyException.InvalidConfiguration.class, () ->{
+            new SaasShieldConfiguration("http://bad-url", "0WUaXesNgbTAuLwn", 1.1f, httpClient, false);
+        });
+        assertTrue(err.getMessage().contains("insecure"));
     }
 }

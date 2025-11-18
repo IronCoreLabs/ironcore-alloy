@@ -24,6 +24,7 @@ pub fn get_client() -> Arc<SaasShield> {
         "0WUaXesNgbTAuLwn".to_string(),
         Some(1.1),
         Arc::new(http_client),
+        true,
     )
     .unwrap();
     SaasShield::new(&config)

@@ -16,24 +16,40 @@ pub struct SaasShieldConfiguration {
 }
 #[uniffi::export]
 impl SaasShieldConfiguration {
-    #[uniffi::constructor]
+    #[uniffi::constructor(default(allow_insecure_http = false))]
     pub fn new(
         tsp_uri: String,
         api_key: String,
         approximation_factor: Option<f32>,
         http_client: Arc<dyn HttpClient>,
+        allow_insecure_http: bool,
     ) -> Result<Arc<Self>, AlloyError> {
-        new_core(tsp_uri, api_key, approximation_factor, http_client, false)
+        new_core(
+            tsp_uri,
+            api_key,
+            approximation_factor,
+            http_client,
+            false,
+            allow_insecure_http,
+        )
     }
 
-    #[uniffi::constructor]
+    #[uniffi::constructor(default(allow_insecure_http = false))]
     pub fn new_with_scaling_factor(
         tsp_uri: String,
         api_key: String,
         approximation_factor: Option<f32>,
         http_client: Arc<dyn HttpClient>,
+        allow_insecure_http: bool,
     ) -> Result<Arc<Self>, AlloyError> {
-        new_core(tsp_uri, api_key, approximation_factor, http_client, true)
+        new_core(
+            tsp_uri,
+            api_key,
+            approximation_factor,
+            http_client,
+            true,
+            allow_insecure_http,
+        )
     }
 }
 
@@ -43,7 +59,19 @@ fn new_core(
     approximation_factor: Option<f32>,
     http_client: Arc<dyn HttpClient>,
     use_scaling_factor: bool,
+    allow_insecure_http: bool,
 ) -> Result<Arc<SaasShieldConfiguration>, AlloyError> {
+    if !allow_insecure_http {
+        let valid_uri =
+            reqwest::Url::parse(&tsp_uri).map_err(|e| AlloyError::InvalidConfiguration {
+                msg: format!("Failed to parse configured TSP URL: {e:?}"),
+            })?;
+        if valid_uri.scheme() != "https" {
+            return Err(AlloyError::InvalidConfiguration {
+                msg: "Provided TSP URL was insecure. Either use https or set `allow_insecure_http` to `true` in your SaaS Shield Configuration.".to_string(),
+            });
+        }
+    };
     let parsed_api_key = ApiKey::try_from(api_key)?;
     let headers = AlloyHttpClientHeaders {
         content_type: "application/json".to_string(),

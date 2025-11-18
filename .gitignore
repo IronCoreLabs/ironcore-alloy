@@ -26,3 +26,6 @@
 **/ironcore_alloy.py
 
 example-integrations/milvus/volumes/**
+
+# mac
+.DS_Store
