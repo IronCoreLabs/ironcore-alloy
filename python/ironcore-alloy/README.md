@@ -14,6 +14,10 @@ Python bindings to the IronCore Labs Alloy SDK. Python API documentation is avai
 pip install ironcore-alloy
 ```
 
+## Local
+
+If you're trying to run local tests and `pytest` is looking for a missing `python`, try `hatch env remove test && hatch env create test` to get hatch to rebuild its test environment.
+
 ## License
 
 `ironcore-alloy` is licensed under the [GNU Affero General Public License](https://github.com/IronCoreLabs/ironoxide/blob/main/LICENSE). We also offer commercial licenses - [email](mailto:info@ironcorelabs.com) for more information or check pricing on our [website](https://ironcorelabs.com/).
