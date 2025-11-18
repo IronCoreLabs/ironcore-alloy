@@ -92,7 +92,7 @@ class TestIroncoreAlloy:
             # Tests using this are skipped by default. Unskip them as needed
             return SaasShield(
                 SaasShieldConfiguration(
-                    "https://localhost:32804", "0WUaXesNgbTAuLwn", 1.1, http_client
+                    "http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1, http_client, true
                 )
             )
 

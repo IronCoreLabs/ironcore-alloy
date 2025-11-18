@@ -80,11 +80,11 @@ class IroncoreAlloyTest {
     val integrationSdk =
             SaasShield(
                     SaasShieldConfiguration(
-                            "https://localhost:32804",
+                            "http://localhost:32804",
                             "0WUaXesNgbTAuLwn",
                             1.1f,
                             httpClient,
-                            false
+                            true
                     )
             )
 

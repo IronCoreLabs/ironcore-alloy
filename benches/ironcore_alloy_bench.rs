@@ -194,6 +194,7 @@ fn tsp_benches(c: &mut Criterion) {
         api_key,
         Some(2.5),
         Arc::new(http_client),
+        true
     )
     .unwrap();
     let sdk = SaasShield::new(&config);
