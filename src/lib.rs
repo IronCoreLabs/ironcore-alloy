@@ -313,7 +313,7 @@ pub(crate) mod alloy_client_trait {
         pub remaining_bytes: Vec<u8>,
     }
 
-    #[uniffi::export]
+    // #[uniffi::export]
     pub trait AlloyClient: Send + Sync {
         /// Returns the only EdekType this Alloy client deals with.
         fn get_edek_type(&self) -> EdekType;
