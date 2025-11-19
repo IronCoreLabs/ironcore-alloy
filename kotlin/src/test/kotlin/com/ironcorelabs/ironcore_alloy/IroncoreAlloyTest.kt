@@ -477,7 +477,7 @@ class IroncoreAlloyTest {
     }
 
     @Test
-    fun configurationHttsRequired() {
+    fun configurationHttpsRequired() {
         val err =
             assertFailsWith<AlloyException.InvalidConfiguration>() {
                 SaasShieldConfiguration(
