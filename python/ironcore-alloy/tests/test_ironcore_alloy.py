@@ -92,7 +92,7 @@ class TestIroncoreAlloy:
             # Tests using this are skipped by default. Unskip them as needed
             return SaasShield(
                 SaasShieldConfiguration(
-                    "http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1, http_client
+                    "http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1, http_client, true
                 )
             )
 
@@ -635,6 +635,15 @@ class TestIroncoreAlloy:
             await standalone_sdk.standard().decrypt(encrypted, metadata)
 
     @pytest.mark.asyncio
+    async def test_insecure_tsp_not_allowed(self, standalone_sdk):
+        async with PyHttpClient() as http_client:
+            with pytest.raises(AlloyError.InvalidConfiguration) as config_error:
+                SaasShieldConfiguration(
+                    "http://localhost:32804", "0WUaXesNgbTAuLwn", 1.1, http_client
+                )
+            assert "insecure" in str(config_error)
+
+    @pytest.mark.asyncio
     async def test_error_handling(self, standalone_sdk):
         with pytest.raises(AlloyError.InvalidConfiguration) as secret_error:
             standard_secrets = StandardSecrets(None, [])
@@ -689,7 +698,7 @@ class TestIroncoreAlloy:
             async with PyHttpClient() as http_client:
                 bad_integration_sdk = SaasShield(
                     SaasShieldConfiguration(
-                        "http://bad-url", "0WUaXesNgbTAuLwn", 1.1, http_client
+                        "https://bad-url", "0WUaXesNgbTAuLwn", 1.1, http_client
                     )
                 )
                 metadata = AlloyMetadata.new_simple("fake_tenant")

@@ -83,7 +83,8 @@ class IroncoreAlloyTest {
                             "http://localhost:32804",
                             "0WUaXesNgbTAuLwn",
                             1.1f,
-                            httpClient
+                            httpClient,
+                            true
                     )
             )
 
@@ -473,6 +474,21 @@ class IroncoreAlloyTest {
                     runBlocking { sdk.standard().decrypt(document, metadata) }
                 }
         assertContains(err.message, " not a Standalone Standard EDEK wrapped value.")
+    }
+
+    @Test
+    fun configurationHttpsRequired() {
+        val err =
+            assertFailsWith<AlloyException.InvalidConfiguration>() {
+                SaasShieldConfiguration(
+                        "http://localhost:32804",
+                        "0WUaXesNgbTAuLwn",
+                        1.1f,
+                        httpClient,
+                        false
+                )
+            }
+        assertContains(err.message, "insecure")
     }
 
     @Test

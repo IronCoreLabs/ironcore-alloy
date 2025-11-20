@@ -10,7 +10,7 @@ async def main():
     tsp_uri = "http://localhost:32804"
     approximation_factor = 7.2
     config = alloy.SaasShieldConfiguration(
-        tsp_uri, api_key, False, approximation_factor
+        tsp_uri, api_key, False, approximation_factor, true
     )
     sdk = alloy.SaasShield(config)
 

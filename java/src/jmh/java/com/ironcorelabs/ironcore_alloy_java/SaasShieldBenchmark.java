@@ -74,7 +74,7 @@ public class SaasShieldBenchmark {
     public void setUp() throws Exception {
         httpClient = new JavaHttpClient();
         saasShieldConfig = new SaasShieldConfiguration(tspUri + ":" + tspPort, apiKey,
-                approximationFactor, httpClient);
+                approximationFactor, httpClient, true);
         saasShieldSdk = new SaasShield(saasShieldConfig);
         smallPlaintext = generatePlaintextDocument(1, 1);
         mediumPlaintext = generatePlaintextDocument(100, 1);
