@@ -1,3 +1,9 @@
+## Unreleased
+
+### Breaking Changes
+
+- All SaaSShield configs now require an `allow_insecure_http` setting, which defaults to `false` in languages with defaults. This requires that the connection to the TSP is via HTTPS.
+
 ## 0.13.1
 
 - Fix a bug in SaaS Shield clients using the default HttpClient that would cause TSP requests to fail with a bad auth header.
