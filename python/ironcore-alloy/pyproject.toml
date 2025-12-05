@@ -14,10 +14,10 @@ description = "Python bindings to the IronCore Labs Alloy SDK. Used for encrypti
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-    "Operating System :: MacOS",
-    "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
 ]
 dependencies = []
 dynamic = ["version"]
@@ -40,7 +40,7 @@ artifacts = ["*.so", "*.dylib"]
 python = "3.10"
 
 [tool.hatch.envs.docs]
-dependencies = ["mkdocs.material==9.4.8", "mkdocstrings-python==1.10.8"]
+dependencies = ["mkdocs.material==9.7.0", "mkdocstrings-python==2.0.1"]
 
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build --clean --strict {args}"
@@ -50,11 +50,11 @@ buildRtd = "mkdocs build --clean --strict --site-dir $READTHEDOCS_OUTPUT/html"
 
 [tool.hatch.envs.test]
 dependencies = [
-    "pytest==7.4.2",
-    "pytest-cov==4.1.0",
-    "pytest-metadata==3.0.0",
-    "pytest-asyncio==0.21.1",
-    "aiohttp==3.11.16",
+  "pytest==7.4.2",
+  "pytest-cov==4.1.0",
+  "pytest-metadata==3.0.0",
+  "pytest-asyncio==0.21.1",
+  "aiohttp==3.11.16",
 ]
 
 [tool.hatch.envs.test.scripts]
@@ -78,10 +78,10 @@ omit = ["ironcore_alloy/__about__.py"]
 
 [tool.coverage.report]
 exclude_lines = [
-    "no cov",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "class _Uniffi",
-    "def _uniffi",
-    "_Uniffi",
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "class _Uniffi",
+  "def _uniffi",
+  "_Uniffi",
 ]
