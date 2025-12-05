@@ -1041,7 +1041,7 @@ dependencies = [
 
 [[package]]
 name = "ironcore-alloy"
-version = "0.13.2-rc.6"
+version = "0.13.2-pre.7"
 dependencies = [
  "aes-gcm",
  "aes-siv",
