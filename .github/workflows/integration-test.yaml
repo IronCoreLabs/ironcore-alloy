@@ -8,41 +8,20 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Look for a comment telling us what TSP ref to use.
-  get_ref:
-    uses: IronCoreLabs/workflows/.github/workflows/get-tsp-ref.yaml@get-tsp-ref-v1
-    secrets: inherit
-
   integration_test:
     runs-on: ubuntu-latest
-    needs: get_ref
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: "21"
-      - name: clone the tsp
-        uses: actions/checkout@v6
+      - name: Start the TSP
+        uses: IronCoreLabs/workflows/.github/actions/start-tsp@start-tsp-v1
         with:
-          repository: IronCoreLabs/tenant-security-proxy
-          ref: ${{ needs.get_ref.outputs.tsp_ref }}
-          path: tenant-security-proxy
-          token: ${{ secrets.WORKFLOW_PAT }}
-      - name: Decrypt TSP integration keys
-        uses: IronCoreLabs/ironhide-actions/decrypt@v3
-        with:
-          keys: ${{ secrets.IRONHIDE_KEYS }}
-          input: tenant-security-proxy/.env.integration.iron
-      - name: install zmq
-        run: sudo apt update && sudo apt install -y --no-install-recommends libzmq3-dev
+          gcloud-auth: ${{ secrets.GCLOUD_AUTH }}
+          env-file-path: tests/demo-tsp.conf
       - name: Install hatch
         run: pipx install hatch
       - name: integration test
-        run: |
-          cd tenant-security-proxy
-          cargo build --release
-          TSP_HTTP_BIND_ADDRESS="0.0.0.0:32804" env $(cat ../tests/demo-tsp.conf) cargo run --release &
-          timeout 700 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost:9000/ready)" =~ ''[01346-9][0-9][0-9]'' ]]; do sleep 5; done' || false
-          cd ..
-          cargo test --features integration_tests -- --nocapture
+        run: cargo test --features integration_tests -- --nocapture
