@@ -21,6 +21,7 @@ jobs:
         with:
           gcloud-auth: ${{ secrets.GCLOUD_AUTH }}
           env-file-path: tests/demo-tsp.conf
+          tsp-port: "32804"
       - name: Install hatch
         run: pipx install hatch
       - name: integration test
