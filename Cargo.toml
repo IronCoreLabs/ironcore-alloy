@@ -40,14 +40,14 @@ aes-siv = "0.7"
 async-trait = "0.1.89"
 base64 = "0.22"
 base64_type = "0.2"
-bytes = { version = "1.10.1", features = ["serde"] }
-convert_case = "0.8.0"
+bytes = { version = "1.11.0", features = ["serde"] }
+convert_case = "0.10.0"
 futures = "0.3.31"
 hmac = { version = "0.12.1", features = ["std"] }
 ironcore-documents = "0.2.2"
 itertools = "0.14"
-ndarray = "0.16.0"
-ndarray-rand = "0.15.0"
+ndarray = "0.16"
+ndarray-rand = "0.15"
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = "0.8.5"
 rand_chacha = "0.3.1"
@@ -60,7 +60,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 ring = "0.17"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
+serde_json = { version = "1.0.148", features = ["float_roundtrip"] }
 thiserror = "2.0.17"
 uniffi = { version = "0.29.4", features = ["tokio", "cli"] }
 uniffi-bindgen-java = "0.2.1"
@@ -69,7 +69,7 @@ z85 = "3.0.6"
 [dev-dependencies]
 approx = "0.5.1"
 ascii85 = "0.2.1"
-assertables = "9.8.2"
+assertables = "9.8.3"
 base64 = "0.22.0"
 base85 = "2.0.0"
 camino = "1.2"
