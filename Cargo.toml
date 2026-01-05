@@ -46,8 +46,8 @@ futures = "0.3.31"
 hmac = { version = "0.12.1", features = ["std"] }
 ironcore-documents = "0.2.2"
 itertools = "0.14"
-ndarray = "0.17.1"
-ndarray-rand = "0.16.0"
+ndarray = "0.16"
+ndarray-rand = "0.15"
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = "0.8.5"
 rand_chacha = "0.3.1"

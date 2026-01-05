@@ -13,6 +13,7 @@ updates:
       - "rand*"
       - "uniffi*"
       - "cargo_metadata" # must be same as uniffi uses
+      - "ndarray*"
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
