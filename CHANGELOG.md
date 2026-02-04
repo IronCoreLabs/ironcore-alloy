@@ -1,5 +1,9 @@
 ## Unreleased
 
+## 0.14.0
+
+- Dependency updates
+
 ### Breaking Changes
 
 - All SaaSShield configs now require an `allow_insecure_http` setting, which specifies whether or not the connection to the TSP must be via HTTPS. This defaults to `false` in languages with defaults.
