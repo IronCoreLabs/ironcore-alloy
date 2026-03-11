@@ -22,17 +22,11 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.9.1")
     testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    implementation("net.java.dev.jna:jna:5.14.0")
 }
 
 java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
     withSourcesJar()
     withJavadocJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
 }
 
 // Until there is official support, we can use the Portal OSSRH Staging API.
@@ -86,11 +80,17 @@ repositories {
 tasks.test {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    systemProperty("java.library.path", file("src/main/resources").absolutePath)
     testLogging {
         exceptionFormat = TestExceptionFormat.FULL
         events = mutableSetOf(TestLogEvent.FAILED, TestLogEvent.PASSED, TestLogEvent.SKIPPED)
         showStandardStreams = true
     }
+}
+
+jmh {
+    jvmArgs.addAll("--enable-native-access=ALL-UNNAMED", "-Djava.library.path=${file("src/main/resources").absolutePath}")
 }
 
 signing {

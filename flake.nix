@@ -31,18 +31,18 @@
               yapf
               curl
               # used when running python tests
-              python310
+              python311
               # used when building python distributions
               hatch
               # used when building java distributions
-              openjdk21
-              (callPackage gradle-packages.gradle_8 {
-                java = openjdk21;
+              openjdk25
+              (gradle-packages.gradle_8.override {
+                java = openjdk25;
               })
               (pkgs.google-cloud-sdk.withExtraComponents [ pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin ])
             ];
           LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
-          JAVA_HOME = if pkgs.stdenv.isDarwin then "${pkgs.openjdk21}" else "${pkgs.openjdk21}/lib/openjdk";
+          JAVA_HOME = if pkgs.stdenv.isDarwin then "${pkgs.openjdk25}" else "${pkgs.openjdk25}/lib/openjdk";
           RUST_TEST_NOCAPTURE = 1;
         };
 
