@@ -45,7 +45,7 @@ class JavaHttpClient implements HttpClient {
 @Warmup(iterations = 1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 public class SaasShieldBenchmark {
 
     private PlaintextDocument smallPlaintext;
