@@ -42,7 +42,7 @@ class JavaHttpClient implements HttpClient {
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 1)
+@Warmup(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
