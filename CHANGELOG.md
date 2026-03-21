@@ -1,4 +1,6 @@
-## Unreleased
+## 0.14.0
+
+- Dependency updates
 
 ### Breaking Changes
 
