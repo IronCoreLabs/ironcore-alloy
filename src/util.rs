@@ -15,16 +15,18 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-/// Reseed threshold in bytes. Matches ThreadRng's 64 KiB interval.
+/// Default reseed threshold in bytes. Matches ThreadRng's 64 KiB interval.
 const RESEED_THRESHOLD: usize = 64 * 1024;
 
 /// A CSPRNG wrapper that automatically reseeds from system entropy periodically.
 /// Implements [`CryptoRng`] so it can be used anywhere a `CryptoRng` is expected.
+///
+/// Set `reseed_threshold` to `None` to disable reseeding, which preserves
+/// deterministic output for test RNGs.
 pub(crate) struct ReseedingRng<T: CryptoRng + SeedableRng> {
     inner: T,
     bytes_generated: usize,
-    /// When true, never reseed. Used for deterministic test RNGs.
-    disable_reseeding: bool,
+    reseed_threshold: Option<usize>,
 }
 
 impl<T: CryptoRng + SeedableRng> ReseedingRng<T> {
@@ -32,7 +34,7 @@ impl<T: CryptoRng + SeedableRng> ReseedingRng<T> {
         ReseedingRng {
             inner: rng,
             bytes_generated: 0,
-            disable_reseeding: false,
+            reseed_threshold: Some(RESEED_THRESHOLD),
         }
     }
 
@@ -40,19 +42,21 @@ impl<T: CryptoRng + SeedableRng> ReseedingRng<T> {
         ReseedingRng {
             inner: T::seed_from_u64(seed),
             bytes_generated: 0,
-            disable_reseeding: true,
+            reseed_threshold: None,
         }
     }
 
     fn reseed_if_needed(&mut self) {
-        if !self.disable_reseeding && self.bytes_generated >= RESEED_THRESHOLD {
-            if let Ok(reseeded) = T::try_from_rng(&mut SysRng) {
-                self.inner = reseeded;
+        if let Some(threshold) = self.reseed_threshold {
+            if self.bytes_generated >= threshold {
+                if let Ok(reseeded) = T::try_from_rng(&mut SysRng) {
+                    self.inner = reseeded;
+                }
+                // On reseed failure, continue with existing state rather than panicking.
+                // The current state is still cryptographically valid and the likelihood of
+                // SysRng erroring is very low.
+                self.bytes_generated = 0;
             }
-            // On reseed failure, continue with existing state rather than panicking.
-            // The current state is still cryptographically valid and the likelihood of
-            // SysRng erroring is very low.
-            self.bytes_generated = 0;
         }
     }
 }
