@@ -9,7 +9,7 @@ use crate::standard::{
     StandardEncryptBatchResult, decrypt_document_core, encrypt_document_core, encrypt_map,
     verify_sig,
 };
-use crate::util::{OurReseedingRng, hash256, perform_batch_action};
+use crate::util::{OurRng, hash256, perform_batch_action};
 use crate::{
     AlloyMetadata, DocumentId, Secret, TenantId,
     alloy_client_trait::{AlloyClient, DecomposedHeader},
@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex};
 #[derive(uniffi::Object)]
 pub struct StandaloneStandardClient {
     config: Arc<StandardSecrets>,
-    rng: Arc<Mutex<OurReseedingRng>>,
+    rng: Arc<Mutex<OurRng>>,
 }
 impl StandaloneStandardClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {
@@ -64,7 +64,7 @@ impl StandaloneStandardClient {
         let (secret_id, secret) = self.get_current_secret_and_id()?;
         let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
         let (aes_dek, v4_doc) = v5::aes::generate_aes_edek_and_sign(
-            self.rng.clone(),
+            &mut *crate::util::take_lock(&self.rng),
             per_tenant_kek,
             None,
             secret_id.to_string().as_str(),
@@ -250,7 +250,7 @@ impl StandardDocumentOps for StandaloneStandardClient {
             let encryption_key =
                 derive_aes_encryption_key(&current_secret.secret, parsed_new_tenant_id);
             let (_, v4_doc) = v5::aes::generate_aes_edek_and_sign(
-                self.rng.clone(),
+                &mut *crate::util::take_lock(&self.rng),
                 encryption_key,
                 Some(dek),
                 current_secret_id.to_string().as_str(),

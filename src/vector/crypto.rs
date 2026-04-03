@@ -3,8 +3,7 @@ use crate::util::{self, take_lock};
 use crate::util::{AuthHash, compute_auth_hash, create_rng};
 use itertools::Itertools;
 use ndarray::Array1;
-use ndarray_rand::RandomExt;
-use rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, Rng};
 use rand_chacha::ChaCha20Rng;
 use rand_distr::{Distribution, StandardNormal, Uniform};
 use std::ops::DerefMut;
@@ -66,14 +65,14 @@ fn sample_normal_vector(
     // Because the multivariate normal distribution we need has mean 0 and an identity variance,
     // we don't have to do any decomposition for sampling, we can just sample straight from
     // the standard normal distribution.
-    Array1::random_using(message_dimensionality, StandardNormal, coin_rng)
+    Array1::from_shape_fn(message_dimensionality, |_| StandardNormal.sample(coin_rng))
 }
 
 /// Get a uniform point. Later expanded on to be a uniform point normalized within our ball defined
 /// by our approximation factor. Step 4 in encrypt, step 3 in decrypt.
 /// x' <-- U(0, 1; coin_2)
 fn sample_uniform_point(coin_rng: &mut rand_chacha::ChaCha20Rng) -> f32 {
-    let uniform = Uniform::from(0.0..1.);
+    let uniform = Uniform::new(0.0, 1.0).unwrap();
     // x' in the paper
     uniform.sample(coin_rng)
 }
@@ -132,7 +131,7 @@ fn generate_normalized_vector(
     calculate_normalized_vector(multivariate_normal_sample, uniform_point_in_ball)
 }
 
-pub(crate) fn encrypt<R: RngCore + CryptoRng + Send + Sync>(
+pub(crate) fn encrypt<R: CryptoRng + Send + Sync>(
     key: &VectorEncryptionKey, // K + s in the paper, key and scaling factor
     approximation_factor: f32,
     message: Array1<f32>, // m in the paper, vector
@@ -620,11 +619,6 @@ pub(crate) mod tests {
         );
     }
     fn new_rng() -> Arc<Mutex<ChaCha20Rng>> {
-        let mut entropy_source = rand::rngs::OsRng;
-        let rng =
-            ChaCha20Rng::from_rng(&mut entropy_source).expect("Failed to seed RNG from OsRng");
-
-        // Wrap in Arc<Mutex> to make it Send + Sync
-        Arc::new(Mutex::new(rng))
+        Arc::new(Mutex::new(ChaCha20Rng::from_rng(&mut rand::rng())))
     }
 }

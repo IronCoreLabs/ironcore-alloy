@@ -2,7 +2,7 @@ use super::config::VectorSecret;
 use crate::alloy_client_trait::DecomposedHeader;
 use crate::errors::AlloyError;
 use crate::standalone::config::RotatableSecret;
-use crate::util::{self, OurReseedingRng, perform_batch_action};
+use crate::util::{self, OurRng, perform_batch_action};
 use crate::vector::{
     EncryptedVector, EncryptedVectors, GenerateVectorQueryResult, PlaintextVector,
     PlaintextVectors, VectorDecryptBatchResult, VectorEncryptBatchResult, VectorEncryptionKey,
@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 #[derive(uniffi::Object)]
 pub struct StandaloneVectorClient {
     config: Arc<HashMap<SecretPath, Arc<VectorSecret>>>,
-    rng: Arc<Mutex<OurReseedingRng>>,
+    rng: Arc<Mutex<OurRng>>,
 }
 impl StandaloneVectorClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {

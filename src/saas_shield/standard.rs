@@ -11,7 +11,7 @@ use crate::tenant_security_client::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, RequestMetadata, TenantSecurityClient,
     UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{BatchResult, OurReseedingRng, perform_batch_action, v4_proto_from_bytes};
+use crate::util::{BatchResult, OurRng, perform_batch_action, v4_proto_from_bytes};
 use crate::{AlloyMetadata, alloy_client_trait::AlloyClient};
 use crate::{DocumentId, FieldId, PlaintextBytes, TenantId};
 use bytes::Bytes;
@@ -28,7 +28,7 @@ use ironcore_documents::v5::key_id_header::{
 };
 use itertools::Itertools;
 use protobuf::Message;
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::convert::identity;
@@ -37,7 +37,7 @@ use std::sync::{Arc, Mutex};
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardClient {
     tenant_security_client: Arc<TenantSecurityClient>,
-    rng: Arc<Mutex<OurReseedingRng>>,
+    rng: Arc<Mutex<OurRng>>,
 }
 
 // Standard SaaS Shield edeks could be V3 if they originated in old TSCs or V4 if they originated from Cloaked Search.
@@ -96,7 +96,7 @@ impl SaasShieldStandardClient {
         }
     }
 
-    fn encrypt_document<R: RngCore + CryptoRng + Send>(
+    fn encrypt_document<R: CryptoRng + Send>(
         &self,
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,
