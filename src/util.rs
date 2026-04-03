@@ -88,7 +88,7 @@ impl<T: CryptoRng + SeedableRng> TryRng for ReseedingRng<T> {
 
 impl<T: CryptoRng + SeedableRng> TryCryptoRng for ReseedingRng<T> {}
 
-pub(crate) type OurRng = ReseedingRng<ChaCha20Rng>;
+pub(crate) type OurReseedingRng = ReseedingRng<ChaCha20Rng>;
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct AuthHash(pub(crate) [u8; 32]);
@@ -168,18 +168,18 @@ pub(crate) fn check_auth_hash<'a, A: AsRef<[u8]>, B: Iterator<Item = &'a f32>>(
     compute_auth_hash(key, approximation_factor, iv, encrypted_embedding) == auth_hash
 }
 
-pub(crate) fn create_reseeding_rng() -> Arc<Mutex<OurRng>> {
+pub(crate) fn create_reseeding_rng() -> Arc<Mutex<OurReseedingRng>> {
     let inner = ChaCha20Rng::try_from_rng(&mut SysRng).expect("Failed to seed RNG from system entropy");
     Arc::new(Mutex::new(ReseedingRng::new(inner)))
 }
 
 /// Creates a seeded RNG to use in test functions from the FFI and in the case
 /// that users are creating a client for testing
-pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurRng>> {
+pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
     Arc::new(Mutex::new(ReseedingRng::new_seeded(seed)))
 }
 
-pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<i32>) -> Arc<Mutex<OurRng>> {
+pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<i32>) -> Arc<Mutex<OurReseedingRng>> {
     maybe_seed
         //We don't care that the negative numbers turn into giant numbers for the seed we just need a static value.
         .map(|seed| create_test_seeded_rng(seed as u64))

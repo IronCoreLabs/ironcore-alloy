@@ -9,7 +9,7 @@ use crate::standard::{
     StandardEncryptBatchResult, decrypt_document_core, encrypt_document_core, encrypt_map,
     verify_sig,
 };
-use crate::util::{OurRng, hash256, perform_batch_action};
+use crate::util::{OurReseedingRng, hash256, perform_batch_action};
 use crate::{
     AlloyMetadata, DocumentId, Secret, TenantId,
     alloy_client_trait::{AlloyClient, DecomposedHeader},
@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex};
 #[derive(uniffi::Object)]
 pub struct StandaloneStandardClient {
     config: Arc<StandardSecrets>,
-    rng: Arc<Mutex<OurRng>>,
+    rng: Arc<Mutex<OurReseedingRng>>,
 }
 impl StandaloneStandardClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {

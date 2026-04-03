@@ -11,7 +11,7 @@ use crate::tenant_security_client::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, RequestMetadata, TenantSecurityClient,
     UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{BatchResult, OurRng, perform_batch_action, v4_proto_from_bytes};
+use crate::util::{BatchResult, OurReseedingRng, perform_batch_action, v4_proto_from_bytes};
 use crate::{AlloyMetadata, alloy_client_trait::AlloyClient};
 use crate::{DocumentId, FieldId, PlaintextBytes, TenantId};
 use bytes::Bytes;
@@ -37,7 +37,7 @@ use std::sync::{Arc, Mutex};
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardClient {
     tenant_security_client: Arc<TenantSecurityClient>,
-    rng: Arc<Mutex<OurRng>>,
+    rng: Arc<Mutex<OurReseedingRng>>,
 }
 
 // Standard SaaS Shield edeks could be V3 if they originated in old TSCs or V4 if they originated from Cloaked Search.

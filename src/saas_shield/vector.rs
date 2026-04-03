@@ -6,7 +6,7 @@ use super::{
 use crate::alloy_client_trait::AlloyClient;
 use crate::errors::AlloyError;
 use crate::tenant_security_client::{DerivationType, SecretType, TenantSecurityClient};
-use crate::util::{OurRng, check_rotation_no_op, perform_batch_action};
+use crate::util::{OurReseedingRng, check_rotation_no_op, perform_batch_action};
 use crate::vector::{
     EncryptedVector, EncryptedVectors, GenerateVectorQueryResult, PlaintextVector,
     PlaintextVectors, VectorDecryptBatchResult, VectorEncryptBatchResult, VectorOps,
@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex};
 pub struct SaasShieldVectorClient {
     approximation_factor: Option<f32>,
     tenant_security_client: Arc<TenantSecurityClient>,
-    rng: Arc<Mutex<OurRng>>,
+    rng: Arc<Mutex<OurReseedingRng>>,
     use_scaling_factor: bool,
 }
 
