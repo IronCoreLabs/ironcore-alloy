@@ -1,94 +1,23 @@
+mod reseeding_rng;
+
+#[cfg(test)]
+pub(crate) use reseeding_rng::create_test_seeded_rng;
+pub(crate) use reseeding_rng::{
+    OurReseedingRng, create_reseeding_rng, create_rng, create_rng_maybe_seeded,
+};
+
 use crate::{AlloyMetadata, TenantId, VectorEncryptionKey, errors::AlloyError};
 use ironcore_documents::v5::key_id_header::KeyId;
 use itertools::Either;
 use protobuf::Message;
-use rand::rngs::SysRng;
-use rand::{CryptoRng, SeedableRng, TryCryptoRng, TryRng};
-use rand_chacha::ChaCha20Rng;
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelExtend};
 use ring::hmac::{HMAC_SHA256, HMAC_SHA512, Key as HMACKey};
-use std::convert::Infallible;
 use std::hash::Hash;
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, MutexGuard},
+    sync::{Mutex, MutexGuard},
 };
-
-/// Default reseed threshold in bytes. Matches ThreadRng's 64 KiB interval.
-const RESEED_THRESHOLD: usize = 64 * 1024;
-
-/// A CSPRNG wrapper that automatically reseeds from system entropy periodically.
-/// Implements [`CryptoRng`] so it can be used anywhere a `CryptoRng` is expected.
-///
-/// Set `reseed_threshold` to `None` to disable reseeding, which preserves
-/// deterministic output for test RNGs.
-pub(crate) struct ReseedingRng<T: CryptoRng + SeedableRng> {
-    inner: T,
-    bytes_generated: usize,
-    reseed_threshold: Option<usize>,
-}
-
-impl<T: CryptoRng + SeedableRng> ReseedingRng<T> {
-    fn new(rng: T) -> Self {
-        ReseedingRng {
-            inner: rng,
-            bytes_generated: 0,
-            reseed_threshold: Some(RESEED_THRESHOLD),
-        }
-    }
-
-    fn new_seeded(seed: u64) -> Self {
-        ReseedingRng {
-            inner: T::seed_from_u64(seed),
-            bytes_generated: 0,
-            reseed_threshold: None,
-        }
-    }
-
-    fn reseed_if_needed(&mut self) {
-        if let Some(threshold) = self.reseed_threshold {
-            if self.bytes_generated >= threshold {
-                if let Ok(reseeded) = T::try_from_rng(&mut SysRng) {
-                    self.inner = reseeded;
-                }
-                // On reseed failure, continue with existing state rather than panicking.
-                // The current state is still cryptographically valid and the likelihood of
-                // SysRng erroring is very low.
-                self.bytes_generated = 0;
-            }
-        }
-    }
-}
-
-impl<T: CryptoRng + SeedableRng> TryRng for ReseedingRng<T> {
-    type Error = Infallible;
-
-    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
-        self.reseed_if_needed();
-        let val = self.inner.next_u32();
-        self.bytes_generated = self.bytes_generated.saturating_add(4);
-        Ok(val)
-    }
-
-    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
-        self.reseed_if_needed();
-        let val = self.inner.next_u64();
-        self.bytes_generated = self.bytes_generated.saturating_add(8);
-        Ok(val)
-    }
-
-    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
-        self.reseed_if_needed();
-        self.inner.fill_bytes(dst);
-        self.bytes_generated = self.bytes_generated.saturating_add(dst.len());
-        Ok(())
-    }
-}
-
-impl<T: CryptoRng + SeedableRng> TryCryptoRng for ReseedingRng<T> {}
-
-pub(crate) type OurReseedingRng = ReseedingRng<ChaCha20Rng>;
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct AuthHash(pub(crate) [u8; 32]);
@@ -166,29 +95,6 @@ pub(crate) fn check_auth_hash<'a, A: AsRef<[u8]>, B: Iterator<Item = &'a f32>>(
     auth_hash: AuthHash,
 ) -> bool {
     compute_auth_hash(key, approximation_factor, iv, encrypted_embedding) == auth_hash
-}
-
-pub(crate) fn create_reseeding_rng() -> Arc<Mutex<OurReseedingRng>> {
-    let inner =
-        ChaCha20Rng::try_from_rng(&mut SysRng).expect("Failed to seed RNG from system entropy");
-    Arc::new(Mutex::new(ReseedingRng::new(inner)))
-}
-
-/// Creates a seeded RNG to use in test functions from the FFI and in the case
-/// that users are creating a client for testing
-pub(crate) fn create_test_seeded_rng(seed: u64) -> Arc<Mutex<OurReseedingRng>> {
-    Arc::new(Mutex::new(ReseedingRng::new_seeded(seed)))
-}
-
-pub(crate) fn create_rng_maybe_seeded(maybe_seed: Option<i32>) -> Arc<Mutex<OurReseedingRng>> {
-    maybe_seed
-        //We don't care that the negative numbers turn into giant numbers for the seed we just need a static value.
-        .map(|seed| create_test_seeded_rng(seed as u64))
-        .unwrap_or_else(create_reseeding_rng)
-}
-
-pub(crate) fn create_rng<K: AsRef<[u8]>, T: AsRef<[u8]>>(key: K, hash_payload: T) -> ChaCha20Rng {
-    ChaCha20Rng::from_seed(hash256(key, hash_payload))
 }
 
 pub(crate) struct BatchResult<K: Hash, U> {
