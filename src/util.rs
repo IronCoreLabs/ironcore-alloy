@@ -5,10 +5,10 @@ use protobuf::Message;
 use rand::rngs::SysRng;
 use rand::{CryptoRng, SeedableRng, TryCryptoRng, TryRng};
 use rand_chacha::ChaCha20Rng;
-use std::convert::Infallible;
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelExtend};
 use ring::hmac::{HMAC_SHA256, HMAC_SHA512, Key as HMACKey};
+use std::convert::Infallible;
 use std::hash::Hash;
 use std::{
     collections::HashMap,
@@ -169,7 +169,8 @@ pub(crate) fn check_auth_hash<'a, A: AsRef<[u8]>, B: Iterator<Item = &'a f32>>(
 }
 
 pub(crate) fn create_reseeding_rng() -> Arc<Mutex<OurReseedingRng>> {
-    let inner = ChaCha20Rng::try_from_rng(&mut SysRng).expect("Failed to seed RNG from system entropy");
+    let inner =
+        ChaCha20Rng::try_from_rng(&mut SysRng).expect("Failed to seed RNG from system entropy");
     Arc::new(Mutex::new(ReseedingRng::new(inner)))
 }
 
