@@ -3,7 +3,7 @@ mod common;
 mod test {
     use std::{error::Error, fs, path::Path, process::Command};
 
-    use crate::common::{build_dynamic_library, generate_bindings, get_dynamic_library_paths};
+    use crate::common::{build_dynamic_library, generate_python_bindings, get_dynamic_library_paths};
 
     /// Run all the foreign Python library tests and fail if any of them failed.
     /// WARNING:
@@ -24,10 +24,9 @@ mod test {
             )?;
         }
         // generate the bindings to go with the just compiled binary
-        generate_bindings(
+        generate_python_bindings(
             dynamic_library_paths[0].clone(),
             python_module_dir,
-            uniffi::PythonBindingGenerator,
         )?;
         // run the hatch test command and print the output as though it were our output
         let mut handle = Command::new("hatch")

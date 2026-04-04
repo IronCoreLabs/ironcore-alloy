@@ -25,6 +25,8 @@ dependencies {
 }
 
 java {
+    sourceCompatibility = JavaVersion.VERSION_22
+    targetCompatibility = JavaVersion.VERSION_22
     withSourcesJar()
     withJavadocJar()
 }
