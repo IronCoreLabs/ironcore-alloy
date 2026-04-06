@@ -9,7 +9,7 @@ use ironcore_documents::{
     v5::{self, key_id_header::KeyIdHeader},
 };
 use protobuf::Message;
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{
     collections::HashMap,
@@ -185,7 +185,7 @@ pub(crate) fn verify_sig(
 }
 
 /// Encrypt each of the fields of the document using the aes_dek
-pub(crate) fn encrypt_document_core<R: RngCore + CryptoRng + Send>(
+pub(crate) fn encrypt_document_core<R: CryptoRng + Send>(
     document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
@@ -199,7 +199,7 @@ pub(crate) fn encrypt_document_core<R: RngCore + CryptoRng + Send>(
     })
 }
 
-pub(crate) fn encrypt_map<R: RngCore + CryptoRng + Send>(
+pub(crate) fn encrypt_map<R: CryptoRng + Send>(
     document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
@@ -208,7 +208,7 @@ pub(crate) fn encrypt_map<R: RngCore + CryptoRng + Send>(
         .into_par_iter()
         .map(|(label, plaintext)| {
             ironcore_documents::aes::encrypt_document_and_attach_iv(
-                rng.clone(),
+                &mut *crate::util::take_lock(&rng),
                 aes_dek,
                 ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec()),
             )

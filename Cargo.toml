@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.14.1-pre.2"
+version = "0.14.1-pre.6"
 description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
 authors = ["IronCore Labs <info@ironcorelabs.com>"]
 edition = "2024"
@@ -44,14 +44,13 @@ bytes = { version = "1.11.1", features = ["serde"] }
 convert_case = "0.11.0"
 futures = "0.3.32"
 hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = "0.2.2"
+ironcore-documents = "0.3.0"
 itertools = "0.14"
-ndarray = "0.16"
-ndarray-rand = "0.15"
+ndarray = "0.17"
 protobuf = { version = "3.3", features = ["with-bytes"] }
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-rand_distr = "0.4.3"
+rand = "0.10"
+rand_chacha = "0.10"
+rand_distr = "0.6"
 rayon = "1.11.0"
 regex = "1.12.3"
 reqwest = { version = "0.12", default-features = false, features = [
@@ -79,8 +78,8 @@ criterion = { version = "0.7", features = ["async_tokio"] }
 hex = "0.4.3"
 hex-literal = "1.1.0"
 lazy_static = "1.5"
-proptest = "1.10.0"
-tokio = { version = "1.49", features = ["macros", "rt-multi-thread"] }
+proptest = "1.11.0"
+tokio = { version = "1.50", features = ["macros", "rt-multi-thread"] }
 uniffi_bindgen = "0.31.0"
 z85 = "3.0.7"
 

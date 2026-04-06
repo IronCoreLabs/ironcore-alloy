@@ -12,9 +12,9 @@ use ironcore_alloy::{
 };
 use ironcore_alloy::{DerivationPath, FieldId};
 use itertools::Itertools;
+use rand::Rng;
 use rand::rngs::ThreadRng;
-use rand::{Rng, RngCore};
-use rand_distr::Uniform;
+use rand_distr::{Distribution, Uniform};
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ fn random_bytes(rng: &mut ThreadRng, length: usize) -> PlaintextBytes {
 }
 
 fn benches(c: &mut Criterion) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut key_bytes = [0u8; 64];
     rng.fill_bytes(&mut key_bytes);
     let secret = Secret::new([1u8; 64].to_vec()).unwrap();
@@ -56,7 +56,7 @@ fn benches(c: &mut Criterion) {
     let sdk = Standalone::new(&config);
     let metadata = AlloyMetadata::new_simple(TenantId("tenant".to_string()));
 
-    let range = Uniform::from(-1.0..1.0);
+    let range = Uniform::new(-1.0, 1.0).unwrap();
     let encrypt_vector = |values| async {
         let vector = PlaintextVector {
             plaintext_vector: values,
@@ -67,28 +67,28 @@ fn benches(c: &mut Criterion) {
     };
     c.bench_function("Standalone - vector_encrypt d=384", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(384).collect_vec(),
+            || range.sample_iter(rand::rng()).take(384).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - vector_encrypt d=768", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(768).collect_vec(),
+            || range.sample_iter(rand::rng()).take(768).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - vector_encrypt d=1536", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(1536).collect_vec(),
+            || range.sample_iter(rand::rng()).take(1536).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - vector_encrypt d=2048", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(2048).collect_vec(),
+            || range.sample_iter(rand::rng()).take(2048).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
@@ -105,28 +105,28 @@ fn benches(c: &mut Criterion) {
     };
     c.bench_function("Standalone - vector_roundtrip d=384", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(384).collect_vec(),
+            || range.sample_iter(rand::rng()).take(384).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - vector_roundtrip d=768", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(768).collect_vec(),
+            || range.sample_iter(rand::rng()).take(768).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - vector_roundtrip d=1536", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(1536).collect_vec(),
+            || range.sample_iter(rand::rng()).take(1536).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("Standalone - vector_roundtrip d=2048", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(2048).collect_vec(),
+            || range.sample_iter(rand::rng()).take(2048).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
@@ -179,7 +179,7 @@ fn benches(c: &mut Criterion) {
 }
 
 fn tsp_benches(c: &mut Criterion) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let tsp_uri = env::var("TSP_ADDRESS").unwrap_or("http://localhost".to_string());
     let tsp_port = env::var("TSP_PORT").unwrap_or("32804".to_string());
     let tenant_id = env::var("TENANT_ID").unwrap_or("tenant-gcp-l".to_string());
@@ -208,7 +208,7 @@ fn tsp_benches(c: &mut Criterion) {
         sdk.standard().decrypt(encrypted, &metadata).await.unwrap()
     };
 
-    let range = Uniform::from(-1.0..1.0);
+    let range = Uniform::new(-1.0, 1.0).unwrap();
     let encrypt_vector = |values| async {
         let vector = PlaintextVector {
             plaintext_vector: values,
@@ -219,28 +219,28 @@ fn tsp_benches(c: &mut Criterion) {
     };
     c.bench_function("TSP - vector_encrypt d=384", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(384).collect_vec(),
+            || range.sample_iter(rand::rng()).take(384).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("TSP - vector_encrypt d=768", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(768).collect_vec(),
+            || range.sample_iter(rand::rng()).take(768).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("TSP - vector_encrypt d=1536", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(1536).collect_vec(),
+            || range.sample_iter(rand::rng()).take(1536).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("TSP - vector_encrypt d=2048", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(2048).collect_vec(),
+            || range.sample_iter(rand::rng()).take(2048).collect_vec(),
             encrypt_vector,
             BatchSize::SmallInput,
         )
@@ -257,28 +257,28 @@ fn tsp_benches(c: &mut Criterion) {
     };
     c.bench_function("TSP - vector_roundtrip d=384", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(384).collect_vec(),
+            || range.sample_iter(rand::rng()).take(384).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("TSP - vector_roundtrip d=768", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(768).collect_vec(),
+            || range.sample_iter(rand::rng()).take(768).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("TSP - vector_roundtrip d=1536", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(1536).collect_vec(),
+            || range.sample_iter(rand::rng()).take(1536).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )
     });
     c.bench_function("TSP - vector_roundtrip d=2048", |b| {
         b.to_async(Runtime::new().unwrap()).iter_batched(
-            || rng.clone().sample_iter(&range).take(2048).collect_vec(),
+            || range.sample_iter(rand::rng()).take(2048).collect_vec(),
             roundtrip_vector,
             BatchSize::SmallInput,
         )

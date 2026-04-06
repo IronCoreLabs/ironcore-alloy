@@ -28,7 +28,7 @@ use ironcore_documents::v5::key_id_header::{
 };
 use itertools::Itertools;
 use protobuf::Message;
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::collections::HashMap;
 use std::convert::identity;
@@ -96,7 +96,7 @@ impl SaasShieldStandardClient {
         }
     }
 
-    fn encrypt_document<R: RngCore + CryptoRng + Send>(
+    fn encrypt_document<R: CryptoRng + Send>(
         &self,
         rng: Arc<Mutex<R>>,
         tsc_edek: Vec<u8>,

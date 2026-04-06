@@ -15,7 +15,7 @@ use ironcore_documents::{
     vector_encryption_metadata::VectorEncryptionMetadata,
 };
 use itertools::Itertools;
-use rand::{CryptoRng, RngCore};
+use rand::CryptoRng;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -215,7 +215,7 @@ pub(crate) fn get_iv_and_auth_hash(b: &[u8]) -> Result<([u8; 12], AuthHash), All
     ))
 }
 
-pub(crate) fn encrypt_internal<R: RngCore + CryptoRng + Send + Sync>(
+pub(crate) fn encrypt_internal<R: CryptoRng + Send + Sync>(
     approximation_factor: f32,
     key: &VectorEncryptionKey,
     key_id: KeyId,
