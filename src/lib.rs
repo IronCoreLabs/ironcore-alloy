@@ -623,8 +623,8 @@ pub(crate) mod tests {
         // (from standalone/deterministic.rs tests)
         fn standalone_deterministic_bytes() -> Vec<u8> {
             vec![
-                0, 0, 0, 1, 128, 0, 44, 194, 55, 224, 251, 64, 34, 109, 10, 77, 197, 32,
-                11, 224, 51, 154, 218, 130, 209,
+                0, 0, 0, 1, 128, 0, 44, 194, 55, 224, 251, 64, 34, 109, 10, 77, 197, 32, 11, 224,
+                51, 154, 218, 130, 209,
             ]
         }
 
@@ -634,8 +634,8 @@ pub(crate) mod tests {
                 edek_type: EdekType::Standalone,
                 payload_type: PayloadType::DeterministicField,
             };
-            let result = client
-                .decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
+            let result =
+                client.decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
             let decomposed = result.unwrap();
             assert_eq!(decomposed.key_id, KeyId(1));
             assert!(!decomposed.remaining_bytes.is_empty());
@@ -660,8 +660,8 @@ pub(crate) mod tests {
                 edek_type: EdekType::SaasShield,
                 payload_type: PayloadType::DeterministicField,
             };
-            let result = client
-                .decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
+            let result =
+                client.decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
             assert!(matches!(
                 result.unwrap_err(),
                 AlloyError::InvalidInput { .. }
@@ -674,8 +674,8 @@ pub(crate) mod tests {
                 edek_type: EdekType::Standalone,
                 payload_type: PayloadType::StandardEdek,
             };
-            let result = client
-                .decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
+            let result =
+                client.decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
             assert!(matches!(
                 result.unwrap_err(),
                 AlloyError::InvalidInput { .. }
