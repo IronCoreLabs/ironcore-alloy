@@ -160,7 +160,7 @@ public class IroncoreAlloyTest {
     @Test
     public void sdkVectorRotateDifferentKey() throws InterruptedException, ExecutionException, AlloyException {
         Map<SecretPath, VectorSecret> vectorSecrets2 = Map.of(
-            new SecretPath(""), new VectorSecret(approximationFactor, new RotatableSecret(
+            new SecretPath(""), VectorSecret.newWithScalingFactor(approximationFactor, new RotatableSecret(
                 new StandaloneSecret(1, new Secret(keyByteArray)),
                 new StandaloneSecret(2, new Secret(keyByteArray))
             ))
@@ -181,7 +181,7 @@ public class IroncoreAlloyTest {
         assertTrue(rotated.successes().containsKey(testVecId));
 
         Map<SecretPath, VectorSecret> vectorSecrets3 = Map.of(
-            new SecretPath(""), new VectorSecret(approximationFactor, new RotatableSecret(
+            new SecretPath(""), VectorSecret.newWithScalingFactor(approximationFactor, new RotatableSecret(
                 new StandaloneSecret(1, new Secret(keyByteArray)), null
             ))
         );
