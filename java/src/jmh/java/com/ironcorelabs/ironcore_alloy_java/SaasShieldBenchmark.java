@@ -4,48 +4,43 @@ import com.ironcorelabs.ironcore_alloy_java.*;
 import org.openjdk.jmh.annotations.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import okhttp3.*;
 import java.util.concurrent.CompletableFuture;
 
-class JavaHttpClient implements HttpClient {
-    OkHttpClient client;
+// Java stdlib HttpClient implementation — no OkHttp dependency
+class StdlibHttpClient implements HttpClient {
+    private final java.net.http.HttpClient client;
 
-    public JavaHttpClient() {
-        this.client = new OkHttpClient();
+    public StdlibHttpClient() {
+        this.client = java.net.http.HttpClient.newBuilder().build();
     }
 
     @Override
     public CompletableFuture<AlloyHttpClientResponse> postJson(String url, String jsonBody,
             AlloyHttpClientHeaders headers) {
-        RequestBody body = RequestBody.create(jsonBody, MediaType.get("application/json"));
-        Request request =
-                new Request.Builder().url(url).header("Content-Type", headers.contentType())
-                        .header("Authorization", headers.authorization()).post(body).build();
-        CompletableFuture<AlloyHttpClientResponse> future = new CompletableFuture<>();
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, java.io.IOException e) {
-                future.completeExceptionally(new AlloyException.RequestException(
-                        "Failed to make JSON post request: " + e.getMessage()));
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws java.io.IOException {
-                future.complete(new AlloyHttpClientResponse(response.body().string(),
-                        (short) response.code()));
-            }
-        });
-        return future;
+        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .header("Content-Type", headers.contentType())
+                .header("Authorization", headers.authorization())
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+        return client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.ofString())
+                .thenApply(response ->
+                    new AlloyHttpClientResponse(response.body(), (short) response.statusCode())
+                )
+                .exceptionally(e -> {
+                    throw new RuntimeException(new AlloyException.RequestException(
+                            "Failed to make JSON post request: " + e.getMessage()));
+                });
     }
 }
 
 
 @State(Scope.Benchmark)
 @Fork(1)
-@Warmup(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
+@Warmup(iterations = 1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 public class SaasShieldBenchmark {
 
     private PlaintextDocument smallPlaintext;
@@ -65,14 +60,14 @@ public class SaasShieldBenchmark {
             new TenantId(System.getenv().getOrDefault("TENANT_ID", "tenant-gcp-l"));
     private final String apiKey = System.getenv().getOrDefault("API_KEY", "0WUaXesNgbTAuLwn");
 
-    private JavaHttpClient httpClient;
+    private StdlibHttpClient httpClient;
     private SaasShieldConfiguration saasShieldConfig;
     private SaasShield saasShieldSdk;
     private final AlloyMetadata metadata = AlloyMetadata.newSimple(tenantId);
 
     @Setup
     public void setUp() throws Exception {
-        httpClient = new JavaHttpClient();
+        httpClient = new StdlibHttpClient();
         saasShieldConfig = new SaasShieldConfiguration(tspUri + ":" + tspPort, apiKey,
                 approximationFactor, httpClient, true);
         saasShieldSdk = new SaasShield(saasShieldConfig);
@@ -100,8 +95,6 @@ public class SaasShieldBenchmark {
     @TearDown
     public void tearDown() {
         saasShieldSdk.close();
-        httpClient.client.dispatcher().executorService().shutdown();
-        httpClient.client.connectionPool().evictAll();
     }
 
     private PlaintextDocument generatePlaintextDocument(int bytesPerField, int numFields) {
