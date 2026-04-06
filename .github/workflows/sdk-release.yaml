@@ -42,7 +42,7 @@ jobs:
       - name: Export GPG signing key
         run: gpg --export-secret-keys > /tmp/9FA43559.asc
       - name: Generate Kotlin files
-        run: cargo run --bin uniffi-bindgen generate --library resources/linux-x86-64/libironcore_alloy.so --language kotlin --out-dir kotlin
+        run: cargo run --bin uniffi-bindgen generate resources/linux-x86-64/libironcore_alloy.so --language kotlin --out-dir kotlin
         working-directory: kotlin/src/main
       - name: Publish
         run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
@@ -82,7 +82,7 @@ jobs:
       - name: Export GPG signing key
         run: gpg --export-secret-keys > /tmp/9FA43559.asc
       - name: Generate Java files
-        run: cargo run --bin uniffi-bindgen-java generate --library resources/linux-x86-64/libironcore_alloy.so --out-dir java
+        run: cargo run --bin uniffi-bindgen-java generate resources/linux-x86-64/libironcore_alloy.so --out-dir java
         working-directory: java/src/main
       - name: Publish
         run: ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
@@ -107,7 +107,7 @@ jobs:
           mv macos-14- darwin-aarch64
         working-directory: python/ironcore-alloy
       - name: Generate Python files
-        run: cargo run --bin uniffi-bindgen generate --library ../linux-x86-64/libironcore_alloy.so --language python --out-dir .
+        run: cargo run --bin uniffi-bindgen generate ../linux-x86-64/libironcore_alloy.so --language python --out-dir .
         working-directory: python/ironcore-alloy/ironcore_alloy
       - name: Install hatch
         run: pipx install hatch
