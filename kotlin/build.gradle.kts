@@ -10,8 +10,8 @@ group = "com.ironcorelabs"
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
     kotlin("jvm") version "2.1.20"
-    id("org.jetbrains.dokka") version "2.0.0"
-    id("org.jetbrains.dokka-javadoc") version "2.0.0"
+    id("org.jetbrains.dokka") version "2.2.0"
+    id("org.jetbrains.dokka-javadoc") version "2.2.0"
 
     // Apply the java-library plugin for API and implementation separation.
     `java-library`
