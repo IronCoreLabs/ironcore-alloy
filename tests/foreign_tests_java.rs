@@ -28,10 +28,7 @@ mod test {
         }
         println!("{main_src_path:?}");
         // generate the bindings to go with the just compiled binary
-        generate_java_bindings(
-            dynamic_library_paths[0].clone(),
-            main_src_path,
-        )?;
+        generate_java_bindings(dynamic_library_paths[0].clone(), main_src_path)?;
         // run the hatch test command and print the output as though it were our output
         let mut handle = std::process::Command::new("./gradlew")
             .args(["test"])
