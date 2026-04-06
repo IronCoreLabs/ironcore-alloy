@@ -474,4 +474,212 @@ pub(crate) mod tests {
         let result1 = base85_prefix_padding(&[1, 2, 3, 4, 5, 6]);
         assert_eq!(result1, [1, 2, 3, 4, 5, 6, 0, 0])
     }
+
+    #[test]
+    fn secret_new_succeeds_with_32_bytes() {
+        let result = Secret::new(vec![0u8; 32]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn secret_new_succeeds_with_more_than_32_bytes() {
+        let result = Secret::new(vec![0u8; 64]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn secret_new_fails_with_short_secret() {
+        let result = Secret::new(vec![0u8; 31]);
+        assert!(matches!(
+            result.unwrap_err(),
+            AlloyError::InvalidConfiguration { .. }
+        ));
+    }
+
+    #[test]
+    fn alloy_metadata_try_into_request_metadata() {
+        let metadata = AlloyMetadata {
+            tenant_id: TenantId("tenant".to_string()),
+            requesting_id: Some("requester".to_string()),
+            data_label: Some("label".to_string()),
+            source_ip: None,
+            object_id: None,
+            request_id: None,
+            custom_fields: HashMap::new(),
+        };
+        let result: Result<RequestMetadata, _> = metadata.try_into();
+        let rm = result.unwrap();
+        assert_eq!(rm.tenant_id, TenantId("tenant".to_string()));
+    }
+
+    #[test]
+    fn alloy_metadata_uses_default_requesting_id() {
+        let metadata = AlloyMetadata {
+            tenant_id: TenantId("tenant".to_string()),
+            requesting_id: None,
+            data_label: None,
+            source_ip: None,
+            object_id: None,
+            request_id: None,
+            custom_fields: HashMap::new(),
+        };
+        let result: Result<RequestMetadata, _> = metadata.try_into();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn metadata_with_positive_time_succeeds() {
+        let metadata = AlloyMetadata {
+            tenant_id: TenantId("tenant".to_string()),
+            requesting_id: None,
+            data_label: None,
+            source_ip: None,
+            object_id: None,
+            request_id: None,
+            custom_fields: HashMap::new(),
+        };
+        let result: Result<RequestMetadata, _> = (metadata, Some(1000i64)).try_into();
+        let rm = result.unwrap();
+        assert_eq!(rm.timestamp_millis, Some(1000u64));
+    }
+
+    #[test]
+    fn metadata_with_zero_time_succeeds() {
+        let metadata = AlloyMetadata {
+            tenant_id: TenantId("tenant".to_string()),
+            requesting_id: None,
+            data_label: None,
+            source_ip: None,
+            object_id: None,
+            request_id: None,
+            custom_fields: HashMap::new(),
+        };
+        let result: Result<RequestMetadata, _> = (metadata, Some(0i64)).try_into();
+        let rm = result.unwrap();
+        assert_eq!(rm.timestamp_millis, Some(0u64));
+    }
+
+    #[test]
+    fn metadata_with_negative_time_fails() {
+        let metadata = AlloyMetadata {
+            tenant_id: TenantId("tenant".to_string()),
+            requesting_id: None,
+            data_label: None,
+            source_ip: None,
+            object_id: None,
+            request_id: None,
+            custom_fields: HashMap::new(),
+        };
+        let result: Result<RequestMetadata, _> = (metadata, Some(-1i64)).try_into();
+        assert!(matches!(
+            result.unwrap_err(),
+            AlloyError::InvalidInput { .. }
+        ));
+    }
+
+    #[test]
+    fn metadata_with_none_time_uses_system_time() {
+        let metadata = AlloyMetadata {
+            tenant_id: TenantId("tenant".to_string()),
+            requesting_id: None,
+            data_label: None,
+            source_ip: None,
+            object_id: None,
+            request_id: None,
+            custom_fields: HashMap::new(),
+        };
+        let before = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let result: Result<RequestMetadata, _> = (metadata, None).try_into();
+        let after = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        let timestamp = result.unwrap().timestamp_millis.unwrap();
+        assert!(timestamp >= before && timestamp <= after);
+    }
+
+    mod decompose_header {
+        use super::*;
+        use crate::alloy_client_trait::AlloyClient;
+
+        struct TestAlloyClient {
+            edek_type: EdekType,
+            payload_type: PayloadType,
+        }
+
+        impl AlloyClient for TestAlloyClient {
+            fn get_edek_type(&self) -> EdekType {
+                self.edek_type
+            }
+            fn get_payload_type(&self) -> PayloadType {
+                self.payload_type
+            }
+        }
+
+        // Known valid bytes for Standalone + DeterministicField + key_id=1
+        // (from standalone/deterministic.rs tests)
+        fn standalone_deterministic_bytes() -> Vec<u8> {
+            vec![
+                0, 0, 0, 1, 128, 0, 44, 194, 55, 224, 251, 64, 34, 109, 10, 77, 197, 32,
+                11, 224, 51, 154, 218, 130, 209,
+            ]
+        }
+
+        #[test]
+        fn valid_header_decomposes_successfully() {
+            let client = TestAlloyClient {
+                edek_type: EdekType::Standalone,
+                payload_type: PayloadType::DeterministicField,
+            };
+            let result = client
+                .decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
+            let decomposed = result.unwrap();
+            assert_eq!(decomposed.key_id, KeyId(1));
+            assert!(!decomposed.remaining_bytes.is_empty());
+        }
+
+        #[test]
+        fn invalid_bytes_returns_error() {
+            let client = TestAlloyClient {
+                edek_type: EdekType::Standalone,
+                payload_type: PayloadType::DeterministicField,
+            };
+            let result = client.decompose_key_id_header(EncryptedBytes(vec![0]));
+            assert!(matches!(
+                result.unwrap_err(),
+                AlloyError::InvalidInput { .. }
+            ));
+        }
+
+        #[test]
+        fn mismatched_edek_type_returns_error() {
+            let client = TestAlloyClient {
+                edek_type: EdekType::SaasShield,
+                payload_type: PayloadType::DeterministicField,
+            };
+            let result = client
+                .decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
+            assert!(matches!(
+                result.unwrap_err(),
+                AlloyError::InvalidInput { .. }
+            ));
+        }
+
+        #[test]
+        fn mismatched_payload_type_returns_error() {
+            let client = TestAlloyClient {
+                edek_type: EdekType::Standalone,
+                payload_type: PayloadType::StandardEdek,
+            };
+            let result = client
+                .decompose_key_id_header(EncryptedBytes(standalone_deterministic_bytes()));
+            assert!(matches!(
+                result.unwrap_err(),
+                AlloyError::InvalidInput { .. }
+            ));
+        }
+    }
 }
