@@ -35,7 +35,31 @@ hatch test --all       # to run unit tests across all Python versions
 
 ## Documentation
 
-Docs can be previewed with `hatch run docs:serve`, or manually built with `hatch run docs:build`. They'll be automatically built and uploaded by our [readthedocs](https://readthedocs.com) integration.
+Docs can be previewed locally with `hatch run docs:serve`, or manually built with `hatch run docs:build`.
+
+Docs are automatically built and hosted by [ReadTheDocs](https://readthedocs.com). Because building the
+Rust library from source exceeds RTD's build time limits, SDK CI builds the docs HTML and uploads it as a
+GitHub Actions artifact. RTD then downloads the pre-built HTML via the GitHub API.
+
+### RTD Setup
+
+RTD's automatic GitHub webhook must be **disabled** in the RTD project settings — builds are
+triggered by SDK CI after the docs artifact is ready. If the automatic webhook is left enabled,
+RTD will try to build before CI has produced the artifact and fail.
+
+RTD needs a GitHub token to download artifacts from CI. Configure this in the
+[RTD project settings](https://readthedocs.org/dashboard/) under **Environment Variables**:
+
+| Variable       | Value                                                                 |
+|----------------|-----------------------------------------------------------------------|
+| `GITHUB_TOKEN` | A GitHub fine-grained personal access token or GitHub App token with `actions:read` permission on `IronCoreLabs/ironcore-alloy` |
+
+The SDK CI workflow also needs two secrets to trigger RTD builds for PRs:
+
+| GitHub Secret      | Value                                                      |
+|--------------------|------------------------------------------------------------|
+| `RTD_WEBHOOK_TOKEN` | Token from the RTD integration webhook settings           |
+| `RTD_WEBHOOK_ID`    | Numeric ID from the RTD webhook URL                       |
 
 ## Release
 

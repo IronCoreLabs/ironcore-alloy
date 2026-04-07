@@ -100,3 +100,37 @@ jobs:
       - name: Run Python tests
         run: hatch test --all -- -s
         working-directory: python/ironcore-alloy
+      - name: Upload generated Python bindings
+        if: matrix.runs-on == 'ubuntu-24.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-bindings
+          path: python/ironcore-alloy/ironcore_alloy/ironcore_alloy.py
+
+  build-docs:
+    needs: python-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-bindings
+          path: python/ironcore-alloy/ironcore_alloy/
+      - name: Install hatch
+        run: pipx install hatch
+      - name: Build docs
+        run: hatch run docs:build
+        working-directory: python/ironcore-alloy
+      - name: Upload docs HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-html
+          path: python/ironcore-alloy/site/
+      - name: Trigger ReadTheDocs build
+        run: |
+          # RTD's automatic webhook is disabled; we trigger after docs are built.
+          BRANCH=${{ github.head_ref || github.ref_name }}
+          curl -X POST \
+            -d "token=${{ secrets.RTD_WEBHOOK_TOKEN }}" \
+            -d "branches=$BRANCH" \
+            https://readthedocs.org/api/v2/webhook/ironcore-alloy/${{ secrets.RTD_WEBHOOK_ID }}/

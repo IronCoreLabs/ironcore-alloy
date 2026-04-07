@@ -1,18 +1,28 @@
 # Read the Docs configuration file for MkDocs projects
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+#
+# Docs are built by SDK CI (sdk-ci.yaml) and uploaded as a GitHub Actions artifact.
+# This config downloads the pre-built HTML and copies it to the RTD output directory.
+# See RELEASING.md for required RTD and GitHub secrets setup.
 version: 2
 build:
   os: ubuntu-24.04
   tools:
-    # should match the minimum version in our `pyproject.toml` test matrix
     python: "3.10"
   commands:
-    # install rust. If we automate/otherwise committing the generated python module we can avoid rust at all and
-    # only would need to install hatch here. Doc builds would then be a few seconds instead of a few minutes.
-    - ./python/ironcore-alloy/rust-toolchain-from-file.sh
-    - ~/.cargo/bin/cargo b
-    - ~/.cargo/bin/cargo run --bin uniffi-bindgen generate --library ./target/debug/libironcore_alloy.so --language python  --out-dir python/ironcore-alloy/ironcore_alloy
-    - pip install -v "hatch==1.16.5"
-    # actual doc building part
-    # Switched from hatch run docs:buildRtd because ReadTheDocs was having issues with a hanging --filter somehow
-    - cd python/ironcore-alloy && hatch env run -e docs buildRtd
+    # Find the CI workflow run for this commit and download the pre-built docs
+    - |
+      REPO="IronCoreLabs/ironcore-alloy"
+      COMMIT="$READTHEDOCS_GIT_COMMIT_HASH"
+      # Find the workflow run for this commit
+      RUN_ID=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$REPO/actions/runs?head_sha=$COMMIT&status=completed" \
+        | python3 -c "import sys,json; runs=json.load(sys.stdin)['workflow_runs']; print(runs[0]['id']) if runs else sys.exit(1)")
+      # Find the docs-html artifact in that run
+      ARTIFACT_URL=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
+        "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts?name=docs-html" \
+        | python3 -c "import sys,json; a=json.load(sys.stdin)['artifacts']; print(a[0]['archive_download_url']) if a else sys.exit(1)")
+      # Download and extract to RTD output
+      curl -sfL -H "Authorization: Bearer $GITHUB_TOKEN" "$ARTIFACT_URL" -o /tmp/docs.zip
+      mkdir -p "$READTHEDOCS_OUTPUT/html"
+      unzip -o /tmp/docs.zip -d "$READTHEDOCS_OUTPUT/html/"
