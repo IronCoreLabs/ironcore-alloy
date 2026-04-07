@@ -9,6 +9,8 @@ cd <project_root>/java
 ./gradlew jmh
 ```
 
+**Prerequisites:** Run `cargo t` from the project root first to generate the Java bindings. This cleans stale generated files and produces fresh bindings.
+
 ## Tenant Security Proxy
 
 In order to run the benchmarks, ironcore-alloy needs to connect to a _Tenant Security Proxy (TSP)_.

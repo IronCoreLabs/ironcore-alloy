@@ -27,6 +27,8 @@ mod test {
             )?;
         }
         println!("{main_src_path:?}");
+        // clean stale generated files before regenerating
+        crate::common::clean_generated_dir(&main_src_path.join("com/ironcorelabs/ironcore_alloy"))?;
         // generate the bindings to go with the just compiled binary
         generate_kotlin_bindings(dynamic_library_paths[0].clone(), main_src_path)?;
         // run the test command and print the output as though it were our output

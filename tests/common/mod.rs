@@ -6,7 +6,8 @@ use ironcore_alloy::{
 use std::{
     env,
     error::Error,
-    path::PathBuf,
+    fs,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus, Stdio},
     sync::Arc,
 };
@@ -75,6 +76,20 @@ pub(crate) fn get_dynamic_library_paths() -> Result<Vec<PathBuf>, Box<dyn Error>
     })
     .collect::<Vec<_>>();
     Ok(paths)
+}
+
+/// Removes all files in a generated bindings directory to prevent stale files
+/// from previous versions causing compilation issues.
+pub(crate) fn clean_generated_dir(dir: &Path) -> Result<(), Box<dyn Error>> {
+    if dir.exists() {
+        for entry in fs::read_dir(dir)? {
+            let path = entry?.path();
+            if path.is_file() {
+                fs::remove_file(&path)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn create_bindgen_loader() -> Result<BindgenLoader, Box<dyn Error>> {
