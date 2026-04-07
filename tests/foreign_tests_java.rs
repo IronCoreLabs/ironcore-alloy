@@ -28,7 +28,9 @@ mod test {
         }
         println!("{main_src_path:?}");
         // clean stale generated files before regenerating
-        crate::common::clean_generated_dir(&main_src_path.join("com/ironcorelabs/ironcore_alloy_java"))?;
+        crate::common::clean_generated_dir(
+            &main_src_path.join("com/ironcorelabs/ironcore_alloy_java"),
+        )?;
         // generate the bindings to go with the just compiled binary
         generate_java_bindings(dynamic_library_paths[0].clone(), main_src_path)?;
         // run the gradle test command and print the output as though it were our output
