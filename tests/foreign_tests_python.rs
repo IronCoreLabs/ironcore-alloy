@@ -29,7 +29,7 @@ mod test {
         generate_python_bindings(dynamic_library_paths[0].clone(), python_module_dir)?;
         // run the hatch test command and print the output as though it were our output
         let mut handle = Command::new("hatch")
-            .args(["run", "test:test", "--color=yes", "-s"])
+            .args(["test", "--all", "--", "--color=yes", "-s"])
             .current_dir(python_dir)
             .spawn()
             .unwrap();

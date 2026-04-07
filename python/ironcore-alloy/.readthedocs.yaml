@@ -4,6 +4,7 @@ version: 2
 build:
   os: ubuntu-24.04
   tools:
+    # should match the minimum version in our `pyproject.toml` test matrix
     python: "3.10"
   commands:
     # install rust. If we automate/otherwise committing the generated python module we can avoid rust at all and

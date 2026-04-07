@@ -28,7 +28,7 @@ Once you have a built environment, some common `hatch` commands you may want to 
 cd python/ironcore-alloy
 hatch build -t wheel   # to produce .whl file for release
 hatch shell            # to get a local pyenv with the sdk installed
-hatch run test:test    # to run unit tests
+hatch test --all       # to run unit tests across all Python versions
 ```
 
 > Note: the generate step needs debug symbols to work on Linux, don't strip them before running it (they can be stripped afterwards)

@@ -1,7 +1,7 @@
 # using https://hatch.pypa.io/latest/
 # hatch build -t wheel
-# hatch run test:test
-# hatch run test:coverage
+# hatch test --all
+# hatch test --cover
 # hatch shell
 [build-system]
 requires = ["hatchling"]
@@ -12,7 +12,9 @@ name = "ironcore-alloy"
 authors = [{ name = "IronCore Labs", email = "info@ironcorelabs.com" }]
 description = "Python bindings to the IronCore Labs Alloy SDK. Used for encrypting and decrypting embeddings and their related metadata."
 readme = "README.md"
-requires-python = ">=3.9"
+# unless we use specific features of something new (our known specific features are 3.8+), python ecosystem standard is
+# for this to be the lowest currently not-EOL version (https://devguide.python.org/versions/).
+requires-python = ">=3.10"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
@@ -37,6 +39,9 @@ artifacts = ["*.so", "*.dylib"]
 [tool.hatch.build.targets.wheel.hooks.custom]
 
 [tool.hatch.envs.default]
+installer = "uv"
+# if you ever run into this failing, manually run `hatch python install all` once
+python-sources = ["internal"]
 python = "3.10"
 
 [tool.hatch.envs.docs]
@@ -48,21 +53,22 @@ serve = "mkdocs serve --dev-addr localhost:8000 {args}"
 # added because ReadTheDocs was having issues with passing args
 buildRtd = "mkdocs build --clean --strict --site-dir $READTHEDOCS_OUTPUT/html"
 
-[tool.hatch.envs.test]
-dependencies = [
-  "pytest==7.4.2",
-  "pytest-cov==4.1.0",
-  "pytest-metadata==3.0.0",
-  "pytest-asyncio==0.21.1",
-  "aiohttp==3.11.16",
+[tool.hatch.envs.hatch-test]
+extra-dependencies = [
+  "pytest-metadata==3.1.1",
+  "pytest-asyncio==1.3.0",
+  "aiohttp==3.13.5",
 ]
 
-[tool.hatch.envs.test.scripts]
-coverage = "pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=ironcore_alloy --cov=tests {args}"
-test = "coverage --no-cov {args}"
+[tool.hatch.envs.hatch-test.scripts]
+run-cov = "coverage run -m pytest {args} && coverage report --show-missing"
+run = "pytest{env:HATCH_TEST_ARGS:} {args}"
+cov-combine = "coverage combine"
+cov-report = "coverage report"
 
-[[tool.hatch.envs.test.matrix]]
-python = ["39", "310", "311"]
+# python will make breaking changes in minor versions, so we should always test on all current non-EOL versions.
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["310", "311", "312", "313", "314"]
 
 [tool.hatch.envs.bench]
 dependencies = ["pyperf==2.6.2"]
@@ -72,6 +78,7 @@ bench = "rm bench.json; python bench.py -o bench.json"
 stats = "pyperf stats bench.json"
 
 [tool.coverage.run]
+source = ["ironcore_alloy", "tests"]
 branch = true
 parallel = true
 omit = ["ironcore_alloy/__about__.py"]

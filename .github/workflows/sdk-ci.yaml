@@ -90,23 +90,6 @@ jobs:
       - name: Generate Python files
         run: cargo run --bin uniffi-bindgen generate libironcore_alloy.* --language python --out-dir . --no-format
         working-directory: python/ironcore-alloy/ironcore_alloy
-      - name: Install Python test matrix
-        if: endsWith(matrix.runs-on, 'arm') != true && matrix.runs-on != 'macos-14'
-        uses: actions/setup-python@v6
-        with:
-          # there are no builds for arm linux at all, so we'll make do with the system ones
-          python-version: |
-            3.9
-            3.10
-            3.11
-      - name: Install Python test matrix (macos-14)
-        if: matrix.runs-on == 'macos-14'
-        uses: actions/setup-python@v6
-        with:
-          # arm mac builds don't exist for pre-3.10
-          python-version: |
-            3.10
-            3.11
       - name: Install hatch
         if: matrix.runs-on != 'ubuntu-24.04-arm' && matrix.runs-on != 'macos-14'
         run: pipx install hatch
@@ -115,5 +98,5 @@ jobs:
         # The arm machines have a permissions error if we don't use sudo
         run: sudo pipx install hatch
       - name: Run Python tests
-        run: hatch run test:test -s
+        run: hatch test --all -- -s
         working-directory: python/ironcore-alloy
