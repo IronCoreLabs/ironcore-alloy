@@ -128,9 +128,76 @@ jobs:
     uses: IronCoreLabs/workflows/.github/workflows/rust-release.yaml@rust-release-v1
     secrets: inherit
 
+  build-docs:
+    needs: generate-cdylibs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: ubuntu-24.04-
+          path: ${{ github.workspace }}/python/ironcore-alloy/ironcore_alloy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate Python files
+        run: cargo run --bin uniffi-bindgen generate libironcore_alloy.* --language python --out-dir . --no-format
+        working-directory: python/ironcore-alloy/ironcore_alloy
+      - name: Install hatch
+        run: pipx install hatch
+      - name: Build docs
+        run: hatch run docs:build
+        working-directory: python/ironcore-alloy
+      - name: Upload docs HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-html-${{ github.sha }}
+          path: python/ironcore-alloy/site/
+      - name: Deploy docs to ReadTheDocs
+        run: |
+          TAG=${{ github.event.release.tag_name || github.ref_name }}
+          RTD_API="https://app.readthedocs.org/api/v3/projects/ironcore-alloy"
+          AUTH="Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
+
+          # Sync versions so RTD discovers the tag
+          curl -sf -X POST -H "$AUTH" "$RTD_API/sync-versions/"
+          # Wait for version to appear
+          for i in $(seq 1 10); do
+            curl -sf -H "$AUTH" "$RTD_API/versions/$TAG/" > /dev/null 2>&1 && break
+            sleep 5
+          done
+
+          # Activate the tag version and stable
+          curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
+            -d '{"active": true, "hidden": false}' \
+            "$RTD_API/versions/$TAG/"
+          curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
+            -d '{"active": true, "hidden": false}' \
+            "$RTD_API/versions/stable/"
+
+          # Trigger build for the tag via v3 API
+          BUILD_URL=$(curl -sf -X POST -H "$AUTH" \
+            "$RTD_API/versions/$TAG/builds/" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['urls']['build'])")
+
+          # Poll build status until finished
+          for i in $(seq 1 60); do
+            STATE=$(curl -sf -H "$AUTH" "$BUILD_URL" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['state']['code'])")
+            case "$STATE" in
+              finished) echo "RTD build succeeded"; break ;;
+              cancelled|failed) echo "RTD build $STATE"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          if [ "$STATE" != "finished" ]; then
+            echo "RTD build timed out (state: $STATE)"
+            exit 1
+          fi
+
   mark-github-release:
     if: github.event.release != null
-    needs: [kotlin-release, python-release, java-release, rust-release]
+    needs: [kotlin-release, python-release, java-release, rust-release, build-docs]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6

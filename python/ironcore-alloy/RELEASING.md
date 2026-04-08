@@ -38,31 +38,32 @@ hatch test --all       # to run unit tests across all Python versions
 Docs can be previewed locally with `hatch run docs:serve`, or manually built with `hatch run docs:build`.
 
 Docs are automatically built and hosted by [ReadTheDocs](https://readthedocs.com). Because building the
-Rust library from source exceeds RTD's build time limits, SDK CI builds the docs HTML and uploads it as a
-GitHub Actions artifact. RTD then downloads the pre-built HTML via the GitHub API.
+Rust library from source exceeds RTD's build time limits, CI builds the docs HTML and uploads it as a
+GitHub Actions artifact keyed by commit SHA. CI then triggers RTD via a generic webhook, and RTD
+downloads the pre-built HTML via the GitHub API.
+
+- **PRs**: `sdk-ci.yaml` builds docs, triggers RTD, creates a hidden version for the PR branch, and
+  posts a docs preview link as a PR comment.
+- **Releases**: `sdk-release.yaml` builds docs and triggers RTD for the stable version.
 
 ### RTD Setup
 
-RTD's automatic GitHub webhook must be **disabled** (or removed) in the RTD project settings — builds are
-triggered by SDK CI after the docs artifact is ready. If the automatic webhook is left enabled,
+RTD's automatic GitHub webhook must be **disabled** (or removed) — builds are triggered by CI
+via the v3 API after the docs artifact is ready. If the automatic webhook is left enabled,
 RTD will try to build before CI has produced the artifact and fail.
 
-In RTD under **Admin > Integrations**, create a **Generic API incoming webhook** (not a GitHub webhook).
-This provides the webhook URL and token used by CI to trigger builds.
-
-RTD needs a GitHub token to download artifacts from CI. Configure this in the
+RTD needs a GitHub token to download CI artifacts. Configure in
 [RTD project settings](https://app.readthedocs.org/dashboard/) under **Environment Variables**:
 
-| Variable       | Value                                                                 |
-|----------------|-----------------------------------------------------------------------|
-| `GITHUB_TOKEN` | A GitHub fine-grained personal access token or GitHub App token with `actions:read` permission on `IronCoreLabs/ironcore-alloy` |
+| Variable       | Value                                                                                            |
+|----------------|--------------------------------------------------------------------------------------------------|
+| `GITHUB_TOKEN` | A GitHub fine-grained personal access token with `actions:read` permission on `IronCoreLabs/ironcore-alloy` |
 
-The SDK CI workflow also needs two secrets to trigger RTD builds:
+CI needs this GitHub repo secret:
 
-| GitHub Secret       | Value                                                                          |
-|---------------------|--------------------------------------------------------------------------------|
-| `RTD_WEBHOOK_TOKEN` | Token from the RTD Generic API incoming webhook                                |
-| `RTD_WEBHOOK_ID`    | Numeric ID from the RTD webhook URL (just the number, not the full URL)        |
+| GitHub Secret    | Value                                                                                     |
+|------------------|-------------------------------------------------------------------------------------------|
+| `RTD_API_TOKEN`  | RTD API token (from [RTD account settings](https://app.readthedocs.org/accounts/tokens/)) |
 
 ## Release
 
