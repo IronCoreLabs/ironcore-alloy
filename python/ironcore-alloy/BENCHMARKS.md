@@ -4,6 +4,8 @@ See `project_root/benches/README.md` for more general information about benchmar
 
 ## Usage
 
+**Prerequisites:** Run `cargo t` from the project root first to generate the Python bindings. This cleans stale generated files and produces fresh bindings.
+
 `hatch run bench:bench` to run the benchmarks. Python benchmarks are all Standalone right now, if you'd like to see TSP benchmarks in Python open up an issue (or a PR :)).
 `hatch run bench:stats` to view the in-depth statistics of the most recent run.
 

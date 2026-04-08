@@ -1,3 +1,13 @@
+## 0.15.0
+
+- Dependency updates
+
+### Breaking Changes
+- Update to uniffi-bindgen-java 0.4.0, uniffi 0.31.0.
+  - `List<Float>` -> `float[]`, same for all other primitive lists
+  - Switched from JNA to FFM, which requires [enabling native acces](https://docs.oracle.com/en/java/javase/25/core/restricted-methods.html)
+  - Java 22+ required
+
 ## 0.14.0
 
 - Dependency updates

@@ -5,7 +5,6 @@ import org.junit.jupiter.api.*;
 import static org.junit.jupiter.api.Assertions.*;
 import okhttp3.*;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CompletableFuture;
 
@@ -81,43 +80,43 @@ public class IroncoreAlloyTest {
     
     @Test
     public void sdkVectorRoundtrip() throws InterruptedException, ExecutionException {
-        List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
+        float[] data = new float[]{1.0f, 2.0f, 3.0f};
         PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
 
         EncryptedVector encrypted = sdk.vector().encrypt(plaintext, metadata).get();
         PlaintextVector decrypted = sdk.vector().decrypt(encrypted, metadata).get();
 
-        for (int i = 0; i < data.size(); i++) {
-            assertEquals(data.get(i), decrypted.plaintextVector().get(i), floatComparisonDelta);
+        for (int i = 0; i < data.length; i++) {
+            assertEquals(data[i], decrypted.plaintextVector()[i], floatComparisonDelta);
         }
     }
 
     @Test
     public void seededSdkVectorEncrypt() throws InterruptedException, ExecutionException {
-        List<Float> data = Arrays.asList(0.1f, -0.2f);
+        float[] data = new float[]{0.1f, -0.2f};
         PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
 
         EncryptedVector encrypted = seededSdk.vector().encrypt(plaintext, metadata).get();
         // Values match other tests using the same seed.
-        assertEquals(encrypted.encryptedVector(), Arrays.asList(0.1299239844083786f, -0.3532053828239441f));
+        assertArrayEquals(encrypted.encryptedVector(), new float[]{0.1299239844083786f, -0.3532053828239441f});
     }
 
     @Test
     public void sdkVectorDecrypt() throws InterruptedException, ExecutionException {
-        List<Float> ciphertext = Arrays.asList(4422816.0f, 15091436.0f, 9409391.0f);
+        float[] ciphertext = new float[]{4422816.0f, 15091436.0f, 9409391.0f};
         byte[] iclMetadata = base64ToByteArray("AAAAAoEACgxFUZiS8PORQubGnk8SIJKbkabplwXSyzEJvXKalrg+Os+OCyDFzMZ2Tf3rei8g");
         EncryptedVector encrypted = new EncryptedVector(ciphertext, new SecretPath(""), new DerivationPath(""), new EncryptedBytes(iclMetadata));
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
 
         PlaintextVector decrypted = sdkWithScaling.vector().decrypt(encrypted, metadata).get();
-        assertEquals(Arrays.asList(1.0f, 2.0f, 3.0f), decrypted.plaintextVector());
+        assertArrayEquals(new float[]{1.0f, 2.0f, 3.0f}, decrypted.plaintextVector());
     }
 
     @Test
     public void sdkBatchRoundtripVector() throws InterruptedException, ExecutionException {
-        List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
+        float[] data = new float[]{1.0f, 2.0f, 3.0f};
         PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
         PlaintextVector badVector = new PlaintextVector(data, new SecretPath("bad_path"), new DerivationPath("bad_path"));
         AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
@@ -126,20 +125,20 @@ public class IroncoreAlloyTest {
         VectorEncryptBatchResult encrypted = sdk.vector().encryptBatch(plaintextVectors, metadata).get();
         assertEquals(1, encrypted.successes().value().size());
         assertEquals(1, encrypted.failures().size());
-        assertEquals("msg=Provided secret path `bad_path` does not exist in the vector configuration.", 
+        assertEquals("msg=Provided secret path `bad_path` does not exist in the vector configuration.",
                      encrypted.failures().get(new VectorId("badVec")).getMessage());
 
         VectorDecryptBatchResult decrypted = sdk.vector().decryptBatch(encrypted.successes(), metadata).get();
         assertEquals(1, decrypted.successes().value().size());
         assertEquals(0, decrypted.failures().size());
-        for (int i = 0; i < data.size(); i++) {
-            assertEquals(data.get(i), decrypted.successes().value().get(new VectorId("vec")).plaintextVector().get(i), floatComparisonDelta);
+        for (int i = 0; i < data.length; i++) {
+            assertEquals(data[i], decrypted.successes().value().get(new VectorId("vec")).plaintextVector()[i], floatComparisonDelta);
         }
     }
 
     @Test
     public void sdkVectorRotateDifferentTenant() throws InterruptedException, ExecutionException {
-        List<Float> ciphertext = Arrays.asList(4422816.0f, 15091436.0f, 9409391.0f);
+        float[] ciphertext = new float[]{4422816.0f, 15091436.0f, 9409391.0f};
         byte[] iclMetadata = base64ToByteArray("AAAAAoEACgxFUZiS8PORQubGnk8SIJKbkabplwXSyzEJvXKalrg+Os+OCyDFzMZ2Tf3rei8g");
         EncryptedVector encrypted = new EncryptedVector(ciphertext, new SecretPath(""), new DerivationPath(""), new EncryptedBytes(iclMetadata));
         EncryptedVectors vectors = new EncryptedVectors(Map.of(new VectorId("vector"), encrypted));
@@ -152,25 +151,23 @@ public class IroncoreAlloyTest {
 
         AlloyMetadata newMetadata = AlloyMetadata.newSimple(new TenantId("tenant2"));
         PlaintextVector decrypted = sdkWithScaling.vector().decrypt(rotated.successes().get(new VectorId("vector")), newMetadata).get();
-        List<Float> expected = Arrays.asList(1.0f, 2.0f, 3.0f);
-        for (int i = 0; i < decrypted.plaintextVector().size(); i++) {
-            var roundtripped = decrypted.plaintextVector().get(i);
-            var expectedV = expected.get(i);
-            assertEquals(expectedV, roundtripped, floatComparisonDelta);
+        float[] expected = new float[]{1.0f, 2.0f, 3.0f};
+        for (int i = 0; i < decrypted.plaintextVector().length; i++) {
+            assertEquals(expected[i], decrypted.plaintextVector()[i], floatComparisonDelta);
         }
     }
 
     @Test
     public void sdkVectorRotateDifferentKey() throws InterruptedException, ExecutionException, AlloyException {
         Map<SecretPath, VectorSecret> vectorSecrets2 = Map.of(
-            new SecretPath(""), new VectorSecret(approximationFactor, new RotatableSecret(
+            new SecretPath(""), VectorSecret.newWithScalingFactor(approximationFactor, new RotatableSecret(
                 new StandaloneSecret(1, new Secret(keyByteArray)),
                 new StandaloneSecret(2, new Secret(keyByteArray))
             ))
         );
         StandaloneConfiguration config2 = new StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets2);
         Standalone sdk2 = new Standalone(config2);
-        List<Float> ciphertext = Arrays.asList(4422816.0f, 15091436.0f, 9409391.0f);
+        float[] ciphertext = new float[]{4422816.0f, 15091436.0f, 9409391.0f};
         byte[] iclMetadata = base64ToByteArray("AAAAAoEACgxFUZiS8PORQubGnk8SIJKbkabplwXSyzEJvXKalrg+Os+OCyDFzMZ2Tf3rei8g");
         EncryptedVector encrypted = new EncryptedVector(ciphertext, new SecretPath(""), new DerivationPath(""), new EncryptedBytes(iclMetadata));
         VectorId testVecId = new VectorId("vector");
@@ -184,16 +181,16 @@ public class IroncoreAlloyTest {
         assertTrue(rotated.successes().containsKey(testVecId));
 
         Map<SecretPath, VectorSecret> vectorSecrets3 = Map.of(
-            new SecretPath(""), new VectorSecret(approximationFactor, new RotatableSecret(
+            new SecretPath(""), VectorSecret.newWithScalingFactor(approximationFactor, new RotatableSecret(
                 new StandaloneSecret(1, new Secret(keyByteArray)), null
             ))
         );
         StandaloneConfiguration config3 = new StandaloneConfiguration(standardSecrets, deterministicSecrets, vectorSecrets3);
         Standalone sdk3 = new Standalone(config3);
         PlaintextVector decrypted = sdk3.vector().decrypt(rotated.successes().get(testVecId), metadata).get();
-        List<Float> expected = Arrays.asList(1.0f, 2.0f, 3.0f);
-        for (int i = 0; i < decrypted.plaintextVector().size(); i++) {
-            assertEquals(expected.get(i), floatComparisonDelta, decrypted.plaintextVector().get(i));
+        float[] expected = new float[]{1.0f, 2.0f, 3.0f};
+        for (int i = 0; i < decrypted.plaintextVector().length; i++) {
+            assertEquals(expected[i], decrypted.plaintextVector()[i], floatComparisonDelta);
         }
     }
 
@@ -429,7 +426,7 @@ public class IroncoreAlloyTest {
     @Disabled // This test requires the TSP from tests/docker-compose.yml to be running. Uncomment to test as needed.
     public void integrationSdkUnknownTenant() {
         AlloyException.TspException err = assertThrows(AlloyException.TspException.class, () -> {
-            List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
+            float[] data = new float[]{1.0f, 2.0f, 3.0f};
             PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
             AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("fake-tenant"));
             sdk.vector().encrypt(plaintext, metadata).get();
@@ -449,7 +446,7 @@ public class IroncoreAlloyTest {
     public void badConfigurationTest() throws AlloyException, ExecutionException, InterruptedException {
         IroncoreAlloyTest.JavaHttpClient httpClient = new IroncoreAlloyTest.JavaHttpClient();
         var badSdk = new SaasShield(new SaasShieldConfiguration("https://bad-url", "0WUaXesNgbTAuLwn", 1.1f, httpClient, false));
-        List<Float> data = Arrays.asList(1.0f, 2.0f, 3.0f);
+        float[] data = new float[]{1.0f, 2.0f, 3.0f};
         PlaintextVector plaintext = new PlaintextVector(data, new SecretPath(""), new DerivationPath(""));
         var metadata = AlloyMetadata.newSimple(new TenantId("fake_tenant"));
         var result = badSdk.vector().encrypt(plaintext, metadata);

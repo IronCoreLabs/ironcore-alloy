@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "25"
       - uses: actions/download-artifact@v8
         with:
           name: ${{ join(matrix.runs-on) }}-
@@ -37,7 +37,7 @@ jobs:
         with:
           cache-provider: github
       - name: Generate Kotlin files
-        run: cargo run --bin uniffi-bindgen generate --library resources/libironcore_alloy.* --language kotlin --out-dir kotlin --no-format
+        run: cargo run --bin uniffi-bindgen generate resources/libironcore_alloy.* --language kotlin --out-dir kotlin --no-format
         working-directory: kotlin/src/main
       - name: Run Kotlin tests
         run: ./gradlew test
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "25"
       - uses: actions/download-artifact@v8
         with:
           name: ${{ join(matrix.runs-on) }}-
@@ -64,7 +64,7 @@ jobs:
         with:
           cache-provider: github
       - name: Generate Java files
-        run: cargo run --bin uniffi-bindgen-java generate --library resources/libironcore_alloy.* --out-dir java
+        run: cargo run --bin uniffi-bindgen-java generate resources/libironcore_alloy.* --out-dir java
         working-directory: java/src/main
       - name: Run Java tests
         run: ./gradlew test
@@ -88,25 +88,8 @@ jobs:
         with:
           cache-provider: github
       - name: Generate Python files
-        run: cargo run --bin uniffi-bindgen generate --library libironcore_alloy.* --language python --out-dir . --no-format
+        run: cargo run --bin uniffi-bindgen generate libironcore_alloy.* --language python --out-dir . --no-format
         working-directory: python/ironcore-alloy/ironcore_alloy
-      - name: Install Python test matrix
-        if: endsWith(matrix.runs-on, 'arm') != true && matrix.runs-on != 'macos-14'
-        uses: actions/setup-python@v6
-        with:
-          # there are no builds for arm linux at all, so we'll make do with the system ones
-          python-version: |
-            3.9
-            3.10
-            3.11
-      - name: Install Python test matrix (macos-14)
-        if: matrix.runs-on == 'macos-14'
-        uses: actions/setup-python@v6
-        with:
-          # arm mac builds don't exist for pre-3.10
-          python-version: |
-            3.10
-            3.11
       - name: Install hatch
         if: matrix.runs-on != 'ubuntu-24.04-arm' && matrix.runs-on != 'macos-14'
         run: pipx install hatch
@@ -115,5 +98,78 @@ jobs:
         # The arm machines have a permissions error if we don't use sudo
         run: sudo pipx install hatch
       - name: Run Python tests
-        run: hatch run test:test -s
+        run: hatch test --all -- -s
         working-directory: python/ironcore-alloy
+      - name: Upload generated Python bindings
+        if: matrix.runs-on == 'ubuntu-24.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-bindings
+          path: python/ironcore-alloy/ironcore_alloy/ironcore_alloy.py
+
+  build-docs:
+    needs: python-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-bindings
+          path: python/ironcore-alloy/ironcore_alloy/
+      - name: Install hatch
+        run: pipx install hatch
+      - name: Build docs
+        run: hatch run docs:build
+        working-directory: python/ironcore-alloy
+      - name: Upload docs HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-html-${{ github.event.pull_request.head.sha || github.sha }}
+          path: python/ironcore-alloy/site/
+      - name: Deploy docs to ReadTheDocs
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH=${{ github.head_ref }}
+          RTD_API="https://app.readthedocs.org/api/v3/projects/ironcore-alloy"
+          AUTH="Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
+
+          # Sync versions so RTD discovers the branch
+          curl -sf -X POST -H "$AUTH" "$RTD_API/sync-versions/"
+          # Wait for version to appear
+          for i in $(seq 1 10); do
+            curl -sf -H "$AUTH" "$RTD_API/versions/$BRANCH/" > /dev/null 2>&1 && break
+            sleep 5
+          done
+
+          # Activate the version as hidden
+          curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
+            -d '{"active": true, "hidden": true}' \
+            "$RTD_API/versions/$BRANCH/"
+
+          # Trigger build via v3 API and get the build's API URL
+          BUILD_API=$(curl -sf -X POST -H "$AUTH" \
+            "$RTD_API/versions/$BRANCH/builds/" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['build']['_links']['_self'])")
+
+          # Poll build status until finished
+          for i in $(seq 1 60); do
+            STATE=$(curl -sf -H "$AUTH" "$BUILD_API" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['state']['code'])")
+            case "$STATE" in
+              finished) echo "RTD build succeeded"; break ;;
+              cancelled|failed) echo "RTD build $STATE"; exit 1 ;;
+            esac
+            sleep 10
+          done
+          if [ "$STATE" != "finished" ]; then
+            echo "RTD build timed out (state: $STATE)"
+            exit 1
+          fi
+
+          # Comment docs preview link on PR (only once)
+          URL="https://ironcore-alloy.readthedocs.io/en/$BRANCH/"
+          if ! gh pr view ${{ github.event.pull_request.number }} --json comments -q '.comments[].body' | grep -qF "$URL"; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "Docs preview: $URL"
+          fi

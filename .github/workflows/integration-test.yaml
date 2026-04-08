@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
-          java-version: "21"
+          java-version: "25"
       - name: Start the TSP
         uses: IronCoreLabs/workflows/.github/actions/start-tsp@start-tsp-v1
         with:

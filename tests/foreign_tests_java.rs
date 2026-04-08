@@ -11,8 +11,7 @@ mod test {
     ///   It will copy our dynamic library and generated Java code to the Java project structure.
     #[test]
     fn foreign_tests_java() -> Result<(), Box<dyn Error>> {
-        use crate::common::generate_bindings;
-        use uniffi_bindgen_java::JavaBindingGenerator;
+        use crate::common::generate_java_bindings;
 
         // `cargo test` doesn't build the cdylib targets, so we need to manually build them to make sure they're there
         build_dynamic_library()?;
@@ -28,13 +27,13 @@ mod test {
             )?;
         }
         println!("{main_src_path:?}");
-        // generate the bindings to go with the just compiled binary
-        generate_bindings(
-            dynamic_library_paths[0].clone(),
-            main_src_path,
-            JavaBindingGenerator,
+        // clean stale generated files before regenerating
+        crate::common::clean_generated_dir(
+            &main_src_path.join("com/ironcorelabs/ironcore_alloy_java"),
         )?;
-        // run the hatch test command and print the output as though it were our output
+        // generate the bindings to go with the just compiled binary
+        generate_java_bindings(dynamic_library_paths[0].clone(), main_src_path)?;
+        // run the gradle test command and print the output as though it were our output
         let mut handle = std::process::Command::new("./gradlew")
             .args(["test"])
             .current_dir(java_dir)

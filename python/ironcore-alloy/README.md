@@ -16,7 +16,7 @@ pip install ironcore-alloy
 
 ## Local
 
-If you're trying to run local tests and `pytest` is looking for a missing `python`, try `hatch env remove test && hatch env create test` to get hatch to rebuild its test environment.
+Run `hatch test --all` to run the full test matrix. If there have been changes to `pyproject.toml` since you were last running things, run `hatch env prune` from within `python/ironcore-alloy` to make sure any future commands fetch the correct environment.
 
 ## License
 

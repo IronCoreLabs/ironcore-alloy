@@ -1,7 +1,6 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.allopen.gradle.*
-import org.jetbrains.kotlin.gradle.tasks.*
 import kotlinx.benchmark.gradle.*
 
 version = "0.14.1-SNAPSHOT"
@@ -10,8 +9,9 @@ group = "com.ironcorelabs"
 
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
-    kotlin("jvm") version "1.9.23"
-    id("org.jetbrains.dokka") version "1.9.20"
+    kotlin("jvm") version "2.1.20"
+    id("org.jetbrains.dokka") version "2.2.0"
+    id("org.jetbrains.dokka-javadoc") version "2.2.0"
 
     // Apply the java-library plugin for API and implementation separation.
     `java-library`
@@ -23,17 +23,19 @@ plugins {
 
     // benchmark deps
     java
-    id("org.jetbrains.kotlinx.benchmark") version "0.4.10"
-    kotlin("plugin.allopen") version "1.9.23"
+    id("org.jetbrains.kotlinx.benchmark") version "0.4.12"
+    kotlin("plugin.allopen") version "2.1.20"
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    kotlinOptions { jvmTarget = "17" }
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_22)
+    }
 }
 
 tasks.register<Jar>("dokkaJavadocJar") {
-    dependsOn(tasks.dokkaJavadoc)
-    from(tasks.dokkaJavadoc.flatMap { it.outputDirectory })
+    dependsOn(tasks.named("dokkaGeneratePublicationJavadoc"))
+    from(tasks.named("dokkaGeneratePublicationJavadoc").map { it.outputs })
     archiveClassifier.set("javadoc")
 }
 
@@ -57,17 +59,17 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.9.1")
     testImplementation("io.ktor:ktor-client-core:$ktor_version")
     testImplementation("io.ktor:ktor-client-cio:$ktor_version")
-    implementation("net.java.dev.jna:jna:5.14.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("net.java.dev.jna:jna:5.16.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlin:kotlin-scripting-jvm")
-    benchmarksImplementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.9")
+    benchmarksImplementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.12")
     benchmarksImplementation(sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath)
 }
 
 java {
     withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_22
+    targetCompatibility = JavaVersion.VERSION_22
 }
 
 // Until there is official support, we can use the Portal OSSRH Staging API.
@@ -122,6 +124,7 @@ repositories {
 tasks.named<Test>("test") {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     testLogging {
         exceptionFormat = TestExceptionFormat.FULL
         events = mutableSetOf(TestLogEvent.FAILED, TestLogEvent.PASSED, TestLogEvent.SKIPPED)

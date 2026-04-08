@@ -6,11 +6,12 @@ use ironcore_alloy::{
 use std::{
     env,
     error::Error,
-    path::PathBuf,
+    fs,
+    path::{Path, PathBuf},
     process::{Command, ExitStatus, Stdio},
     sync::Arc,
 };
-use uniffi_bindgen::BindingGenerator;
+use uniffi_bindgen::{BindgenLoader, BindgenPaths};
 
 pub type TestResult = Result<(), AlloyError>;
 
@@ -77,29 +78,73 @@ pub(crate) fn get_dynamic_library_paths() -> Result<Vec<PathBuf>, Box<dyn Error>
     Ok(paths)
 }
 
-pub(crate) fn generate_bindings<T: BindingGenerator>(
+/// Removes all files in a generated bindings directory to prevent stale files
+/// from previous versions causing compilation issues.
+pub(crate) fn clean_generated_dir(dir: &Path) -> Result<(), Box<dyn Error>> {
+    if dir.exists() {
+        for entry in fs::read_dir(dir)? {
+            let path = entry?.path();
+            if path.is_file() {
+                fs::remove_file(&path)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn create_bindgen_loader() -> Result<BindgenLoader, Box<dyn Error>> {
+    let mut paths = BindgenPaths::default();
+    paths.add_cargo_metadata_layer(false)?;
+    Ok(BindgenLoader::new(paths))
+}
+
+pub(crate) fn generate_kotlin_bindings(
     library_path: PathBuf,
     out_dir: PathBuf,
-    language: T,
 ) -> Result<(), Box<dyn Error>> {
-    let config_supplier = {
-        use uniffi_bindgen::cargo_metadata::CrateConfigSupplier;
-        let cmd = cargo_metadata::MetadataCommand::new();
-        let metadata = cmd.exec()?;
-        CrateConfigSupplier::from(metadata)
-    };
-
     let camino_lib_path = camino::Utf8PathBuf::from_path_buf(library_path).unwrap();
     let camino_out_dir = camino::Utf8PathBuf::from_path_buf(out_dir).unwrap();
-    uniffi_bindgen::library_mode::generate_bindings(
-        &camino_lib_path,
-        None,
-        &language,
-        &config_supplier,
-        None,
-        &camino_out_dir,
-        false,
-    )?;
+    uniffi_bindgen::bindings::generate(uniffi_bindgen::bindings::GenerateOptions {
+        languages: vec![uniffi_bindgen::bindings::TargetLanguage::Kotlin],
+        source: camino_lib_path,
+        out_dir: camino_out_dir,
+        format: false,
+        ..Default::default()
+    })?;
+    Ok(())
+}
 
+pub(crate) fn generate_python_bindings(
+    library_path: PathBuf,
+    out_dir: PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let camino_lib_path = camino::Utf8PathBuf::from_path_buf(library_path).unwrap();
+    let camino_out_dir = camino::Utf8PathBuf::from_path_buf(out_dir).unwrap();
+    uniffi_bindgen::bindings::generate(uniffi_bindgen::bindings::GenerateOptions {
+        languages: vec![uniffi_bindgen::bindings::TargetLanguage::Python],
+        source: camino_lib_path,
+        out_dir: camino_out_dir,
+        format: false,
+        ..Default::default()
+    })?;
+    Ok(())
+}
+
+pub(crate) fn generate_java_bindings(
+    library_path: PathBuf,
+    out_dir: PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let loader = create_bindgen_loader()?;
+    let camino_lib_path = camino::Utf8PathBuf::from_path_buf(library_path).unwrap();
+    let camino_out_dir = camino::Utf8PathBuf::from_path_buf(out_dir).unwrap();
+    uniffi_bindgen_java::generate(
+        &loader,
+        &uniffi_bindgen_java::GenerateOptions {
+            source: camino_lib_path,
+            out_dir: camino_out_dir,
+            format: false,
+            crate_filter: None,
+        },
+    )?;
     Ok(())
 }

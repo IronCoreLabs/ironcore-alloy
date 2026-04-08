@@ -1,5 +1,10 @@
 # Java build and publish info
 
+## Requirements
+
+- Java 22+
+- [enable native access](https://docs.oracle.com/en/java/javase/25/core/restricted-methods.html)
+
 ## Build
 
 Ensure the library and source have been created, typically done by running `cargo t` in `../`.

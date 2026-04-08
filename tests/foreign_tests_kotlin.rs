@@ -11,7 +11,7 @@ mod test {
     ///   It will copy our dynamic library and generated Kotlin code to the Kotlin project structure.
     #[test]
     fn foreign_tests_kotlin() -> Result<(), Box<dyn Error>> {
-        use crate::common::generate_bindings;
+        use crate::common::generate_kotlin_bindings;
 
         // `cargo test` doesn't build the cdylib targets, so we need to manually build them to make sure they're there
         build_dynamic_library()?;
@@ -27,12 +27,10 @@ mod test {
             )?;
         }
         println!("{main_src_path:?}");
+        // clean stale generated files before regenerating
+        crate::common::clean_generated_dir(&main_src_path.join("com/ironcorelabs/ironcore_alloy"))?;
         // generate the bindings to go with the just compiled binary
-        generate_bindings(
-            dynamic_library_paths[0].clone(),
-            main_src_path,
-            uniffi::KotlinBindingGenerator,
-        )?;
+        generate_kotlin_bindings(dynamic_library_paths[0].clone(), main_src_path)?;
         // run the test command and print the output as though it were our output
         let mut handle = std::process::Command::new("./gradlew")
             .args(["test"])

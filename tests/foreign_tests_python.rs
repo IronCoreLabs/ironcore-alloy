@@ -3,7 +3,9 @@ mod common;
 mod test {
     use std::{error::Error, fs, path::Path, process::Command};
 
-    use crate::common::{build_dynamic_library, generate_bindings, get_dynamic_library_paths};
+    use crate::common::{
+        build_dynamic_library, generate_python_bindings, get_dynamic_library_paths,
+    };
 
     /// Run all the foreign Python library tests and fail if any of them failed.
     /// WARNING:
@@ -23,15 +25,13 @@ mod test {
                 python_module_dir.join(library_file.file_name().unwrap()),
             )?;
         }
+        // clean stale generated binding file before regenerating
+        let _ = std::fs::remove_file(python_module_dir.join("ironcore_alloy.py"));
         // generate the bindings to go with the just compiled binary
-        generate_bindings(
-            dynamic_library_paths[0].clone(),
-            python_module_dir,
-            uniffi::PythonBindingGenerator,
-        )?;
+        generate_python_bindings(dynamic_library_paths[0].clone(), python_module_dir)?;
         // run the hatch test command and print the output as though it were our output
         let mut handle = Command::new("hatch")
-            .args(["run", "test:test", "--color=yes", "-s"])
+            .args(["test", "--all", "--", "--color=yes", "-s"])
             .current_dir(python_dir)
             .spawn()
             .unwrap();

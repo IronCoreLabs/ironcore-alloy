@@ -52,7 +52,7 @@ After either of the non-`--lib` `cargo` commands have been run, the Kotlin and P
 
 - `cd kotlin; ./gradlew test` will manually run only the Kotlin tests.
 - `cd java; ./gradlew test` will manually run only the Java tests.
-- `cd python/ironcore-alloy; hatch run test:test` will manually run only the Python tests.
+- `cd python/ironcore-alloy; hatch test --all` will manually run only the Python tests.
 - See `python/ironcore-alloy/README.md` for more information about manually releasing that package and other available `hatch` commands.
 
 ## Integration Tests

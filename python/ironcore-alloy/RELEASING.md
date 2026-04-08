@@ -28,14 +28,42 @@ Once you have a built environment, some common `hatch` commands you may want to 
 cd python/ironcore-alloy
 hatch build -t wheel   # to produce .whl file for release
 hatch shell            # to get a local pyenv with the sdk installed
-hatch run test:test    # to run unit tests
+hatch test --all       # to run unit tests across all Python versions
 ```
 
 > Note: the generate step needs debug symbols to work on Linux, don't strip them before running it (they can be stripped afterwards)
 
 ## Documentation
 
-Docs can be previewed with `hatch run docs:serve`, or manually built with `hatch run docs:build`. They'll be automatically built and uploaded by our [readthedocs](https://readthedocs.com) integration.
+Docs can be previewed locally with `hatch run docs:serve`, or manually built with `hatch run docs:build`.
+
+Docs are automatically built and hosted by [ReadTheDocs](https://readthedocs.com). Because building the
+Rust library from source exceeds RTD's build time limits, CI builds the docs HTML and uploads it as a
+GitHub Actions artifact keyed by commit SHA. CI then triggers RTD via a generic webhook, and RTD
+downloads the pre-built HTML via the GitHub API.
+
+- **PRs**: `sdk-ci.yaml` builds docs, triggers RTD, creates a hidden version for the PR branch, and
+  posts a docs preview link as a PR comment.
+- **Releases**: `sdk-release.yaml` builds docs and triggers RTD for the stable version.
+
+### RTD Setup
+
+RTD's automatic GitHub webhook must be **disabled** (or removed) — builds are triggered by CI
+via the v3 API after the docs artifact is ready. If the automatic webhook is left enabled,
+RTD will try to build before CI has produced the artifact and fail.
+
+RTD needs a GitHub token to download CI artifacts. Configure in
+[RTD project settings](https://app.readthedocs.org/dashboard/) under **Environment Variables**:
+
+| Variable       | Value                                                                                            |
+|----------------|--------------------------------------------------------------------------------------------------|
+| `GITHUB_TOKEN` | A GitHub fine-grained personal access token with `actions:read` permission on `IronCoreLabs/ironcore-alloy` |
+
+CI needs this GitHub repo secret:
+
+| GitHub Secret    | Value                                                                                     |
+|------------------|-------------------------------------------------------------------------------------------|
+| `RTD_API_TOKEN`  | RTD API token (from [RTD account settings](https://app.readthedocs.org/accounts/tokens/)) |
 
 ## Release
 

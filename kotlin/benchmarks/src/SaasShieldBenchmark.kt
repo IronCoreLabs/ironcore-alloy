@@ -37,7 +37,7 @@ class KotlinHttpClient : HttpClient {
 @Warmup(iterations = 1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
-@Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
+@Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 class SaasShieldBenchmark {
     // See setup for initialization
     var smallPlaintext: PlaintextDocument = emptyMap()
