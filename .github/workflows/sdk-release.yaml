@@ -172,14 +172,14 @@ jobs:
             -d '{"active": true, "hidden": false}' \
             "$RTD_API/versions/$TAG/"
 
-          # Build the tag version
-          BUILD_URL=$(curl -sf -X POST -H "$AUTH" \
+          # Build the tag version and get the build's API URL
+          BUILD_API=$(curl -sf -X POST -H "$AUTH" \
             "$RTD_API/versions/$TAG/builds/" \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['urls']['build'])")
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['build']['_links']['_self'])")
 
           # Poll build status until finished
           for i in $(seq 1 60); do
-            STATE=$(curl -sf -H "$AUTH" "$BUILD_URL" \
+            STATE=$(curl -sf -H "$AUTH" "$BUILD_API" \
               | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['state']['code'])")
             case "$STATE" in
               finished) echo "RTD build succeeded"; break ;;
