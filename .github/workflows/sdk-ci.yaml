@@ -133,4 +133,4 @@ jobs:
           curl -X POST \
             -d "token=${{ secrets.RTD_WEBHOOK_TOKEN }}" \
             -d "branches=$BRANCH" \
-            https://readthedocs.org/api/v2/webhook/ironcore-alloy/${{ secrets.RTD_WEBHOOK_ID }}/
+            https://app.readthedocs.org/api/v2/webhook/ironcore-alloy/${{ secrets.RTD_WEBHOOK_ID }}/

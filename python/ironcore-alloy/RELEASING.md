@@ -43,23 +43,26 @@ GitHub Actions artifact. RTD then downloads the pre-built HTML via the GitHub AP
 
 ### RTD Setup
 
-RTD's automatic GitHub webhook must be **disabled** in the RTD project settings — builds are
+RTD's automatic GitHub webhook must be **disabled** (or removed) in the RTD project settings — builds are
 triggered by SDK CI after the docs artifact is ready. If the automatic webhook is left enabled,
 RTD will try to build before CI has produced the artifact and fail.
 
+In RTD under **Admin > Integrations**, create a **Generic API incoming webhook** (not a GitHub webhook).
+This provides the webhook URL and token used by CI to trigger builds.
+
 RTD needs a GitHub token to download artifacts from CI. Configure this in the
-[RTD project settings](https://readthedocs.org/dashboard/) under **Environment Variables**:
+[RTD project settings](https://app.readthedocs.org/dashboard/) under **Environment Variables**:
 
 | Variable       | Value                                                                 |
 |----------------|-----------------------------------------------------------------------|
 | `GITHUB_TOKEN` | A GitHub fine-grained personal access token or GitHub App token with `actions:read` permission on `IronCoreLabs/ironcore-alloy` |
 
-The SDK CI workflow also needs two secrets to trigger RTD builds for PRs:
+The SDK CI workflow also needs two secrets to trigger RTD builds:
 
-| GitHub Secret      | Value                                                      |
-|--------------------|------------------------------------------------------------|
-| `RTD_WEBHOOK_TOKEN` | Token from the RTD integration webhook settings           |
-| `RTD_WEBHOOK_ID`    | Numeric ID from the RTD webhook URL                       |
+| GitHub Secret       | Value                                                                          |
+|---------------------|--------------------------------------------------------------------------------|
+| `RTD_WEBHOOK_TOKEN` | Token from the RTD Generic API incoming webhook                                |
+| `RTD_WEBHOOK_ID`    | Numeric ID from the RTD webhook URL (just the number, not the full URL)        |
 
 ## Release
 
