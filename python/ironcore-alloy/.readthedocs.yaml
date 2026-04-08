@@ -10,17 +10,4 @@ build:
   tools:
     python: "3.10"
   commands:
-    - |
-      REPO="IronCoreLabs/ironcore-alloy"
-      COMMIT="$READTHEDOCS_GIT_COMMIT_HASH"
-      ARTIFACT_NAME="docs-html-$COMMIT"
-
-      # Find the artifact download URL by commit SHA
-      ARTIFACT_URL=$(curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" \
-        "https://api.github.com/repos/$REPO/actions/artifacts?name=$ARTIFACT_NAME" \
-        | python3 -c 'import sys,json; a=json.load(sys.stdin)["artifacts"]; print(a[0]["archive_download_url"]) if a else sys.exit(1)')
-
-      # Download and extract to RTD output
-      mkdir -p "$READTHEDOCS_OUTPUT/html"
-      curl -sfL -H "Authorization: Bearer $GITHUB_TOKEN" "$ARTIFACT_URL" -o /tmp/docs.zip
-      unzip -o /tmp/docs.zip -d "$READTHEDOCS_OUTPUT/html/"
+    - python3 .github/scripts/rtd-fetch-docs.py

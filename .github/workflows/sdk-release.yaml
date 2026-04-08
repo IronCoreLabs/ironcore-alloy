@@ -159,23 +159,20 @@ jobs:
           RTD_API="https://app.readthedocs.org/api/v3/projects/ironcore-alloy"
           AUTH="Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
 
-          # Sync versions so RTD discovers the tag
+          # Sync versions so RTD discovers the tag and updates stable
           curl -sf -X POST -H "$AUTH" "$RTD_API/sync-versions/"
-          # Wait for version to appear
+          # Wait for tag version to appear
           for i in $(seq 1 10); do
             curl -sf -H "$AUTH" "$RTD_API/versions/$TAG/" > /dev/null 2>&1 && break
             sleep 5
           done
 
-          # Activate the tag version and stable
+          # Activate the tag version
           curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
             -d '{"active": true, "hidden": false}' \
             "$RTD_API/versions/$TAG/"
-          curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
-            -d '{"active": true, "hidden": false}' \
-            "$RTD_API/versions/stable/"
 
-          # Trigger build for the tag via v3 API
+          # Build the tag version
           BUILD_URL=$(curl -sf -X POST -H "$AUTH" \
             "$RTD_API/versions/$TAG/builds/" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['urls']['build'])")
