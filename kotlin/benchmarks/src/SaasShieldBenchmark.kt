@@ -58,7 +58,7 @@ class SaasShieldBenchmark {
     val metadata = AlloyMetadata.newSimple(tenantId)
     val client = KotlinHttpClient()
     val saasShieldConfig =
-            SaasShieldConfiguration("$tspUri:$tspPort", apiKey, approximationFactor, client, true)
+            SaasShieldConfiguration("$tspUri:$tspPort", apiKey, approximationFactor, client, false, true)
     val saasShieldSdk = SaasShield(saasShieldConfig)
 
     @Setup

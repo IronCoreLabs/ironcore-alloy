@@ -1,12 +1,16 @@
 ## 0.15.0
 
 - Dependency updates
+- Added `legacy_tsc_compatible_write_format` option to `SaasShieldConfiguration`. When enabled, standard encryption writes in the legacy `tenant-security-client-*` V3 data format, allowing in-place migration from TSC SDKs to alloy without changing the encrypted data format. Only affects `StandardDocumentOps` — attached, deterministic, and vector encryption are unaffected. See [the TSC-> Alloy migration guide](./TSC_ALLOY_MIGRATION_GUIDE.md)` for details.
 
 ### Breaking Changes
 - Update to uniffi-bindgen-java 0.4.0, uniffi 0.31.0.
   - `List<Float>` -> `float[]`, same for all other primitive lists
   - Switched from JNA to FFM, which requires [enabling native acces](https://docs.oracle.com/en/java/javase/25/core/restricted-methods.html)
   - Java 22+ required
+- `StandardDocumentOps::get_searchable_edek_prefix` now returns `Result<Vec<u8>, AlloyError>` instead of `Vec<u8>`. Returns an error when configured with `legacy_tsc_compatible_write_format: true` since V3 EDEKs have no searchable prefix.
+- `SaasShieldConfiguration::new` and `new_with_scaling_factor` have a new `legacy_tsc_compatible_write_format: bool` parameter (defaults to `false` in languages with defaults).
+- `encrypt_with_existing_edek` does not automatically upgrade the provided EDEK's format. When migrating from V3 to V5, call `rekey_edeks` on the EDEK separately to upgrade it for prefix searchability.
 
 ## 0.14.0
 

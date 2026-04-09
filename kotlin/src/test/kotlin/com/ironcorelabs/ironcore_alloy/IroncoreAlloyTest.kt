@@ -84,6 +84,7 @@ class IroncoreAlloyTest {
                             "0WUaXesNgbTAuLwn",
                             1.1f,
                             httpClient,
+                            false,
                             true
                     )
             )
@@ -485,6 +486,7 @@ class IroncoreAlloyTest {
                         "0WUaXesNgbTAuLwn",
                         1.1f,
                         httpClient,
+                        false,
                         false
                 )
             }

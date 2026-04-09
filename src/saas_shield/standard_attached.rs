@@ -23,7 +23,8 @@ pub struct SaasShieldStandardAttachedClient {
 impl SaasShieldStandardAttachedClient {
     pub(crate) fn new(tenant_security_client: Arc<TenantSecurityClient>) -> Self {
         Self {
-            standard_client: SaasShieldStandardClient::new(tenant_security_client),
+            // Attached always uses V5 — there is no TSC equivalent of attached encryption
+            standard_client: SaasShieldStandardClient::new(tenant_security_client, false),
         }
     }
 }
@@ -98,7 +99,9 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     /// avoid pitfalls when encoding across byte boundaries.
     /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        self.standard_client.get_searchable_edek_prefix(id)
+        self.standard_client
+            .get_searchable_edek_prefix(id)
+            .expect("Attached client is always V5, prefix should never fail")
     }
 }
 

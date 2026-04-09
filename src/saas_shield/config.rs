@@ -13,15 +13,23 @@ pub struct SaasShieldConfiguration {
     pub(crate) approximation_factor: Option<f32>,
     pub(crate) tenant_security_client: Arc<TenantSecurityClient>,
     pub(crate) use_scaling_factor: bool,
+    /// When true, standard encryption writes in the legacy `tenant-security-client-*` V3 wire
+    /// format. Only affects `StandardDocumentOps` — attached, deterministic, and vector encryption
+    /// are unaffected because they have no TSC equivalent.
+    pub(crate) legacy_tsc_compatible_write_format: bool,
 }
 #[uniffi::export]
 impl SaasShieldConfiguration {
-    #[uniffi::constructor(default(allow_insecure_http = false))]
+    #[uniffi::constructor(default(
+        legacy_tsc_compatible_write_format = false,
+        allow_insecure_http = false
+    ))]
     pub fn new(
         tsp_uri: String,
         api_key: String,
         approximation_factor: Option<f32>,
         http_client: Arc<dyn HttpClient>,
+        legacy_tsc_compatible_write_format: bool,
         allow_insecure_http: bool,
     ) -> Result<Arc<Self>, AlloyError> {
         new_core(
@@ -30,16 +38,21 @@ impl SaasShieldConfiguration {
             approximation_factor,
             http_client,
             false,
+            legacy_tsc_compatible_write_format,
             allow_insecure_http,
         )
     }
 
-    #[uniffi::constructor(default(allow_insecure_http = false))]
+    #[uniffi::constructor(default(
+        legacy_tsc_compatible_write_format = false,
+        allow_insecure_http = false
+    ))]
     pub fn new_with_scaling_factor(
         tsp_uri: String,
         api_key: String,
         approximation_factor: Option<f32>,
         http_client: Arc<dyn HttpClient>,
+        legacy_tsc_compatible_write_format: bool,
         allow_insecure_http: bool,
     ) -> Result<Arc<Self>, AlloyError> {
         new_core(
@@ -48,6 +61,7 @@ impl SaasShieldConfiguration {
             approximation_factor,
             http_client,
             true,
+            legacy_tsc_compatible_write_format,
             allow_insecure_http,
         )
     }
@@ -59,6 +73,7 @@ fn new_core(
     approximation_factor: Option<f32>,
     http_client: Arc<dyn HttpClient>,
     use_scaling_factor: bool,
+    legacy_tsc_compatible_write_format: bool,
     allow_insecure_http: bool,
 ) -> Result<Arc<SaasShieldConfiguration>, AlloyError> {
     if !allow_insecure_http {
@@ -81,5 +96,6 @@ fn new_core(
         approximation_factor,
         tenant_security_client: Arc::new(TenantSecurityClient::new(tsp_uri, http_client, headers)),
         use_scaling_factor,
+        legacy_tsc_compatible_write_format,
     }))
 }

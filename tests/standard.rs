@@ -2,7 +2,7 @@ mod common;
 
 #[cfg(feature = "integration_tests")]
 mod tests {
-    use crate::common::{TestResult, get_client};
+    use crate::common::{TestResult, get_client, get_legacy_client};
     use base64::{Engine, engine::general_purpose::STANDARD};
     use ironcore_alloy::{
         AlloyMetadata, DocumentId, EncryptedBytes, FieldId, TenantId,
@@ -337,7 +337,7 @@ mod tests {
     }
     #[tokio::test]
     async fn standard_get_searchable_edek_prefix_works() -> TestResult {
-        let prefix = get_client().standard().get_searchable_edek_prefix(1);
+        let prefix = get_client().standard().get_searchable_edek_prefix(1)?;
         let expected = [0, 0, 0, 1, 2, 0];
         assert_eq!(prefix, expected);
         Ok(())
@@ -394,6 +394,142 @@ mod tests {
         // This is now a V5 document, which starts with the KeyIdHeader
         // First 4 bytes are KMS config ID 511
         assert!(rekeyed.0.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        Ok(())
+    }
+
+    // --- Legacy TSC-compatible write format tests ---
+
+    #[tokio::test]
+    async fn legacy_encrypt_decrypt_roundtrip() -> TestResult {
+        let client = get_legacy_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        let encrypted = client
+            .standard()
+            .encrypt(plaintext.clone(), &metadata)
+            .await?;
+        // V3 encrypted field starts with [3, 'I', 'R', 'O', 'N']
+        let field_bytes = encrypted.document.values().next().unwrap();
+        assert_eq!(&field_bytes.0[..5], &[3, 73, 82, 79, 78]);
+        let decrypted = client.standard().decrypt(encrypted, &metadata).await?;
+        assert_eq!(decrypted, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_encrypt_v5_decrypt_cross_format() -> TestResult {
+        let legacy_client = get_legacy_client();
+        let v5_client = get_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        let encrypted = legacy_client
+            .standard()
+            .encrypt(plaintext.clone(), &metadata)
+            .await?;
+        // V5 client decrypts V3 data transparently
+        let decrypted = v5_client.standard().decrypt(encrypted, &metadata).await?;
+        assert_eq!(decrypted, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_rekey_v5_edek_preserves_v5() -> TestResult {
+        let legacy_client = get_legacy_client();
+        let metadata = get_metadata();
+        let edek = get_ciphertext().edek;
+        let edeks = [(DocumentId("edek".to_string()), edek)].into();
+        let all_rekeyed = legacy_client
+            .standard()
+            .rekey_edeks(edeks, &metadata, None)
+            .await?;
+        let rekeyed = all_rekeyed
+            .successes
+            .get(&DocumentId("edek".to_string()))
+            .unwrap();
+        // Even though client is legacy, V5 input stays V5 (never downgrade)
+        assert!(rekeyed.0.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_rekey_v3_edek_stays_v3() -> TestResult {
+        let legacy_client = get_legacy_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        let encrypted = legacy_client
+            .standard()
+            .encrypt(plaintext, &metadata)
+            .await?;
+        let edeks = [(DocumentId("edek".to_string()), encrypted.edek)].into();
+        let all_rekeyed = legacy_client
+            .standard()
+            .rekey_edeks(edeks, &metadata, None)
+            .await?;
+        let rekeyed = all_rekeyed
+            .successes
+            .get(&DocumentId("edek".to_string()))
+            .unwrap();
+        // Legacy config + V3 input = V3 output (raw protobuf, no key_id_header)
+        // V3 EDEKs are protobuf EncryptedDeks which start with field tag 0x0a
+        assert_eq!(rekeyed.0.0[0], 0x0a);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn v5_rekey_v3_edek_upgrades_to_v5() -> TestResult {
+        let legacy_client = get_legacy_client();
+        let v5_client = get_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        let encrypted = legacy_client
+            .standard()
+            .encrypt(plaintext, &metadata)
+            .await?;
+        let edeks = [(DocumentId("edek".to_string()), encrypted.edek)].into();
+        let all_rekeyed = v5_client
+            .standard()
+            .rekey_edeks(edeks, &metadata, None)
+            .await?;
+        let rekeyed = all_rekeyed
+            .successes
+            .get(&DocumentId("edek".to_string()))
+            .unwrap();
+        // V5 config + V3 input = V5 output (upgraded, starts with key_id_header)
+        // key_id_header byte 5 is the type byte, byte 6 is 0x00
+        assert_eq!(rekeyed.0.0[5], 0x00);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_get_searchable_edek_prefix_errors() -> TestResult {
+        let result = get_legacy_client().standard().get_searchable_edek_prefix(1);
+        assert!(matches!(
+            result.unwrap_err(),
+            AlloyError::InvalidConfiguration { .. }
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_encrypt_batch_roundtrip() -> TestResult {
+        let client = get_legacy_client();
+        let metadata = get_metadata();
+        let docs = PlaintextDocuments(
+            [
+                (DocumentId("doc1".to_string()), get_plaintext()),
+                (DocumentId("doc2".to_string()), get_plaintext()),
+            ]
+            .into(),
+        );
+        let encrypted = client.standard().encrypt_batch(docs, &metadata).await?;
+        assert_eq!(encrypted.successes.0.len(), 2);
+        assert!(encrypted.failures.is_empty());
+        let decrypted = client
+            .standard()
+            .decrypt_batch(encrypted.successes, &metadata)
+            .await?;
+        assert_eq!(decrypted.successes.0.len(), 2);
+        assert!(decrypted.failures.is_empty());
         Ok(())
     }
 

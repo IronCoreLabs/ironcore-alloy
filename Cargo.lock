@@ -1154,9 +1154,8 @@ dependencies = [
 
 [[package]]
 name = "ironcore-documents"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c762247bc700f7000153a90a7ae23e1fc47988969f3b916d4d1297e9fc5eb745"
+version = "0.3.1-pre"
+source = "git+https://github.com/IronCoreLabs/ironcore-documents?branch=expose-v3-document-encrypt#5cbf67298bc2b05b6e82870521c3d3e78d9082b9"
 dependencies = [
  "aes-gcm",
  "bytes",
