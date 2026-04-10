@@ -581,7 +581,7 @@ public class IroncoreAlloyTest
         Assert.Contains("JSON post request", ex.Message);
     }
 
-    [Fact]
+    [Fact(Skip = "Integration test. Requires TSP running at localhost:32804. Remove Skip to run.")]
     public async Task IntegrationSdkUnknownTenant()
     {
         var httpClient = new CSharpHttpClient();
