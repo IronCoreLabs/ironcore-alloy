@@ -31,6 +31,11 @@ name = "uniffi-bindgen-java"
 path = "uniffi-bindgen-java.rs"
 bench = false
 
+[[bin]]
+name = "uniffi-bindgen-cs"
+path = "uniffi-bindgen-cs.rs"
+bench = false
+
 [features]
 integration_tests = []
 
@@ -62,6 +67,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
 thiserror = "2.0.18"
 uniffi = { version = "0.31.0", features = ["tokio", "cli"] }
+uniffi-bindgen-cs = { git = "https://github.com/jmbryan4/uniffi-bindgen-cs", branch = "upgrade/uniffi-rs-0.31.0-clean" }
 uniffi-bindgen-java = "0.4.1"
 z85 = "3.0.7"
 

@@ -1,4 +1,4 @@
-name: Python/Kotlin/Java CI
+name: Python/Kotlin/Java/C# CI
 on:
   pull_request:
   workflow_dispatch:
@@ -69,6 +69,35 @@ jobs:
       - name: Run Java tests
         run: ./gradlew test
         working-directory: java
+
+  csharp-test:
+    needs: generate-cdylibs
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        # This should stay in sync with the `os_matrix` above
+        runs-on: ["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "macos-14"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ join(matrix.runs-on) }}-
+          path: ${{ github.workspace }}/csharp/
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Generate C# files
+        run: cargo run --bin uniffi-bindgen-cs -- --library libironcore_alloy.* --out-dir . --no-format
+        working-directory: csharp
+      - name: Fix generated C# bindings
+        run: python3 fix_bindings.py ironcore_alloy.cs
+        working-directory: csharp
+      - name: Run C# tests
+        run: dotnet test --verbosity normal
+        working-directory: csharp
 
   python-test:
     needs: generate-cdylibs

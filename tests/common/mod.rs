@@ -130,6 +130,47 @@ pub(crate) fn generate_python_bindings(
     Ok(())
 }
 
+pub(crate) fn generate_csharp_bindings(
+    library_path: PathBuf,
+    out_dir: PathBuf,
+) -> Result<(), Box<dyn Error>> {
+    let camino_lib_path = camino::Utf8PathBuf::from_path_buf(library_path).unwrap();
+    let camino_out_dir = camino::Utf8PathBuf::from_path_buf(out_dir.clone()).unwrap();
+    // uniffi-bindgen-cs uses a CLI-driven API, so we run it as a subprocess
+    let status = Command::new("cargo")
+        .args([
+            "run",
+            "--bin",
+            "uniffi-bindgen-cs",
+            "--",
+            "--library",
+            camino_lib_path.as_str(),
+            "--out-dir",
+            camino_out_dir.as_str(),
+            "--no-format",
+        ])
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()?;
+    if !status.success() {
+        return Err("uniffi-bindgen-cs failed".into());
+    }
+    // Post-process generated bindings to fix C# codegen issues
+    let cs_file = out_dir.join("ironcore_alloy.cs");
+    let fix_status = Command::new("python3")
+        .args([
+            out_dir.join("fix_bindings.py").to_str().unwrap(),
+            cs_file.to_str().unwrap(),
+        ])
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()?;
+    if !fix_status.success() {
+        return Err("fix_bindings.py failed".into());
+    }
+    Ok(())
+}
+
 pub(crate) fn generate_java_bindings(
     library_path: PathBuf,
     out_dir: PathBuf,
