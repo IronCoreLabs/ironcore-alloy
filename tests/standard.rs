@@ -337,7 +337,7 @@ mod tests {
     }
     #[tokio::test]
     async fn standard_get_searchable_edek_prefix_works() -> TestResult {
-        let prefix = get_client().standard().get_searchable_edek_prefix(1)?;
+        let prefix = get_client().standard().get_searchable_edek_prefix(1);
         let expected = [0, 0, 0, 1, 2, 0];
         assert_eq!(prefix, expected);
         Ok(())
@@ -501,12 +501,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn legacy_get_searchable_edek_prefix_errors() -> TestResult {
-        let result = get_legacy_client().standard().get_searchable_edek_prefix(1);
-        assert!(matches!(
-            result.unwrap_err(),
-            AlloyError::InvalidConfiguration { .. }
-        ));
+    async fn legacy_get_searchable_edek_prefix_works() -> TestResult {
+        let prefix = get_legacy_client().standard().get_searchable_edek_prefix(1);
+        let expected = [0, 0, 0, 1, 2, 0];
+        assert_eq!(prefix, expected);
         Ok(())
     }
 

@@ -23,7 +23,7 @@ pub fn get_legacy_client() -> Arc<SaasShield> {
     create_client(true)
 }
 
-fn create_client(legacy_tsc_compatible_write_format: bool) -> Arc<SaasShield> {
+fn create_client(legacy_tsc_write_format: bool) -> Arc<SaasShield> {
     let http_client = reqwest::ClientBuilder::new()
         .danger_accept_invalid_certs(false)
         .build()
@@ -33,7 +33,7 @@ fn create_client(legacy_tsc_compatible_write_format: bool) -> Arc<SaasShield> {
         "0WUaXesNgbTAuLwn".to_string(),
         Some(1.1),
         Arc::new(http_client),
-        legacy_tsc_compatible_write_format,
+        legacy_tsc_write_format,
         true,
     )
     .unwrap();

@@ -3,7 +3,7 @@
 
 ## Overview
 
-This guide covers migrating from `tenant-security-client-*` (TSC) SDKs to `ironcore-alloy` with minimal disruption. The `legacy_tsc_compatible_write_format` configuration option allows an in-place upgrade: switch to Alloy for performance benefits while continuing to write the old document format, then upgrade to V5 format on your own timeline.
+This guide covers migrating from `tenant-security-client-*` (TSC) SDKs to `ironcore-alloy` with minimal disruption. The `legacy_tsc_write_format` configuration option allows an in-place upgrade: switch to Alloy for performance benefits while continuing to write the old document format, then upgrade to V5 format on your own timeline.
 
 This setting only affects standard (detached) encryption. Attached, deterministic, and vector encryption are unaffected because they have no TSC equivalent (deterministic is already byte-compatible without any flag).
 
@@ -11,7 +11,7 @@ This setting only affects standard (detached) encryption. Attached, deterministi
 
 ### Step 1: Drop-in replacement (legacy format)
 
-- Initialize `SaasShieldConfiguration` with `legacy_tsc_compatible_write_format: true`
+- Initialize `SaasShieldConfiguration` with `legacy_tsc_write_format: true`
 - All new standard encryption writes to V3 format (compatible with existing TSC data and clients)
 - Reads by Alloy clients work for both V3 and V5 data automatically
 - Deterministic encryption is already byte-compatible between TSC and Alloy (no flag needed)
@@ -20,9 +20,9 @@ You could stay at this step for as long as you want while reaping the performanc
 
 ### Step 2: Switch to V5 format
 
-Once all services are deployed using Alloy with `legacy_tsc_compatible_write_format: true` and there are no more TSC-based services deployed, then you can move to this step.
+Once all services are deployed using Alloy with `legacy_tsc_write_format: true` and there are no more TSC-based services deployed, then you can move to this step.
 
-- Change `legacy_tsc_compatible_write_format` to `false` (the default)
+- Change `legacy_tsc_write_format` to `false` (the default)
 - New writes use V5 format with `key_id_header` prefix
 - Old V3 data continues to decrypt without any changes
 - `get_searchable_edek_prefix` becomes available for new V5 documents
@@ -37,11 +37,11 @@ SELECT * FROM documents WHERE substring(edek FROM 5 FOR 2) != '\x0200'::bytea;
 
 - Use `rekey_edeks` to upgrade existing V3 EDEKs to V5
 - After rekeying, all documents are discoverable via `get_searchable_edek_prefix`
-- Note: rekey never downgrades — a V5 EDEK stays V5 even if `legacy_tsc_compatible_write_format` is still `true`
+- Note: rekey never downgrades — a V5 EDEK stays V5 even if `legacy_tsc_write_format` is still `true`
 
 ## Rolling Deployments
 
-The legacy format support is safe for rolling deployments where some services are on `legacy_tsc_compatible_write_format: true` and others have already switched to `false`:
+The legacy format support is safe for rolling deployments where some services are on `legacy_tsc_write_format: true` and others have already switched to `false`:
 
 - All Alloy instances read both V3 and V5 data regardless of write format configuration
 - Rekey never downgrades: a V5 EDEK stays V5 even if processed by a legacy-configured service
@@ -55,20 +55,20 @@ This means you can safely roll out the V5 switch incrementally without coordinat
 
 When migrating from V3 to V5 format, `encrypt_with_existing_edek` will re-encrypt document fields in V5 format but will **not** automatically upgrade the provided EDEK. The EDEK remains in whatever format it was originally created in.
 
-This means that after disabling `legacy_tsc_compatible_write_format`:
+This means that after disabling `legacy_tsc_write_format`:
 - Documents updated via `encrypt_with_existing_edek` with a V3 EDEK will have V5-formatted fields but a V3 EDEK
 - These documents will decrypt correctly (the decrypt path handles mixed formats)
 - However, the V3 EDEK will **not** be discoverable via `get_searchable_edek_prefix`
 
 To fully migrate a document to V5, you should call `rekey_edeks` on the EDEK to upgrade it as well. This can be done before or after re-encrypting fields — the order doesn't matter since both formats decrypt correctly regardless of the other's format.
 
-### `get_searchable_edek_prefix` is V5-only
+### `get_searchable_edek_prefix` only matches V5 EDEKs
 
-This method returns an error when the SDK is configured with `legacy_tsc_compatible_write_format: true`, because V3 EDEKs do not have a fixed searchable prefix. Disable the legacy flag before relying on prefix-based search.
+The prefix returned by this method will not match V3 EDEKs, since V3 EDEKs do not have a fixed searchable prefix. It can still be called regardless of the `legacy_tsc_write_format` setting — if your store contains a mix of V3 and V5 data, the prefix will match the V5 entries.
 
 ### Standard Attached is V5-only
 
-`StandardAttachedDocumentOps` always uses V5 format because TSC never had an attached encryption concept. The `legacy_tsc_compatible_write_format` flag does not affect it.
+`StandardAttachedDocumentOps` always uses V5 format because TSC never had an attached encryption concept. The `legacy_tsc_write_format` flag does not affect it.
 
 ## Deterministic Encryption
 

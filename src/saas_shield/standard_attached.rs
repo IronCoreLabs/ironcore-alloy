@@ -99,9 +99,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     /// avoid pitfalls when encoding across byte boundaries.
     /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
-        self.standard_client
-            .get_searchable_edek_prefix(id)
-            .expect("Attached client is always V5, prefix should never fail")
+        self.standard_client.get_searchable_edek_prefix(id)
     }
 }
 

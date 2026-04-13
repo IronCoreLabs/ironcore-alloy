@@ -298,15 +298,13 @@ impl StandardDocumentOps for StandaloneStandardClient {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: i32) -> Result<Vec<u8>, AlloyError> {
-        Ok(
-            get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
-                self.get_edek_type(),
-                self.get_payload_type(),
-                KeyId(id as u32),
-            ))
-            .into(),
-        )
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
+            self.get_edek_type(),
+            self.get_payload_type(),
+            KeyId(id as u32),
+        ))
+        .into()
     }
 }
 
@@ -723,7 +721,7 @@ pub(crate) mod test {
     #[test]
     fn get_searchable_edek_prefix_works() {
         let client = default_client();
-        let result = client.get_searchable_edek_prefix(100).unwrap();
+        let result = client.get_searchable_edek_prefix(100);
         assert_eq!(result, vec![0, 0, 0, 100, 130, 0]);
     }
 }

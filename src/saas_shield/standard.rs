@@ -40,7 +40,7 @@ use std::sync::{Arc, Mutex};
 pub struct SaasShieldStandardClient {
     tenant_security_client: Arc<TenantSecurityClient>,
     rng: Arc<Mutex<OurReseedingRng>>,
-    legacy_tsc_compatible_write_format: bool,
+    legacy_tsc_write_format: bool,
 }
 
 // Standard SaaS Shield edeks could be V3 if they originated in old TSCs or V4 if they originated from Cloaked Search.
@@ -98,12 +98,12 @@ impl EdekParts {
 impl SaasShieldStandardClient {
     pub(crate) fn new(
         tenant_security_client: Arc<TenantSecurityClient>,
-        legacy_tsc_compatible_write_format: bool,
+        legacy_tsc_write_format: bool,
     ) -> Self {
         SaasShieldStandardClient {
             tenant_security_client,
             rng: crate::util::create_reseeding_rng(),
-            legacy_tsc_compatible_write_format,
+            legacy_tsc_write_format,
         }
     }
 
@@ -115,7 +115,7 @@ impl SaasShieldStandardClient {
         tenant_id: &TenantId,
         document: HashMap<FieldId, PlaintextBytes>,
     ) -> Result<EncryptedDocument, AlloyError> {
-        if self.legacy_tsc_compatible_write_format {
+        if self.legacy_tsc_write_format {
             encrypt_document_v3(rng, tsc_edek, dek, tenant_id, document)
         } else {
             self.encrypt_document_v5(rng, tsc_edek, dek, tenant_id, document)
@@ -155,7 +155,7 @@ impl SaasShieldStandardClient {
     ) -> Result<EdekWithKeyIdHeader, AlloyError> {
         let edek_parts = self.decompose_edek_header(edek)?;
         // Never downgrade: only write legacy format if both input and config are legacy
-        let write_legacy = self.legacy_tsc_compatible_write_format && edek_parts.is_legacy_format();
+        let write_legacy = self.legacy_tsc_write_format && edek_parts.is_legacy_format();
         let edek = edek_parts.get_edek_bytes()?;
         let tsp_resp = self
             .tenant_security_client
@@ -466,7 +466,7 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                 plaintext_document.document.0,
                 self.rng.clone(),
                 enc_key,
-                self.legacy_tsc_compatible_write_format,
+                self.legacy_tsc_write_format,
                 Some(&metadata.tenant_id.0),
             )?,
             edek: plaintext_document.edek,
@@ -533,21 +533,17 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: i32) -> Result<Vec<u8>, AlloyError> {
-        if self.legacy_tsc_compatible_write_format {
-            Err(AlloyError::InvalidConfiguration {
-                msg: "Searchable EDEK prefix is not available in the V3 document format. Switch the SDK to V5 to use prefix-based search.".to_string(),
-            })
-        } else {
-            Ok(get_prefix_bytes_for_search(
-                ironcore_documents::v5::key_id_header::KeyIdHeader::new(
-                    self.get_edek_type(),
-                    self.get_payload_type(),
-                    KeyId(id as u32),
-                ),
-            )
-            .into())
-        }
+    ///
+    /// Warning: this will never match a SaaS Shield Standard EDEK created `legacy_tsc_write_format` (or the
+    /// legacy TSCs). Upgrade to the V5 data format via the `TSC_ALLOY_MIGRATION_GUIDE.md` to take advantage of this
+    /// functionality.
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
+        get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
+            self.get_edek_type(),
+            self.get_payload_type(),
+            KeyId(id as u32),
+        ))
+        .into()
     }
 }
 
@@ -902,25 +898,7 @@ mod test {
     }
 
     #[test]
-    fn get_searchable_edek_prefix_errors_in_legacy_mode() {
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
-        );
-        let client = SaasShieldStandardClient::new(Arc::new(tsc), true);
-        let result = client.get_searchable_edek_prefix(1);
-        assert!(matches!(
-            result.unwrap_err(),
-            AlloyError::InvalidConfiguration { .. }
-        ));
-    }
-
-    #[test]
-    fn get_searchable_edek_prefix_works_in_v5_mode() {
+    fn get_searchable_edek_prefix_works() {
         let tsc = TenantSecurityClient::new(
             "".to_string(),
             Arc::new(reqwest::Client::new()),
@@ -930,7 +908,7 @@ mod test {
             },
         );
         let client = SaasShieldStandardClient::new(Arc::new(tsc), false);
-        let result = client.get_searchable_edek_prefix(1).unwrap();
+        let result = client.get_searchable_edek_prefix(1);
         assert_eq!(result, vec![0, 0, 0, 1, 2, 0]);
     }
 }

@@ -151,7 +151,7 @@ pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    fn get_searchable_edek_prefix(&self, id: i32) -> Result<Vec<u8>, AlloyError>;
+    fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
     /// Encrypt a document with the provided metadata. The document must be a map from field identifiers to plaintext
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
@@ -209,7 +209,7 @@ pub(crate) fn encrypt_map<R: CryptoRng + Send>(
     document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
-    legacy_tsc_compatible_write_format: bool,
+    legacy_tsc_write_format: bool,
     tenant_id: Option<&str>,
 ) -> Result<HashMap<FieldId, EncryptedBytes>, AlloyError> {
     let encrypted_document = document
@@ -217,7 +217,7 @@ pub(crate) fn encrypt_map<R: CryptoRng + Send>(
         .map(|(label, plaintext)| {
             let plaintext_doc =
                 ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec());
-            let encrypted_bytes = if legacy_tsc_compatible_write_format {
+            let encrypted_bytes = if legacy_tsc_write_format {
                 v3::encrypt_detached_document(
                     &mut *crate::util::take_lock(&rng),
                     aes_dek,
