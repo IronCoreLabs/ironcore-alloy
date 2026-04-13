@@ -20,7 +20,7 @@ You could stay at this step for as long as you want while reaping the performanc
 
 ### Step 2: Switch to V5 format
 
-Once all services are deployed using Alloy with `legacy_tsc_compatible_write_format: true`, there are no more TSC-based services deployed, then you can move to this step.
+Once all services are deployed using Alloy with `legacy_tsc_compatible_write_format: true` and there are no more TSC-based services deployed, then you can move to this step.
 
 - Change `legacy_tsc_compatible_write_format` to `false` (the default)
 - New writes use V5 format with `key_id_header` prefix
