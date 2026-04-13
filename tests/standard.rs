@@ -279,6 +279,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn standard_encrypt_with_existing_v3_edek_batch_works() -> TestResult {
+        let metadata = get_metadata();
+        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
+        let edek_bytes = STANDARD.decode(edek).unwrap();
+        let plaintext =
+            PlaintextDocument([(FieldId("field2".to_string()), vec![1, 2, 3, 4].into())].into());
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: EdekWithKeyIdHeader(edek_bytes.clone().into()),
+            document: plaintext.clone(),
+        };
+        let plaintexts = PlaintextDocumentsWithEdeks(
+            [(DocumentId("doc".to_string()), plaintext_with_edek)].into(),
+        );
+        let mut batch_encrypted = get_client()
+            .standard()
+            .encrypt_with_existing_edek_batch(plaintexts, &metadata)
+            .await?;
+        assert_eq!(batch_encrypted.successes.0.len(), 1);
+        assert!(batch_encrypted.failures.is_empty());
+        let enc_doc = batch_encrypted
+            .successes
+            .0
+            .remove(&DocumentId("doc".to_string()))
+            .unwrap();
+        // EDEK should be unchanged (still v3 raw protobuf)
+        assert_eq!(enc_doc.edek.0.0, edek_bytes);
+        let decrypted = get_client().standard().decrypt(enc_doc, &metadata).await?;
+        assert_eq!(decrypted, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn standard_log_security_event_works() -> TestResult {
         let metadata = get_metadata();
         get_client()
@@ -501,6 +533,150 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn legacy_decrypt_v3_document() -> TestResult {
+        let document = get_v3_ciphertext();
+        let metadata = get_metadata();
+        // Verify that changing the write format doesn't change the fact that we can decrypt
+        // the TSC java edek/edoc.
+        let decrypted = get_legacy_client()
+            .standard()
+            .decrypt(document, &metadata)
+            .await?;
+        let decrypted_string =
+            from_utf8(&decrypted.0.get(&FieldId("doc".to_string())).unwrap().0).unwrap();
+        assert_eq!(decrypted_string, "Encrypt these bytes!");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_encrypt_with_existing_edek_roundtrip() -> TestResult {
+        let client = get_legacy_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        let encrypted = client.standard().encrypt(plaintext, &metadata).await?;
+        let plaintext2 =
+            PlaintextDocument([(FieldId("field2".to_string()), vec![1, 2, 3, 4].into())].into());
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: encrypted.edek.clone(),
+            document: plaintext2.clone(),
+        };
+        let second_encrypted = client
+            .standard()
+            .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
+            .await?;
+        // EDEK should be unchanged
+        assert_eq!(&encrypted.edek, &second_encrypted.edek);
+        // Fields should be V3 format
+        let field_bytes = second_encrypted.document.values().next().unwrap();
+        assert_eq!(&field_bytes.0[..5], &[3, 73, 82, 79, 78]);
+        let decrypted = client
+            .standard()
+            .decrypt(second_encrypted, &metadata)
+            .await?;
+        assert_eq!(decrypted, plaintext2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_encrypt_with_existing_v3_ciphertext_edek() -> TestResult {
+        let client = get_legacy_client();
+        let metadata = get_metadata();
+        let v3_edek = get_v3_ciphertext().edek;
+        let plaintext =
+            PlaintextDocument([(FieldId("field2".to_string()), vec![1, 2, 3, 4].into())].into());
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: v3_edek.clone(),
+            document: plaintext.clone(),
+        };
+        let encrypted = client
+            .standard()
+            .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
+            .await?;
+        // EDEK should be unchanged
+        assert_eq!(encrypted.edek, v3_edek);
+        // Fields should be V3 format
+        let field_bytes = encrypted.document.values().next().unwrap();
+        assert_eq!(&field_bytes.0[..5], &[3, 73, 82, 79, 78]);
+        let decrypted = client.standard().decrypt(encrypted, &metadata).await?;
+        assert_eq!(decrypted, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_encrypt_with_existing_v5_edek_produces_v3_fields() -> TestResult {
+        let legacy_client = get_legacy_client();
+        let v5_client = get_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        // Encrypt with v5 client to get a v5 edek
+        let encrypted = v5_client.standard().encrypt(plaintext, &metadata).await?;
+        let plaintext2 =
+            PlaintextDocument([(FieldId("field2".to_string()), vec![1, 2, 3, 4].into())].into());
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: encrypted.edek,
+            document: plaintext2.clone(),
+        };
+        // Legacy client re-encrypts with existing v5 edek; fields should still be v3 format
+        let second_encrypted = legacy_client
+            .standard()
+            .encrypt_with_existing_edek(plaintext_with_edek, &metadata)
+            .await?;
+        let field_bytes = second_encrypted.document.values().next().unwrap();
+        assert_eq!(&field_bytes.0[..5], &[3, 73, 82, 79, 78]);
+        // Both clients should be able to decrypt
+        let decrypted = v5_client
+            .standard()
+            .decrypt(second_encrypted, &metadata)
+            .await?;
+        assert_eq!(decrypted, plaintext2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn legacy_encrypt_with_existing_edek_batch_roundtrip() -> TestResult {
+        let client = get_legacy_client();
+        let metadata = get_metadata();
+        let plaintext = get_plaintext();
+        let encrypted = client.standard().encrypt(plaintext, &metadata).await?;
+        let plaintext2 =
+            PlaintextDocument([(FieldId("field2".to_string()), vec![1, 2, 3, 4].into())].into());
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: encrypted.edek,
+            document: plaintext2.clone(),
+        };
+        let plaintexts = PlaintextDocumentsWithEdeks(
+            [(DocumentId("doc".to_string()), plaintext_with_edek)].into(),
+        );
+        let mut batch_encrypted = client
+            .standard()
+            .encrypt_with_existing_edek_batch(plaintexts, &metadata)
+            .await?;
+        assert_eq!(batch_encrypted.successes.0.len(), 1);
+        assert!(batch_encrypted.failures.is_empty());
+        // Fields should be V3 format
+        let enc_doc = batch_encrypted
+            .successes
+            .0
+            .get(&DocumentId("doc".to_string()))
+            .unwrap();
+        let field_bytes = enc_doc.document.values().next().unwrap();
+        assert_eq!(&field_bytes.0[..5], &[3, 73, 82, 79, 78]);
+        let decrypted = client
+            .standard()
+            .decrypt(
+                batch_encrypted
+                    .successes
+                    .0
+                    .remove(&DocumentId("doc".to_string()))
+                    .unwrap(),
+                &metadata,
+            )
+            .await?;
+        assert_eq!(decrypted, plaintext2);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn legacy_get_searchable_edek_prefix_works() -> TestResult {
         let prefix = get_legacy_client().standard().get_searchable_edek_prefix(1);
         let expected = [0, 0, 0, 1, 2, 0];
@@ -522,12 +698,49 @@ mod tests {
         let encrypted = client.standard().encrypt_batch(docs, &metadata).await?;
         assert_eq!(encrypted.successes.0.len(), 2);
         assert!(encrypted.failures.is_empty());
+        // Mix in a known v3 ciphertext from an external source
+        let v3_doc = get_v3_ciphertext();
+        let bad_document = EncryptedDocument {
+            edek: EdekWithKeyIdHeader(vec![1].into()),
+            document: HashMap::new(),
+        };
+        let mixed_encrypted = EncryptedDocuments(
+            encrypted
+                .successes
+                .0
+                .into_iter()
+                .chain([
+                    (DocumentId("v3_doc".to_string()), v3_doc),
+                    (DocumentId("bad_doc".to_string()), bad_document),
+                ])
+                .collect(),
+        );
         let decrypted = client
             .standard()
-            .decrypt_batch(encrypted.successes, &metadata)
+            .decrypt_batch(mixed_encrypted, &metadata)
             .await?;
-        assert_eq!(decrypted.successes.0.len(), 2);
-        assert!(decrypted.failures.is_empty());
+        assert_eq!(decrypted.successes.0.len(), 3);
+        assert_eq!(decrypted.failures.len(), 1);
+        let decrypted_v3 = from_utf8(
+            &decrypted
+                .successes
+                .0
+                .get(&DocumentId("v3_doc".to_string()))
+                .unwrap()
+                .0
+                .get(&FieldId("doc".to_string()))
+                .unwrap()
+                .0,
+        )
+        .unwrap();
+        assert_eq!(decrypted_v3, "Encrypt these bytes!");
+        assert!(matches!(
+            decrypted
+                .failures
+                .get(&DocumentId("bad_doc".to_string()))
+                .unwrap(),
+            AlloyError::DecryptError { .. }
+        ));
         Ok(())
     }
 
