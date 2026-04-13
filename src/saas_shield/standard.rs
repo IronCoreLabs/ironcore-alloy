@@ -502,16 +502,19 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             let UnwrapKeyResponse { dek } = maybe_keys.ok_or_else(|| AlloyError::DecryptError {
                 msg: "TSP failed to wrap key for document.".to_string(),
             })?;
-            let edek_parts = self.decompose_edek_header(plaintext_document.edek)?;
+            let edek_parts = self.decompose_edek_header(plaintext_document.edek.clone())?;
             let enc_key = tsc_dek_to_encryption_key(dek.0)?;
             edek_parts.validate_signature(enc_key)?;
-            self.encrypt_document(
-                self.rng.clone(),
-                edek_parts.get_edek_bytes()?,
-                enc_key,
-                &metadata.tenant_id,
-                plaintext_document.document.0,
-            )
+            Ok(EncryptedDocument {
+                document: encrypt_map(
+                    plaintext_document.document.0,
+                    self.rng.clone(),
+                    enc_key,
+                    self.legacy_tsc_write_format,
+                    Some(&metadata.tenant_id.0),
+                )?,
+                edek: plaintext_document.edek,
+            })
         };
         let decryption_result = perform_batch_action(docs_and_keys, encrypt_document);
         let combined_failures = batch_unwrap_response
