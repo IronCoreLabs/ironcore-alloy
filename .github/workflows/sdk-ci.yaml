@@ -171,5 +171,5 @@ jobs:
           # Comment docs preview link on PR (only once)
           URL="https://ironcore-alloy.readthedocs.io/en/$BRANCH/"
           if ! gh pr view ${{ github.event.pull_request.number }} --json comments -q '.comments[].body' | grep -qF "$URL"; then
-            gh pr comment ${{ github.event.pull_request.number }} --body "Docs preview: $URL"
+            gh pr comment ${{ github.event.pull_request.number }} --body "Python doc preview: $URL"
           fi
