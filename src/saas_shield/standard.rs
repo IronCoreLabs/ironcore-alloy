@@ -161,7 +161,7 @@ impl SaasShieldStandardClient {
             .await?;
         let dek = tsc_dek_to_encryption_key(tsp_resp.dek.0)?;
         edek_parts.validate_signature(dek)?;
-        // Rekey writes in the configured format — this is the mechanism for upgrading or
+        // Rekey writes in the configured format. This is the mechanism for upgrading or
         // downgrading EDEK format.
         if self.legacy_tsc_write_format {
             Ok(EdekWithKeyIdHeader(EncryptedBytes(tsp_resp.edek.0)))

@@ -37,7 +37,7 @@ SELECT * FROM documents WHERE substring(edek FROM 5 FOR 2) != '\x0200'::bytea;
 
 - Use `rekey_edeks` to upgrade existing V3 EDEKs to V5
 - After rekeying, all documents are discoverable via `get_searchable_edek_prefix`
-- Rekey always writes in the configured format — a non-legacy client will upgrade V3 EDEKs to V5, and a legacy client will downgrade V5 EDEKs to V3. This makes rekey the tool for intentional format migration in either direction.
+- Rekey always writes in the configured format. A non-legacy client will upgrade V3 EDEKs to V5, and a legacy client will downgrade V5 EDEKs to V3. This makes rekey the tool for intentional format migration in either direction.
 
 ## Rolling Deployments
 
@@ -49,19 +49,19 @@ The legacy format support is safe for rolling deployments where some services ar
 - `encrypt` and `rekey_edeks` write in the configured format
 - `encrypt_with_existing_edek` matches its field format to the provided EDEK's format, so it won't produce mismatched documents regardless of which service handles it
 
-This means you can safely roll out the V5 switch incrementally without coordinating a simultaneous deployment. If you need to roll back to legacy after some services have already written V5 data, re-enable the legacy flag and use `rekey_edeks` to downgrade V5 EDEKs back to V3 (invert the command in Step 3 to find them). V5 documents can still be read by any Alloy client in the meantime, bus if you still have active TSC-based services they will fail to read V5 documents.
+This means you can safely roll out the V5 switch incrementally without coordinating a simultaneous deployment. If you need to roll back to legacy after some services have already written V5 data, re-enable the legacy flag and use `rekey_edeks` to downgrade V5 EDEKs back to V3 (invert the command in Step 3 to find them). V5 documents can still be read by any Alloy client in the meantime, but if you still have active TSC-based services they will fail to read V5 documents.
 
 ## Known Friction Points
 
 ### `encrypt_with_existing_edek` matches the EDEK format
 
-`encrypt_with_existing_edek` ignores the `legacy_tsc_write_format` setting. Instead, it matches the field format to the provided EDEK — a V3 EDEK produces V3 fields, a V5 EDEK produces V5 fields. This ensures the EDEK and fields are always in the same format.
+`encrypt_with_existing_edek` ignores the `legacy_tsc_write_format` setting. Instead, it matches the field format to the provided EDEK. A V3 EDEK produces V3 fields, a V5 EDEK produces V5 fields. This ensures the EDEK and fields are always in the same format.
 
 To upgrade a document from V3 to V5, first call `rekey_edeks` in a `legacy_tsc_write_format: false` client to get a V5 EDEK, then use the rekeyed EDEK with `encrypt_with_existing_edek`. To roll back from V5 to the TSC-compatible V3, do the same with a `legacy_tsc_write_format: true` client.
 
 ### `get_searchable_edek_prefix` only matches V5 EDEKs
 
-The prefix returned by this method will not match V3 EDEKs, since V3 EDEKs do not have a fixed searchable prefix. It can still be called regardless of the `legacy_tsc_write_format` setting — if your store contains a mix of V3 and V5 data, the prefix will match the V5 entries.
+The prefix returned by this method will not match V3 EDEKs, since V3 EDEKs do not have a fixed searchable prefix. It can still be called regardless of the `legacy_tsc_write_format` setting. If your store contains a mix of V3 and V5 data, the prefix will match the V5 entries.
 
 ### Standard Attached is V5-only
 

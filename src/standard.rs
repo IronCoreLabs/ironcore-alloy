@@ -189,7 +189,7 @@ pub(crate) fn verify_sig(
 }
 
 /// Encrypt each of the fields of the document using the aes_dek.
-/// Always writes V5 format — the V3 path bypasses this and uses `encrypt_document_v3` directly.
+/// Always writes V5 format. The V3 path bypasses this and uses `encrypt_document_v3` directly.
 pub(crate) fn encrypt_document_core<R: CryptoRng + Send>(
     document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,

@@ -1,7 +1,7 @@
 ## 0.15.0
 
 - Dependency updates
-- Added `legacy_tsc_write_format` option to `SaasShieldConfiguration`. When enabled, standard encryption writes in the legacy `tenant-security-client-*` V3 data format, allowing in-place migration from TSC SDKs to alloy without changing the encrypted data format. Only affects `StandardDocumentOps` — attached, deterministic, and vector encryption are unaffected. See [the TSC-> Alloy migration guide](./TSC_ALLOY_MIGRATION_GUIDE.md)` for details.
+- Added `legacy_tsc_write_format` option to `SaasShieldConfiguration`. When enabled, standard encryption writes in the legacy `tenant-security-client-*` V3 data format, allowing in-place migration from TSC SDKs to alloy without changing the encrypted data format. Only affects `StandardDocumentOps`. Attached, deterministic, and vector encryption are unaffected. See [the TSC-> Alloy migration guide](./TSC_ALLOY_MIGRATION_GUIDE.md)` for details.
 
 ### Breaking Changes
 - Update to uniffi-bindgen-java 0.4.0, uniffi 0.31.0.

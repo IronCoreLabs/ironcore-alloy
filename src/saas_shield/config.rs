@@ -14,7 +14,7 @@ pub struct SaasShieldConfiguration {
     pub(crate) tenant_security_client: Arc<TenantSecurityClient>,
     pub(crate) use_scaling_factor: bool,
     /// When true, standard encryption writes in the legacy `tenant-security-client-*` V3 wire
-    /// format. Only affects `StandardDocumentOps` — attached, deterministic, and vector encryption
+    /// format. Only affects `StandardDocumentOps`. Attached, deterministic, and vector encryption
     /// are unaffected because they have no TSC equivalent.
     pub(crate) legacy_tsc_write_format: bool,
 }
