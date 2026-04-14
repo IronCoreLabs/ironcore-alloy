@@ -154,8 +154,6 @@ impl SaasShieldStandardClient {
         request_metadata: &RequestMetadata,
     ) -> Result<EdekWithKeyIdHeader, AlloyError> {
         let edek_parts = self.decompose_edek_header(edek)?;
-        // Never downgrade: only write legacy format if both input and config are legacy
-        let write_legacy = self.legacy_tsc_write_format && edek_parts.is_legacy_format();
         let edek = edek_parts.get_edek_bytes()?;
         let tsp_resp = self
             .tenant_security_client
@@ -163,7 +161,9 @@ impl SaasShieldStandardClient {
             .await?;
         let dek = tsc_dek_to_encryption_key(tsp_resp.dek.0)?;
         edek_parts.validate_signature(dek)?;
-        if write_legacy {
+        // Rekey writes in the configured format — this is the mechanism for upgrading or
+        // downgrading EDEK format.
+        if self.legacy_tsc_write_format {
             Ok(EdekWithKeyIdHeader(EncryptedBytes(tsp_resp.edek.0)))
         } else {
             self.encrypt_document_v5(
@@ -447,6 +447,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
     /// of the document.
+    /// The provided EDEK's format will determine the output document format, not the `legacy_tsc_write_format` setting.
+    /// A legacy EDEK will produce legacy document, a non-legacy EDEK will produce a current document. Rekey EDEKs per
+    /// `TSC_ALLOY_MIGRATION_GUIDE.md` if this is undesired.
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,
@@ -466,7 +469,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                 plaintext_document.document.0,
                 self.rng.clone(),
                 enc_key,
-                self.legacy_tsc_write_format,
+                // `with_existing_edek` ignores the `legacy_tsc_write_format` setting. We take a V3 EDEK as an explicit
+                // indication that they want a V3 doc (and same for V5).
+                edek_parts.is_legacy_format(),
                 Some(&metadata.tenant_id.0),
             )?,
             edek: plaintext_document.edek,
@@ -476,6 +481,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     /// Encrypt multiple documents with the provided metadata.
     /// The provided EDEKs will be decrypted and used to encrypt each corresponding document's fields.
     /// This is useful when updating some fields of the document.
+    /// The provided EDEK's format will determine the output documents format, not the `legacy_tsc_write_format` setting.
+    /// A legacy EDEK will produce legacy document, a non-legacy EDEK will produce a current document. Rekey EDEKs per
+    /// `TSC_ALLOY_MIGRATION_GUIDE.md` if this is undesired.
     async fn encrypt_with_existing_edek_batch(
         &self,
         plaintext_documents: PlaintextDocumentsWithEdeks,
@@ -510,7 +518,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
                     plaintext_document.document.0,
                     self.rng.clone(),
                     enc_key,
-                    self.legacy_tsc_write_format,
+                    // `with_existing_edek` ignores the `legacy_tsc_write_format` setting. We take a V3 EDEK as an explicit
+                    // indication that they want a V3 doc (and same for V5).
+                    edek_parts.is_legacy_format(),
                     Some(&metadata.tenant_id.0),
                 )?,
                 edek: plaintext_document.edek,

@@ -157,10 +157,9 @@ pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
     /// of the document.
     ///
-    /// Note: this method re-encrypts document fields but does not automatically upgrade the provided EDEK's format.
-    /// If migrating from V3 to V5 format, you should call `rekey_edeks` on the EDEK to upgrade it as well,
-    /// so it becomes discoverable via `get_searchable_edek_prefix`. Decryption works correctly regardless
-    /// of whether the EDEK and field formats match.
+    /// Note: this method matches the field format to the provided EDEK's format, ignoring the
+    /// `legacy_tsc_write_format` setting. A V3 EDEK produces V3 fields, a V5 EDEK produces V5 fields.
+    /// To upgrade a document from V3 to V5, first rekey the EDEK via `rekey_edeks`.
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,
