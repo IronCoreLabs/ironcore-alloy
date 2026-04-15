@@ -3,7 +3,7 @@ import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.allopen.gradle.*
 import kotlinx.benchmark.gradle.*
 
-version = "0.14.1-SNAPSHOT"
+version = "0.15.0"
 
 group = "com.ironcorelabs"
 
