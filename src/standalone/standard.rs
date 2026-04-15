@@ -366,6 +366,7 @@ pub(crate) mod test {
     use crate::{EncryptedBytes, FieldId, Secret};
     use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
     use ironcore_documents::v5::key_id_header::{self, EdekType, KeyId, PayloadType};
+    use rstest::rstest;
 
     fn default_client() -> StandaloneStandardClient {
         new_client(Some(1))
@@ -566,9 +567,15 @@ pub(crate) mod test {
         Ok(())
     }
 
+    #[rstest]
+    #[case::missing_primary(None, "No primary secret exists in the standard configuration")]
+    #[case::primary_not_in_map(Some(1000), "Primary secret id not found in secrets map")]
     #[tokio::test]
-    async fn encrypt_missing_primary() -> Result<(), AlloyError> {
-        let client = new_client(None);
+    async fn encrypt_invalid_primary(
+        #[case] primary_secret_id: Option<u32>,
+        #[case] expected_msg: &str,
+    ) -> Result<(), AlloyError> {
+        let client = new_client(primary_secret_id);
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
         let error = client
@@ -578,46 +585,22 @@ pub(crate) mod test {
         assert_eq!(
             error,
             AlloyError::InvalidConfiguration {
-                msg: "No primary secret exists in the standard configuration".to_string()
+                msg: expected_msg.to_string()
             }
         );
         Ok(())
     }
 
-    #[tokio::test]
-    async fn encrypt_primary_not_found() -> Result<(), AlloyError> {
-        // This id isn't in the config map.
-        let client = new_client(Some(1000));
-        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
-        let error = client
-            .encrypt(PlaintextDocument(document), &metadata)
-            .await
-            .unwrap_err();
-        assert_eq!(
-            error,
-            AlloyError::InvalidConfiguration {
-                msg: "Primary secret id not found in secrets map".to_string()
-            }
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn decrypt_id_not_primary() -> Result<(), AlloyError> {
-        //The edek below is for key_id 1, setting primary to 2 in the sdk.
-        let client = new_client(Some(2));
-        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
-        let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
-        let encrypted = EncryptedDocument {
+    fn make_encrypted_doc_with_key_id(kib: u8) -> EncryptedDocument {
+        EncryptedDocument {
             edek: EdekWithKeyIdHeader(EncryptedBytes(vec![
-                0, 0, 0, 1, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
-                77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
-                42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
-                71, 124, 244, 209, 252, 151, 18, 48, 77, 53, 19, 139, 40, 178, 7, 81, 160, 95, 18,
-                209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
-                59, 126, 89, 87, 96, 177, 145, 45, 167, 75, 142, 49, 14, 249, 71, 29, 207, 70, 26,
-                1, 49,
+                0, 0, 0, kib, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147,
+                46, 77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55,
+                178, 42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41,
+                0, 71, 124, 244, 209, 252, 151, 18, 48, 77, 53, 19, 139, 40, 178, 7, 81, 160, 95,
+                18, 209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4,
+                28, 59, 126, 89, 87, 96, 177, 145, 45, 167, 75, 142, 49, 14, 249, 71, 29, 207, 70,
+                26, 1, 49,
             ])),
             document: [(
                 FieldId("hi".to_string()),
@@ -628,39 +611,21 @@ pub(crate) mod test {
                 ]),
             )]
             .into(),
-        };
-        let plaintext = client.decrypt(encrypted, &metadata).await.unwrap();
-        assert_eq!(plaintext.0, document);
-        Ok(())
+        }
     }
 
+    #[rstest]
+    #[case::id_not_primary(1)]
+    #[case::id_zero(0)]
     #[tokio::test]
-    async fn decrypt_id_zero() -> Result<(), AlloyError> {
-        //The edek below is for key_id 0, setting primary to 2 in the sdk.
+    async fn decrypt_with_non_primary_key_id(#[case] key_id_byte: u8) -> Result<(), AlloyError> {
         let client = new_client(Some(2));
         let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
         let document: HashMap<_, _> = [(FieldId("hi".to_string()), vec![1, 2, 3].into())].into();
-        let encrypted = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![
-                0, 0, 0, 0, 130, 0, 10, 36, 10, 32, 63, 209, 198, 171, 21, 208, 189, 114, 147, 46,
-                77, 51, 5, 205, 148, 219, 103, 230, 206, 111, 139, 227, 209, 247, 100, 74, 55, 178,
-                42, 107, 148, 237, 16, 1, 18, 71, 18, 69, 26, 67, 10, 12, 248, 21, 21, 9, 41, 0,
-                71, 124, 244, 209, 252, 151, 18, 48, 77, 53, 19, 139, 40, 178, 7, 81, 160, 95, 18,
-                209, 6, 53, 112, 39, 222, 52, 235, 151, 227, 69, 139, 208, 207, 8, 32, 92, 4, 28,
-                59, 126, 89, 87, 96, 177, 145, 45, 167, 75, 142, 49, 14, 249, 71, 29, 207, 70, 26,
-                1, 49,
-            ])),
-            document: [(
-                FieldId("hi".to_string()),
-                EncryptedBytes(vec![
-                    0, 73, 82, 79, 78, 7, 10, 168, 250, 84, 170, 243, 140, 53, 47, 99, 212, 184,
-                    119, 142, 12, 136, 196, 155, 120, 225, 188, 254, 66, 143, 227, 183, 50, 78, 0,
-                    50,
-                ]),
-            )]
-            .into(),
-        };
-        let plaintext = client.decrypt(encrypted, &metadata).await.unwrap();
+        let plaintext = client
+            .decrypt(make_encrypted_doc_with_key_id(key_id_byte), &metadata)
+            .await
+            .unwrap();
         assert_eq!(plaintext.0, document);
         Ok(())
     }

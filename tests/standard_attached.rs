@@ -15,11 +15,9 @@ mod tests {
         standard_attached::PlaintextAttachedDocument,
     };
     use ironcore_alloy::{EncryptedBytes, PlaintextBytes};
+    use rstest::rstest;
     use serde_json::{Map, Value};
-    use std::{
-        sync::Arc,
-        time::{SystemTime, UNIX_EPOCH},
-    };
+    use std::sync::Arc;
 
     fn get_metadata() -> Arc<AlloyMetadata> {
         AlloyMetadata::new_simple(TenantId("tenant-gcp-l".to_string()))
@@ -144,61 +142,33 @@ mod tests {
         Ok(())
     }
 
+    #[rstest]
+    #[case::with_timestamp(Some(1000), true)]
+    #[case::without_timestamp(None, true)]
+    #[case::negative_timestamp(Some(-1), false)]
     #[tokio::test]
-    async fn standard_log_security_event_works() -> TestResult {
-        let metadata = get_metadata();
-        get_client()
+    async fn standard_attached_log_security_event(
+        #[case] event_time: Option<i64>,
+        #[case] expect_success: bool,
+    ) -> TestResult {
+        let result = get_client()
             .standard_attached()
             .log_security_event(
                 SecurityEvent::Data {
                     event: DataEvent::ChangePermissions,
                 },
-                &metadata,
-                Some(
-                    SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as i64,
-                ),
+                &get_metadata(),
+                event_time,
             )
-            .await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn standard_attached_log_security_event_works_with_none() -> TestResult {
-        let metadata = get_metadata();
-        get_client()
-            .standard_attached()
-            .log_security_event(
-                SecurityEvent::Data {
-                    event: DataEvent::ChangePermissions,
-                },
-                &metadata,
-                None,
-            )
-            .await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn standard_attached_log_security_event_fails_with_negative_time() -> TestResult {
-        let metadata = get_metadata();
-        let err = get_client()
-            .standard_attached()
-            .log_security_event(
-                SecurityEvent::Data {
-                    event: DataEvent::ChangePermissions,
-                },
-                &metadata,
-                Some(-1),
-            )
-            .await
-            .unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "Invalid input: 'millis times must be >= 0.'"
-        );
+            .await;
+        if expect_success {
+            result?;
+        } else {
+            assert_eq!(
+                result.unwrap_err().to_string(),
+                "Invalid input: 'millis times must be >= 0.'"
+            );
+        }
         Ok(())
     }
 
@@ -212,72 +182,46 @@ mod tests {
         Ok(())
     }
 
+    #[rstest]
+    #[case::same_tenant(None, &[0, 0, 1, 255, 2, 0])]
+    #[case::new_tenant(Some("tenant-aws"), &[0, 0, 2, 0, 2, 0])]
     #[tokio::test]
-    async fn standard_attached_rekey_v5_edek_works() -> TestResult {
+    async fn standard_attached_rekey(
+        #[case] new_tenant_id: Option<&str>,
+        #[case] expected_prefix: &[u8],
+    ) -> TestResult {
         let metadata = get_metadata();
         let doc = get_ciphertext();
         let docs = EncryptedAttachedDocuments([(DocumentId("doc".to_string()), doc)].into());
+        let new_tenant = new_tenant_id.map(|id| TenantId(id.to_string()));
         let mut all_rekeyed = get_client()
             .standard_attached()
-            .rekey_documents(docs, &metadata, None)
+            .rekey_documents(docs, &metadata, new_tenant.clone())
             .await?;
         assert_eq!(all_rekeyed.successes.len(), 1);
         assert_eq!(all_rekeyed.failures.len(), 0);
-        assert!(
-            all_rekeyed
-                .successes
-                .contains_key(&DocumentId("doc".to_string()))
-        );
         let rekeyed = all_rekeyed
             .successes
             .remove(&DocumentId("doc".to_string()))
             .unwrap();
-        // First 4 bytes are KMS config ID 511
-        assert!(rekeyed.0.0.starts_with(&[0, 0, 1, 255, 2, 0]));
+        assert!(rekeyed.0.0.starts_with(expected_prefix));
+        // When rekeyed to a new tenant, decrypting with the original metadata must fail
+        if new_tenant.is_some() {
+            let err = get_client()
+                .standard_attached()
+                .decrypt(rekeyed.clone(), &metadata)
+                .await
+                .unwrap_err();
+            assert!(matches!(err, AlloyError::TspError { .. }));
+        }
+        let decrypt_metadata = match &new_tenant {
+            Some(tid) => AlloyMetadata::new_simple(tid.clone()),
+            None => metadata,
+        };
         let decrypted = get_client()
             .standard_attached()
-            .decrypt(rekeyed, &metadata)
-            .await
-            .unwrap();
-        assert_eq!(decrypted, get_plaintext());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn standard_attached_rekey_new_tenant_edek_works() -> TestResult {
-        let metadata = get_metadata();
-        let doc = get_ciphertext();
-        let docs = EncryptedAttachedDocuments([(DocumentId("doc".to_string()), doc)].into());
-        let new_tenant = TenantId("tenant-aws".to_string());
-        let mut all_rekeyed = get_client()
-            .standard_attached()
-            .rekey_documents(docs, &metadata, Some(new_tenant.clone()))
+            .decrypt(rekeyed, &decrypt_metadata)
             .await?;
-        assert_eq!(all_rekeyed.successes.len(), 1);
-        assert_eq!(all_rekeyed.failures.len(), 0);
-        assert!(
-            all_rekeyed
-                .successes
-                .contains_key(&DocumentId("doc".to_string()))
-        );
-        let rekeyed = all_rekeyed
-            .successes
-            .remove(&DocumentId("doc".to_string()))
-            .unwrap();
-        // First 4 bytes are KMS config ID 512
-        assert!(rekeyed.0.0.starts_with(&[0, 0, 2, 0, 2, 0]));
-        let bad_decrypted = get_client()
-            .standard_attached()
-            .decrypt(rekeyed.clone(), &metadata)
-            .await
-            .unwrap_err();
-        assert!(matches!(bad_decrypted, AlloyError::TspError { .. }));
-        let new_metadata = AlloyMetadata::new_simple(new_tenant);
-        let decrypted = get_client()
-            .standard_attached()
-            .decrypt(rekeyed, &new_metadata)
-            .await
-            .unwrap();
         assert_eq!(decrypted, get_plaintext());
         Ok(())
     }

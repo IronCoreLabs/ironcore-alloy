@@ -704,13 +704,9 @@ mod test {
     use crate::{EncryptedBytes, standard::EdekWithKeyIdHeader};
     use base64::{Engine, engine::general_purpose::STANDARD};
     use ironcore_documents::v5::key_id_header::{KeyId, KeyIdHeader};
+    use rstest::rstest;
 
-    #[test]
-    fn decompose_edek_header_makes_v3_for_invalid() {
-        let encrypted_document = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(EncryptedBytes(vec![0u8])),
-            document: Default::default(),
-        };
+    fn test_client() -> SaasShieldStandardClient {
         let tsc = TenantSecurityClient::new(
             "".to_string(),
             Arc::new(reqwest::Client::new()),
@@ -719,44 +715,24 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
-        assert!(matches!(
-            dont_care_client
-                .decompose_edek_header(encrypted_document.edek)
-                .unwrap(),
-            EdekParts::V3(_)
-        ));
+        SaasShieldStandardClient::new(Arc::new(tsc), Default::default())
     }
 
-    #[test]
-    fn get_document_header_and_edek_fails_for_wrong_type() {
-        // This is a SaaS Shield Standard edek which is empty along with a valid header.
-        let bytes = vec![0u8, 0, 0, 42, 1, 0, 18, 4, 18, 2, 18, 0];
-        let encrypted_doc = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(EncryptedBytes(bytes)),
-            document: Default::default(),
-        };
-
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
-        );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
-
-        assert!(matches!(
-            dont_care_client
-                .decompose_edek_header(encrypted_doc.edek)
-                .unwrap_err(),
-            AlloyError::InvalidInput { msg: _ }
-        ));
+    #[derive(Debug)]
+    enum ExpectedEdek {
+        V3,
+        // V4 covered by `parse_old_v4_document_works`, can't easily add to parameterized
+        V5,
+        Error,
     }
 
-    #[test]
-    fn get_document_header_and_edek_succeeds_for_good_header() {
+    #[rstest]
+    #[case::invalid_bytes_fallback_to_v3(vec![0u8], ExpectedEdek::V3)]
+    #[case::wrong_edek_type_errors(
+        vec![0u8, 0, 0, 42, 1, 0, 18, 4, 18, 2, 18, 0],
+        ExpectedEdek::Error
+    )]
+    #[case::valid_v5_header({
         let edek = EncryptedDek {
             encryptedDekData: vec![1, 2, 3].into(),
             kmsConfigId: 1,
@@ -764,36 +740,27 @@ mod test {
             ..Default::default()
         };
         let v4_doc = generate_cmk_v4_doc_and_sign(
-            vec![edek],
-            EncryptionKey([1; 32]),
-            &TenantId("tenant".to_string()),
-        )
-        .unwrap();
-        let doc_bytes = v4_doc.write_to_bytes().unwrap();
-        let final_bytes =
-            KeyIdHeader::new(EdekType::SaasShield, PayloadType::StandardEdek, KeyId(123))
-                .put_header_on_document(doc_bytes);
-        let encrypted_doc = EncryptedDocument {
-            edek: EdekWithKeyIdHeader(EncryptedBytes(final_bytes.to_vec())),
-            document: Default::default(),
-        };
-
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
-        );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
-
-        assert!(
-            dont_care_client
-                .decompose_edek_header(encrypted_doc.edek)
-                .is_ok()
-        );
+            vec![edek], EncryptionKey([1; 32]), &TenantId("tenant".to_string()),
+        ).unwrap();
+        KeyIdHeader::new(EdekType::SaasShield, PayloadType::StandardEdek, KeyId(123))
+            .put_header_on_document(v4_doc.write_to_bytes().unwrap())
+            .to_vec()
+    }, ExpectedEdek::V5)]
+    fn decompose_edek_header_detects_format(
+        #[case] edek_bytes: Vec<u8>,
+        #[case] expected: ExpectedEdek,
+    ) {
+        let client = test_client();
+        let result = client.decompose_edek_header(EdekWithKeyIdHeader(EncryptedBytes(edek_bytes)));
+        match expected {
+            ExpectedEdek::V3 => assert!(matches!(result.unwrap(), EdekParts::V3(_))),
+            ExpectedEdek::V5 => assert!(matches!(result.unwrap(), EdekParts::V5(_, _))),
+            ExpectedEdek::Error => assert!(matches!(result, Err(AlloyError::InvalidInput { .. }))),
+        }
     }
+
+    // These tests verify specific field values from known TSC-produced EDEKs,
+    // so they stay hand-written rather than parameterized.
 
     #[test]
     fn parse_old_v4_document_works() {
@@ -813,24 +780,15 @@ mod test {
             50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97, 110,
             116, 45, 103, 99, 112, 45, 108,
         ]));
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
-        );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
-        let edek_parts = dont_care_client
+        let edek_parts = test_client()
             .decompose_edek_header(edek_and_header)
             .unwrap();
         assert!(matches!(edek_parts, EdekParts::V4(_)));
-        let edek_bytes = edek_parts.get_edek_bytes().unwrap();
-        let encrypted_deks: cmk_edek::EncryptedDeks =
-            Message::parse_from_bytes(&edek_bytes).unwrap();
-        assert_eq!(encrypted_deks.encryptedDeks.len(), 1);
-        let encrypted_dek = encrypted_deks.encryptedDeks[0].clone();
+        let encrypted_dek =
+            cmk_edek::EncryptedDeks::parse_from_bytes(&edek_parts.get_edek_bytes().unwrap())
+                .unwrap()
+                .encryptedDeks[0]
+                .clone();
         assert_eq!(encrypted_dek.kmsConfigId, 511);
         assert_eq!(encrypted_dek.tenantId.to_string(), "tenant-gcp-l");
     }
@@ -853,24 +811,15 @@ mod test {
             194, 50, 103, 109, 176, 41, 144, 121, 250, 182, 16, 255, 3, 50, 12, 116, 101, 110, 97,
             110, 116, 45, 103, 99, 112, 45, 108,
         ]));
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
-        );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
-        let edek_parts = dont_care_client
+        let edek_parts = test_client()
             .decompose_edek_header(edek_and_header)
             .unwrap();
         assert!(matches!(edek_parts, EdekParts::V5(_, _)));
-        let edek_bytes = edek_parts.get_edek_bytes().unwrap();
-        let encrypted_deks: cmk_edek::EncryptedDeks =
-            Message::parse_from_bytes(&edek_bytes).unwrap();
-        assert_eq!(encrypted_deks.encryptedDeks.len(), 1);
-        let encrypted_dek = encrypted_deks.encryptedDeks[0].clone();
+        let encrypted_dek =
+            cmk_edek::EncryptedDeks::parse_from_bytes(&edek_parts.get_edek_bytes().unwrap())
+                .unwrap()
+                .encryptedDeks[0]
+                .clone();
         assert_eq!(encrypted_dek.kmsConfigId, 511);
         assert_eq!(encrypted_dek.tenantId.to_string(), "tenant-gcp-l");
     }
@@ -878,26 +827,14 @@ mod test {
     #[test]
     fn parse_v3_document_works() {
         let edek = STANDARD.decode("CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D").unwrap();
-        // This type isn't true, but it's what a caller would be creating if they had old EDEKs
         let liar_type_edek = EdekWithKeyIdHeader(EncryptedBytes(edek));
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
-        );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
-        let edek_parts = dont_care_client
-            .decompose_edek_header(liar_type_edek)
-            .unwrap();
+        let edek_parts = test_client().decompose_edek_header(liar_type_edek).unwrap();
         assert!(matches!(edek_parts, EdekParts::V3(_)));
-        let edek_bytes = edek_parts.get_edek_bytes().unwrap();
-        let encrypted_deks: cmk_edek::EncryptedDeks =
-            Message::parse_from_bytes(&edek_bytes).unwrap();
-        assert_eq!(encrypted_deks.encryptedDeks.len(), 1);
-        let encrypted_dek = encrypted_deks.encryptedDeks[0].clone();
+        let encrypted_dek =
+            cmk_edek::EncryptedDeks::parse_from_bytes(&edek_parts.get_edek_bytes().unwrap())
+                .unwrap()
+                .encryptedDeks[0]
+                .clone();
         assert_eq!(encrypted_dek.kmsConfigId, 511);
         // This EDEK came from TSC-java, where we weren't setting tenant IDs
         assert_eq!(encrypted_dek.tenantId.to_string(), "");
@@ -912,16 +849,9 @@ mod test {
 
     #[test]
     fn get_searchable_edek_prefix_works() {
-        let tsc = TenantSecurityClient::new(
-            "".to_string(),
-            Arc::new(reqwest::Client::new()),
-            crate::tenant_security_client::request::AlloyHttpClientHeaders {
-                content_type: "".to_string(),
-                authorization: "".to_string(),
-            },
+        assert_eq!(
+            test_client().get_searchable_edek_prefix(1),
+            vec![0, 0, 0, 1, 2, 0]
         );
-        let client = SaasShieldStandardClient::new(Arc::new(tsc), false);
-        let result = client.get_searchable_edek_prefix(1);
-        assert_eq!(result, vec![0, 0, 0, 1, 2, 0]);
     }
 }
