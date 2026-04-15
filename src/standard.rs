@@ -156,6 +156,10 @@ pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
     /// of the document.
+    ///
+    /// Note: this method matches the field format to the provided EDEK's format, ignoring the
+    /// `legacy_tsc_write_format` setting. A V3 EDEK produces V3 fields, a V5 EDEK produces V5 fields.
+    /// To upgrade a document from V3 to V5, first rekey the EDEK via `rekey_edeks`.
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,
@@ -184,7 +188,8 @@ pub(crate) fn verify_sig(
     }
 }
 
-/// Encrypt each of the fields of the document using the aes_dek
+/// Encrypt each of the fields of the document using the aes_dek.
+/// Always writes V5 format. The V3 path bypasses this and uses `encrypt_document_v3` directly.
 pub(crate) fn encrypt_document_core<R: CryptoRng + Send>(
     document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
@@ -192,7 +197,7 @@ pub(crate) fn encrypt_document_core<R: CryptoRng + Send>(
     key_id_header: KeyIdHeader,
     v4_doc: icl_header_v4::V4DocumentHeader,
 ) -> Result<EncryptedDocument, AlloyError> {
-    let encrypted_document = encrypt_map(document, rng, aes_dek)?;
+    let encrypted_document = encrypt_map(document, rng, aes_dek, false, None)?;
     Ok(EncryptedDocument {
         edek: EdekWithKeyIdHeader::new(key_id_header, v4_doc),
         document: encrypted_document,
@@ -203,21 +208,30 @@ pub(crate) fn encrypt_map<R: CryptoRng + Send>(
     document: HashMap<FieldId, PlaintextBytes>,
     rng: Arc<Mutex<R>>,
     aes_dek: EncryptionKey,
+    legacy_tsc_write_format: bool,
+    tenant_id: Option<&str>,
 ) -> Result<HashMap<FieldId, EncryptedBytes>, AlloyError> {
     let encrypted_document = document
         .into_par_iter()
         .map(|(label, plaintext)| {
-            ironcore_documents::aes::encrypt_document_and_attach_iv(
-                &mut *crate::util::take_lock(&rng),
-                aes_dek,
-                ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec()),
-            )
-            .map(|c| {
-                (
-                    label,
-                    EncryptedBytes(v5::EncryptedPayload::from(c).write_to_bytes()),
+            let plaintext_doc =
+                ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec());
+            let encrypted_bytes = if legacy_tsc_write_format {
+                v3::encrypt_detached_document(
+                    &mut *crate::util::take_lock(&rng),
+                    aes_dek,
+                    tenant_id.unwrap_or_default(),
+                    plaintext_doc,
                 )
-            })
+            } else {
+                ironcore_documents::aes::encrypt_document_and_attach_iv(
+                    &mut *crate::util::take_lock(&rng),
+                    aes_dek,
+                    plaintext_doc,
+                )
+                .map(|c| v5::EncryptedPayload::from(c).write_to_bytes())
+            }?;
+            Ok::<_, AlloyError>((label, EncryptedBytes(encrypted_bytes)))
         })
         .collect::<Result<_, _>>()?;
     Ok(encrypted_document)
@@ -257,6 +271,64 @@ mod test {
     pub(crate) fn create_rng() -> ChaCha20Rng {
         ChaCha20Rng::seed_from_u64(1u64)
     }
+    #[test]
+    fn encrypt_map_v3_produces_v3_format() {
+        let rng = create_rng();
+        let document: HashMap<_, _> =
+            [(FieldId("foo".to_string()), PlaintextBytes(vec![1, 2, 3]))].into();
+        let result = encrypt_map(
+            document,
+            Arc::new(Mutex::new(rng)),
+            EncryptionKey([0u8; 32]),
+            true,
+            Some("tenant"),
+        )
+        .unwrap();
+        let encrypted = result.get(&FieldId("foo".to_string())).unwrap();
+        // V3 format starts with [3, 'I', 'R', 'O', 'N']
+        assert!(encrypted.0.starts_with(&v3::VERSION_AND_MAGIC));
+    }
+
+    #[test]
+    fn encrypt_map_v5_produces_v5_format() {
+        let rng = create_rng();
+        let document: HashMap<_, _> =
+            [(FieldId("foo".to_string()), PlaintextBytes(vec![1, 2, 3]))].into();
+        let result = encrypt_map(
+            document,
+            Arc::new(Mutex::new(rng)),
+            EncryptionKey([0u8; 32]),
+            false,
+            None,
+        )
+        .unwrap();
+        let encrypted = result.get(&FieldId("foo".to_string())).unwrap();
+        // V5 format starts with [0, 'I', 'R', 'O', 'N']
+        assert!(encrypted.0.starts_with(&v5::VERSION_AND_MAGIC));
+    }
+
+    #[test]
+    fn v3_encrypted_field_decrypts_via_v5_decrypt_path() {
+        let rng = create_rng();
+        let dek = EncryptionKey([0u8; 32]);
+        let document: HashMap<_, _> =
+            [(FieldId("foo".to_string()), PlaintextBytes(vec![1, 2, 3]))].into();
+        let encrypted = encrypt_map(
+            document,
+            Arc::new(Mutex::new(rng)),
+            dek,
+            true,
+            Some("tenant"),
+        )
+        .unwrap();
+        // decrypt_document_core handles V3, V5, and plain IV formats
+        let decrypted = decrypt_document_core(encrypted, dek).unwrap();
+        assert_eq!(
+            decrypted.get(&FieldId("foo".to_string())).unwrap().0,
+            vec![1, 2, 3]
+        );
+    }
+
     #[test]
     fn encrypt_document_core_works() {
         let rng = create_rng();

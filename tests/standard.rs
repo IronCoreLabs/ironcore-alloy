@@ -279,6 +279,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn standard_encrypt_with_existing_v3_edek_batch_works() -> TestResult {
+        let metadata = get_metadata();
+        let edek = "CsABCjCkFe10OS/aiG6p9I0ijOirFq1nsRE8cPMog/bhOS0vYv5OCrYGZMSxOlo6dMJEYNgQ/wMYgAUiDEzjRFRtGVz1SRGWoip4CnYKcQokAKUEZIeCIuR/vrw3x2e4iWJRBfNjd/huZXKWoRxk5G5Ae6neEkkA3PhOjCcLd/QJqPK+ML9smJ0deGE4dmgtkBD1qgk0bygWrrmHZl+Oq7Sjdi63aS2JQqo9MaYvuGPoVipJdlfCMmdtsCmQefq2EP8D";
+        let edek_bytes = STANDARD.decode(edek).unwrap();
+        let plaintext =
+            PlaintextDocument([(FieldId("field2".to_string()), vec![1, 2, 3, 4].into())].into());
+        let plaintext_with_edek = PlaintextDocumentWithEdek {
+            edek: EdekWithKeyIdHeader(edek_bytes.clone().into()),
+            document: plaintext.clone(),
+        };
+        let plaintexts = PlaintextDocumentsWithEdeks(
+            [(DocumentId("doc".to_string()), plaintext_with_edek)].into(),
+        );
+        let mut batch_encrypted = get_client()
+            .standard()
+            .encrypt_with_existing_edek_batch(plaintexts, &metadata)
+            .await?;
+        assert_eq!(batch_encrypted.successes.0.len(), 1);
+        assert!(batch_encrypted.failures.is_empty());
+        let enc_doc = batch_encrypted
+            .successes
+            .0
+            .remove(&DocumentId("doc".to_string()))
+            .unwrap();
+        // EDEK should be unchanged (still v3 raw protobuf)
+        assert_eq!(enc_doc.edek.0.0, edek_bytes);
+        let decrypted = get_client().standard().decrypt(enc_doc, &metadata).await?;
+        assert_eq!(decrypted, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn standard_log_security_event_works() -> TestResult {
         let metadata = get_metadata();
         get_client()

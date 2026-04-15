@@ -16,6 +16,14 @@ use uniffi_bindgen::{BindgenLoader, BindgenPaths};
 pub type TestResult = Result<(), AlloyError>;
 
 pub fn get_client() -> Arc<SaasShield> {
+    create_client(false)
+}
+
+pub fn get_legacy_client() -> Arc<SaasShield> {
+    create_client(true)
+}
+
+fn create_client(legacy_tsc_write_format: bool) -> Arc<SaasShield> {
     let http_client = reqwest::ClientBuilder::new()
         .danger_accept_invalid_certs(false)
         .build()
@@ -25,6 +33,7 @@ pub fn get_client() -> Arc<SaasShield> {
         "0WUaXesNgbTAuLwn".to_string(),
         Some(1.1),
         Arc::new(http_client),
+        legacy_tsc_write_format,
         true,
     )
     .unwrap();

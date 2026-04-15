@@ -100,7 +100,8 @@ pub trait StandardAttachedDocumentOps: Send + Sync {
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
-    /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
+    /// Note that this will not work for matching values that don't use our key_id_header format, such as Cloaked Search
+    /// or legacy TSC data.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
 }
 

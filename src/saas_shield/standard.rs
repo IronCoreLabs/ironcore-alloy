@@ -12,8 +12,10 @@ use crate::tenant_security_client::{
     UnwrapKeyResponse, WrapKeyResponse,
 };
 use crate::util::{BatchResult, OurReseedingRng, perform_batch_action, v4_proto_from_bytes};
-use crate::{AlloyMetadata, alloy_client_trait::AlloyClient};
-use crate::{DocumentId, FieldId, PlaintextBytes, TenantId};
+use crate::{
+    AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
+    alloy_client_trait::AlloyClient,
+};
 use bytes::Bytes;
 use futures::future::{FutureExt, join_all};
 use ironcore_documents::aes::EncryptionKey;
@@ -38,6 +40,7 @@ use std::sync::{Arc, Mutex};
 pub struct SaasShieldStandardClient {
     tenant_security_client: Arc<TenantSecurityClient>,
     rng: Arc<Mutex<OurReseedingRng>>,
+    legacy_tsc_write_format: bool,
 }
 
 // Standard SaaS Shield edeks could be V3 if they originated in old TSCs or V4 if they originated from Cloaked Search.
@@ -77,6 +80,10 @@ impl EdekParts {
         }
     }
 
+    fn is_legacy_format(&self) -> bool {
+        matches!(self, EdekParts::V3(_))
+    }
+
     /// Validates the signature in the case of V4 document header. V3 doesn't need validation
     fn validate_signature(&self, enc_key: EncryptionKey) -> Result<(), AlloyError> {
         match self {
@@ -89,10 +96,14 @@ impl EdekParts {
 }
 
 impl SaasShieldStandardClient {
-    pub(crate) fn new(tenant_security_client: Arc<TenantSecurityClient>) -> Self {
+    pub(crate) fn new(
+        tenant_security_client: Arc<TenantSecurityClient>,
+        legacy_tsc_write_format: bool,
+    ) -> Self {
         SaasShieldStandardClient {
             tenant_security_client,
             rng: crate::util::create_reseeding_rng(),
+            legacy_tsc_write_format,
         }
     }
 
@@ -104,17 +115,29 @@ impl SaasShieldStandardClient {
         tenant_id: &TenantId,
         document: HashMap<FieldId, PlaintextBytes>,
     ) -> Result<EncryptedDocument, AlloyError> {
+        if self.legacy_tsc_write_format {
+            encrypt_document_v3(rng, tsc_edek, dek, tenant_id, document)
+        } else {
+            self.encrypt_document_v5(rng, tsc_edek, dek, tenant_id, document)
+        }
+    }
+
+    fn encrypt_document_v5<R: CryptoRng + Send>(
+        &self,
+        rng: Arc<Mutex<R>>,
+        tsc_edek: Vec<u8>,
+        dek: EncryptionKey,
+        tenant_id: &TenantId,
+        document: HashMap<FieldId, PlaintextBytes>,
+    ) -> Result<EncryptedDocument, AlloyError> {
         let pb_edeks: ironcore_documents::cmk_edek::EncryptedDeks =
             protobuf::Message::parse_from_bytes(&tsc_edek)?;
-
-        // We will choose the first edek, so that's the id we want to put on the front.
         let kms_config_id = pb_edeks
             .encryptedDeks
             .first()
             .map(|edek| edek.kmsConfigId as u32)
             .unwrap_or(0);
         let v4_doc = generate_cmk_v4_doc_and_sign(pb_edeks.encryptedDeks, dek, tenant_id)?;
-
         encrypt_document_core(
             document,
             rng,
@@ -138,14 +161,20 @@ impl SaasShieldStandardClient {
             .await?;
         let dek = tsc_dek_to_encryption_key(tsp_resp.dek.0)?;
         edek_parts.validate_signature(dek)?;
-        self.encrypt_document(
-            self.rng.clone(), // this isn't actually used because of the empty document
-            tsp_resp.edek.0,
-            dek,
-            parsed_new_tenant_id,
-            HashMap::new(), // empty document. We only care about the EDEK part and there's no wasted work
-        )
-        .map(|doc| doc.edek)
+        // Rekey writes in the configured format. This is the mechanism for upgrading or
+        // downgrading EDEK format.
+        if self.legacy_tsc_write_format {
+            Ok(EdekWithKeyIdHeader(EncryptedBytes(tsp_resp.edek.0)))
+        } else {
+            self.encrypt_document_v5(
+                self.rng.clone(), // this isn't actually used because of the empty document
+                tsp_resp.edek.0,
+                dek,
+                parsed_new_tenant_id,
+                HashMap::new(), // empty document. We only care about the EDEK part and there's no wasted work
+            )
+            .map(|doc| doc.edek)
+        }
     }
 
     /// Break the EDEK into its V3, V4 or V5 parts. This should be used instead of self.decompose_key_id_header
@@ -418,6 +447,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     /// bytes, and the same metadata must be provided when decrypting the document.
     /// The provided EDEK will be decrypted and used to encrypt each field. This is useful when updating some fields
     /// of the document.
+    /// The provided EDEK's format will determine the output document format, not the `legacy_tsc_write_format` setting.
+    /// A legacy EDEK will produce legacy document, a non-legacy EDEK will produce a current document. Rekey EDEKs per
+    /// `TSC_ALLOY_MIGRATION_GUIDE.md` if this is undesired.
     async fn encrypt_with_existing_edek(
         &self,
         plaintext_document: PlaintextDocumentWithEdek,
@@ -433,7 +465,15 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         let enc_key = tsc_dek_to_encryption_key(dek.0)?;
         edek_parts.validate_signature(enc_key)?;
         Ok(EncryptedDocument {
-            document: encrypt_map(plaintext_document.document.0, self.rng.clone(), enc_key)?,
+            document: encrypt_map(
+                plaintext_document.document.0,
+                self.rng.clone(),
+                enc_key,
+                // `with_existing_edek` ignores the `legacy_tsc_write_format` setting. We take a V3 EDEK as an explicit
+                // indication that they want a V3 doc (and same for V5).
+                edek_parts.is_legacy_format(),
+                Some(&metadata.tenant_id.0),
+            )?,
             edek: plaintext_document.edek,
         })
     }
@@ -441,6 +481,9 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     /// Encrypt multiple documents with the provided metadata.
     /// The provided EDEKs will be decrypted and used to encrypt each corresponding document's fields.
     /// This is useful when updating some fields of the document.
+    /// The provided EDEK's format will determine the output documents format, not the `legacy_tsc_write_format` setting.
+    /// A legacy EDEK will produce legacy document, a non-legacy EDEK will produce a current document. Rekey EDEKs per
+    /// `TSC_ALLOY_MIGRATION_GUIDE.md` if this is undesired.
     async fn encrypt_with_existing_edek_batch(
         &self,
         plaintext_documents: PlaintextDocumentsWithEdeks,
@@ -467,16 +510,21 @@ impl StandardDocumentOps for SaasShieldStandardClient {
             let UnwrapKeyResponse { dek } = maybe_keys.ok_or_else(|| AlloyError::DecryptError {
                 msg: "TSP failed to wrap key for document.".to_string(),
             })?;
-            let edek_parts = self.decompose_edek_header(plaintext_document.edek)?;
+            let edek_parts = self.decompose_edek_header(plaintext_document.edek.clone())?;
             let enc_key = tsc_dek_to_encryption_key(dek.0)?;
             edek_parts.validate_signature(enc_key)?;
-            self.encrypt_document(
-                self.rng.clone(),
-                edek_parts.get_edek_bytes()?,
-                enc_key,
-                &metadata.tenant_id,
-                plaintext_document.document.0,
-            )
+            Ok(EncryptedDocument {
+                document: encrypt_map(
+                    plaintext_document.document.0,
+                    self.rng.clone(),
+                    enc_key,
+                    // `with_existing_edek` ignores the `legacy_tsc_write_format` setting. We take a V3 EDEK as an explicit
+                    // indication that they want a V3 doc (and same for V5).
+                    edek_parts.is_legacy_format(),
+                    Some(&metadata.tenant_id.0),
+                )?,
+                edek: plaintext_document.edek,
+            })
         };
         let decryption_result = perform_batch_action(docs_and_keys, encrypt_document);
         let combined_failures = batch_unwrap_response
@@ -493,11 +541,15 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         .into())
     }
 
-    /// Generate a prefix that could used to search a data store for documents encrypted using an identifier (KMS
+    /// Generate a prefix that could be used to search a data store for documents encrypted using an identifier (KMS
     /// config id for SaaS Shield, secret id for Standalone). These bytes should be encoded into
     /// a format matching the encoding in the data store. z85/ascii85 users should first pass these bytes through
     /// `encode_prefix_z85` or `base85_prefix_padding`. Make sure you've read the documentation of those functions to
     /// avoid pitfalls when encoding across byte boundaries.
+    ///
+    /// Warning: this will never match a SaaS Shield Standard EDEK created `legacy_tsc_write_format` (or the
+    /// legacy TSCs). Upgrade to the V5 data format via the `TSC_ALLOY_MIGRATION_GUIDE.md` to take advantage of this
+    /// functionality.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         get_prefix_bytes_for_search(ironcore_documents::v5::key_id_header::KeyIdHeader::new(
             self.get_edek_type(),
@@ -601,6 +653,22 @@ fn fix_encrypted_dek(
     })
 }
 
+/// V3 encrypt: EDEK is the raw EncryptedDeks protobuf from the TSP (no V4DocumentHeader or
+/// key_id_header wrapping). Fields are encrypted in V3 format with the tenant_id in the header.
+fn encrypt_document_v3<R: CryptoRng + Send>(
+    rng: Arc<Mutex<R>>,
+    tsc_edek: Vec<u8>,
+    dek: EncryptionKey,
+    tenant_id: &TenantId,
+    document: HashMap<FieldId, PlaintextBytes>,
+) -> Result<EncryptedDocument, AlloyError> {
+    let encrypted_fields = encrypt_map(document, rng, dek, true, Some(&tenant_id.0))?;
+    Ok(EncryptedDocument {
+        edek: EdekWithKeyIdHeader(EncryptedBytes(tsc_edek)),
+        document: encrypted_fields,
+    })
+}
+
 fn tsc_dek_to_encryption_key(dek: Vec<u8>) -> Result<EncryptionKey, AlloyError> {
     let bytes: [u8; 32] = dek.try_into().map_err(|_| AlloyError::InvalidKey {
         msg: "Invalid DEK".to_string(),
@@ -651,7 +719,7 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
         assert!(matches!(
             dont_care_client
                 .decompose_edek_header(encrypted_document.edek)
@@ -677,7 +745,7 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
 
         assert!(matches!(
             dont_care_client
@@ -718,7 +786,7 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
 
         assert!(
             dont_care_client
@@ -753,7 +821,7 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
         let edek_parts = dont_care_client
             .decompose_edek_header(edek_and_header)
             .unwrap();
@@ -793,7 +861,7 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
         let edek_parts = dont_care_client
             .decompose_edek_header(edek_and_header)
             .unwrap();
@@ -820,7 +888,7 @@ mod test {
                 authorization: "".to_string(),
             },
         );
-        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc));
+        let dont_care_client = SaasShieldStandardClient::new(Arc::new(tsc), Default::default());
         let edek_parts = dont_care_client
             .decompose_edek_header(liar_type_edek)
             .unwrap();
@@ -833,5 +901,27 @@ mod test {
         assert_eq!(encrypted_dek.kmsConfigId, 511);
         // This EDEK came from TSC-java, where we weren't setting tenant IDs
         assert_eq!(encrypted_dek.tenantId.to_string(), "");
+    }
+
+    #[test]
+    fn edek_parts_is_legacy_format() {
+        assert!(EdekParts::V3(bytes::Bytes::new()).is_legacy_format());
+        assert!(!EdekParts::V4(Default::default()).is_legacy_format());
+        assert!(!EdekParts::V5(KeyId(1), Default::default()).is_legacy_format());
+    }
+
+    #[test]
+    fn get_searchable_edek_prefix_works() {
+        let tsc = TenantSecurityClient::new(
+            "".to_string(),
+            Arc::new(reqwest::Client::new()),
+            crate::tenant_security_client::request::AlloyHttpClientHeaders {
+                content_type: "".to_string(),
+                authorization: "".to_string(),
+            },
+        );
+        let client = SaasShieldStandardClient::new(Arc::new(tsc), false);
+        let result = client.get_searchable_edek_prefix(1);
+        assert_eq!(result, vec![0, 0, 0, 1, 2, 0]);
     }
 }

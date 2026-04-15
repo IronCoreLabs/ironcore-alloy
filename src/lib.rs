@@ -243,6 +243,7 @@ impl SaasShield {
         Arc::new(Self {
             standard: Arc::new(SaasShieldStandardClient::new(
                 config.tenant_security_client.clone(),
+                config.legacy_tsc_write_format,
             )),
             standard_attached: Arc::new(SaasShieldStandardAttachedClient::new(
                 config.tenant_security_client.clone(),

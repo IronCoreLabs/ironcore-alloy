@@ -23,7 +23,8 @@ pub struct SaasShieldStandardAttachedClient {
 impl SaasShieldStandardAttachedClient {
     pub(crate) fn new(tenant_security_client: Arc<TenantSecurityClient>) -> Self {
         Self {
-            standard_client: SaasShieldStandardClient::new(tenant_security_client),
+            // Attached always uses V5. There is no TSC equivalent of attached encryption.
+            standard_client: SaasShieldStandardClient::new(tenant_security_client, false),
         }
     }
 }

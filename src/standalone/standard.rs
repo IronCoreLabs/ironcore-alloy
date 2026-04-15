@@ -161,8 +161,13 @@ impl StandaloneStandardClient {
             &self.config.secrets,
             &metadata.tenant_id,
         )?;
-        let encrypted_document: HashMap<_, _> =
-            encrypt_map(plaintext_document.document.0, self.rng.clone(), dek)?;
+        let encrypted_document: HashMap<_, _> = encrypt_map(
+            plaintext_document.document.0,
+            self.rng.clone(),
+            dek,
+            false,
+            None,
+        )?;
         Ok(EncryptedDocument {
             edek: plaintext_document.edek,
             document: encrypted_document,

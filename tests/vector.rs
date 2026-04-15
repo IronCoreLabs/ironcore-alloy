@@ -14,7 +14,7 @@ mod tests {
     };
     use std::{iter, sync::Arc};
 
-    fn assert_ulps_vec_eq(vec1: Vec<f32>, vec2: Vec<f32>) -> () {
+    fn assert_ulps_vec_eq(vec1: Vec<f32>, vec2: Vec<f32>) {
         if vec1.len() != vec2.len() {
             panic!("Vectors must be equal length");
         }
