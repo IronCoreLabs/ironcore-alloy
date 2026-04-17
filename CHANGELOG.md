@@ -1,3 +1,7 @@
+## 0.15.1
+
+- Fix to Rust doc.rs build.
+
 ## 0.15.0
 
 - Dependency updates

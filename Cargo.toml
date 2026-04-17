@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.15.1-pre"
+version = "0.15.2-pre"
 description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
 authors = ["IronCore Labs <info@ironcorelabs.com>"]
 edition = "2024"
@@ -13,6 +13,10 @@ repository = "https://github.com/IronCoreLabs/ironcore-alloy"
 categories = ["cryptography"]
 keywords = ["cryptography", "saas-shield", "ALE", "cloaked-ai"]
 rust-version = "1.85.0"
+
+[package.metadata.docs.rs]
+# Disable default features to exclude heavy uniffi-bindgen deps that cause OOM
+no-default-features = true
 
 # This is needed to allow extra options to be passed to criterion
 # https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
@@ -32,7 +36,9 @@ path = "uniffi-bindgen-java.rs"
 bench = false
 
 [features]
+default = ["bindgen"]
 integration_tests = []
+bindgen = ["uniffi/cli", "dep:uniffi-bindgen-java"]
 
 [dependencies]
 aes-gcm = "0.10"
@@ -61,8 +67,8 @@ ring = "0.17"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["float_roundtrip"] }
 thiserror = "2.0.18"
-uniffi = { version = "0.31.0", features = ["tokio", "cli"] }
-uniffi-bindgen-java = "0.4.1"
+uniffi = { version = "0.31.0", features = ["tokio"] }
+uniffi-bindgen-java = { version = "0.4.1", optional = true }
 z85 = "3.0.7"
 
 [dev-dependencies]
