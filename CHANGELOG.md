@@ -1,3 +1,7 @@
+## 0.15.2
+
+- Fix a check on API key that was too strict
+
 ## 0.15.1
 
 - Fix to Rust doc.rs build.
