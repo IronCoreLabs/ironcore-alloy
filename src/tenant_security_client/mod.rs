@@ -37,11 +37,11 @@ impl TryFrom<String> for ApiKey {
                 msg: "API_KEY was not valid Base64.".to_string(),
             })
             .and_then(|base64| {
-                if base64.len() == 12 {
+                if base64.len() >= 12 {
                     Ok(ApiKey(value))
                 } else {
                     Err(InvalidConfiguration {
-                        msg: "API_KEY was not 16 characters.".to_string(),
+                        msg: "API_KEY was not at least 16 characters.".to_string(),
                     })
                 }
             })
