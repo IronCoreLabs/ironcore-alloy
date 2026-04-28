@@ -136,21 +136,29 @@ jobs:
           AUTH="Authorization: Token ${{ secrets.RTD_API_TOKEN }}"
 
           # Sync versions so RTD discovers the branch
-          curl -sf -X POST -H "$AUTH" "$RTD_API/sync-versions/"
-          # Wait for version to appear
+          curl -sf -X POST -H "$AUTH" "$RTD_API/sync-versions/" > /dev/null
+
+          # Wait for the version to appear and resolve its slug (RTD slugifies branch names)
           for i in $(seq 1 10); do
-            curl -sf -H "$AUTH" "$RTD_API/versions/$BRANCH/" > /dev/null 2>&1 && break
+            SLUG=$(curl -sf -H "$AUTH" "$RTD_API/versions/?verbose_name=$BRANCH" \
+              | python3 -c "import sys,json; r=json.load(sys.stdin)['results']; print(r[0]['slug'] if r else '')")
+            [ -n "$SLUG" ] && break
             sleep 5
           done
+          if [ -z "$SLUG" ]; then
+            echo "Could not resolve RTD version slug for branch $BRANCH"
+            exit 1
+          fi
+          echo "RTD version slug: $SLUG"
 
           # Activate the version as hidden
           curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
             -d '{"active": true, "hidden": true}' \
-            "$RTD_API/versions/$BRANCH/"
+            "$RTD_API/versions/$SLUG/" > /dev/null
 
           # Trigger build via v3 API and get the build's API URL
           BUILD_API=$(curl -sf -X POST -H "$AUTH" \
-            "$RTD_API/versions/$BRANCH/builds/" \
+            "$RTD_API/versions/$SLUG/builds/" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['build']['_links']['_self'])")
 
           # Poll build status until finished
@@ -169,7 +177,7 @@ jobs:
           fi
 
           # Comment docs preview link on PR (only once)
-          URL="https://ironcore-alloy.readthedocs.io/en/$BRANCH/"
+          URL="https://ironcore-alloy.readthedocs.io/en/$SLUG/"
           if ! gh pr view ${{ github.event.pull_request.number }} --json comments -q '.comments[].body' | grep -qF "$URL"; then
             gh pr comment ${{ github.event.pull_request.number }} --body "Python doc preview: $URL"
           fi
