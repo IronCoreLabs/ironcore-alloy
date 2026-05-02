@@ -106,7 +106,7 @@ jobs:
         working-directory: python/ironcore-alloy
       - name: Upload generated Python bindings
         if: matrix.runs-on == 'ubuntu-24.04'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-bindings
           path: python/ironcore-alloy/ironcore_alloy/ironcore_alloy.py
@@ -126,7 +126,7 @@ jobs:
         run: hatch run docs:build
         working-directory: python/ironcore-alloy
       - name: Upload docs HTML
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: docs-html-${{ github.event.pull_request.head.sha || github.sha }}
           path: python/ironcore-alloy/site/
