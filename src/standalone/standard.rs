@@ -9,7 +9,10 @@ use crate::standard::{
     StandardEncryptBatchResult, decrypt_document_core, encrypt_document_core, encrypt_map,
     verify_sig,
 };
-use crate::util::{OurReseedingRng, hash256, perform_batch_action};
+use crate::streaming::{
+    IV_LEN, StreamingDekUnwrapper, StreamingStandardDecryptor, StreamingStandardEncryptor,
+};
+use crate::util::{OurReseedingRng, generate_streaming_iv, hash256, perform_batch_action};
 use crate::{
     AlloyMetadata, DocumentId, Secret, TenantId,
     alloy_client_trait::{AlloyClient, DecomposedHeader},
@@ -173,6 +176,37 @@ impl StandaloneStandardClient {
             document: encrypted_document,
         })
     }
+
+    /// Derive a fresh DEK and produce a V5 EDEK for streaming encryption.
+    pub(crate) fn streaming_acquire_dek_and_edek(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<(EncryptionKey, EdekWithKeyIdHeader), AlloyError> {
+        let (secret_id, secret) = self.get_current_secret_and_id()?;
+        let per_tenant_kek = derive_aes_encryption_key(&secret.secret, &metadata.tenant_id);
+        let (aes_dek, v4_doc) = v5::aes::generate_aes_edek_and_sign(
+            &mut *crate::util::take_lock(&self.rng),
+            per_tenant_kek,
+            None,
+            secret_id.to_string().as_str(),
+        )?;
+        let edek = EdekWithKeyIdHeader::new(self.create_key_id_header(secret_id), v4_doc);
+        Ok((aes_dek, edek))
+    }
+
+    /// Generate a fresh IV for streaming encryption using this client's RNG.
+    pub(crate) fn streaming_generate_iv(&self) -> [u8; IV_LEN] {
+        generate_streaming_iv(&self.rng)
+    }
+
+    /// Decrypt the DEK from an EDEK for streaming decryption.
+    pub(crate) fn streaming_acquire_decrypt_dek(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptionKey, AlloyError> {
+        self.decrypt_document_dek(edek, &self.config.secrets, &metadata.tenant_id)
+    }
 }
 
 impl AlloyClient for StandaloneStandardClient {
@@ -306,6 +340,36 @@ impl StandardDocumentOps for StandaloneStandardClient {
         ))
         .into()
     }
+
+    async fn create_streaming_encryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardEncryptor>, AlloyError> {
+        let (dek, edek) = self.streaming_acquire_dek_and_edek(metadata)?;
+        let iv = generate_streaming_iv(&self.rng);
+        Ok(StreamingStandardEncryptor::new(dek, edek, iv))
+    }
+
+    async fn create_streaming_decryptor(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardDecryptor>, AlloyError> {
+        let dek = self.streaming_acquire_decrypt_dek(edek, metadata)?;
+        Ok(StreamingStandardDecryptor::new(dek))
+    }
+}
+
+#[async_trait::async_trait]
+impl StreamingDekUnwrapper for StandaloneStandardClient {
+    async fn unwrap_streaming_dek(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptionKey, AlloyError> {
+        // Standalone DEK unwrap is local/synchronous; no work is awaited.
+        self.streaming_acquire_decrypt_dek(edek, metadata)
+    }
 }
 
 /// Try to find the aes edek in the V4 header and decrypt the aes edek using the provided kek.
@@ -363,7 +427,7 @@ fn derive_aes_encryption_key_legacy<K: AsRef<[u8]>>(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::{EncryptedBytes, FieldId, Secret};
+    use crate::{EncryptedBytes, FieldId, PlaintextBytes, Secret};
     use crate::{standard::EdekWithKeyIdHeader, util::create_test_seeded_rng};
     use ironcore_documents::v5::key_id_header::{self, EdekType, KeyId, PayloadType};
     use rstest::rstest;
@@ -688,5 +752,121 @@ pub(crate) mod test {
         let client = default_client();
         let result = client.get_searchable_edek_prefix(100);
         assert_eq!(result, vec![0, 0, 0, 100, 130, 0]);
+    }
+
+    // Drive a streaming encryptor over the given plaintext chunks and return (edek, full edoc).
+    async fn stream_encrypt(
+        client: &StandaloneStandardClient,
+        metadata: &AlloyMetadata,
+        chunks: &[&[u8]],
+    ) -> (EdekWithKeyIdHeader, Vec<u8>) {
+        let encryptor = client.create_streaming_encryptor(metadata).await.unwrap();
+        let mut edoc = Vec::new();
+        for chunk in chunks {
+            edoc.extend(encryptor.encrypt_chunk(chunk.to_vec()).unwrap());
+        }
+        edoc.extend(encryptor.finish().unwrap());
+        (encryptor.edek(), edoc)
+    }
+
+    // Drive a streaming decryptor over the edoc, splitting into `chunk`-sized pieces.
+    async fn stream_decrypt(
+        client: &StandaloneStandardClient,
+        metadata: &AlloyMetadata,
+        edek: EdekWithKeyIdHeader,
+        edoc: &[u8],
+        chunk: usize,
+    ) -> Result<Vec<u8>, AlloyError> {
+        let decryptor = client
+            .create_streaming_decryptor(edek, metadata)
+            .await
+            .unwrap();
+        let mut out = Vec::new();
+        for piece in edoc.chunks(chunk.max(1)) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec())?);
+        }
+        out.extend(decryptor.finish()?);
+        Ok(out)
+    }
+
+    fn field() -> FieldId {
+        FieldId("f".to_string())
+    }
+
+    #[tokio::test]
+    async fn streaming_encrypt_then_one_shot_decrypt() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let plaintext = vec![42u8; 5000];
+        let (edek, edoc) = stream_encrypt(
+            &client,
+            &metadata,
+            &[&plaintext[..2000], &plaintext[2000..]],
+        )
+        .await;
+        // The streamed edoc is a normal V5 edoc that the one-shot path decrypts.
+        let document = EncryptedDocument {
+            edek,
+            document: [(field(), EncryptedBytes(edoc))].into(),
+        };
+        let decrypted = client.decrypt(document, &metadata).await.unwrap();
+        assert_eq!(decrypted.0[&field()], PlaintextBytes(plaintext));
+    }
+
+    #[tokio::test]
+    async fn one_shot_encrypt_then_streaming_decrypt() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let plaintext = vec![7u8; 5000];
+        let encrypted = client
+            .encrypt(
+                PlaintextDocument([(field(), PlaintextBytes(plaintext.clone()))].into()),
+                &metadata,
+            )
+            .await
+            .unwrap();
+        let edoc = encrypted.document[&field()].0.clone();
+        // Decrypt the one-shot edoc via streaming across odd chunk boundaries.
+        let decrypted = stream_decrypt(&client, &metadata, encrypted.edek, &edoc, 13)
+            .await
+            .unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[tokio::test]
+    async fn streaming_roundtrip_various_chunk_sizes() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let plaintext: Vec<u8> = (0..1000u32).map(|i| i as u8).collect();
+        let (edek, edoc) = stream_encrypt(&client, &metadata, &[&plaintext]).await;
+        for chunk in [1usize, 16, 17, 64, 999, 100_000] {
+            let decrypted = stream_decrypt(&client, &metadata, edek.clone(), &edoc, chunk)
+                .await
+                .unwrap();
+            assert_eq!(decrypted, plaintext, "failed at chunk size {chunk}");
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_empty_payload_roundtrips() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let (edek, edoc) = stream_encrypt(&client, &metadata, &[]).await;
+        let decrypted = stream_decrypt(&client, &metadata, edek, &edoc, 4)
+            .await
+            .unwrap();
+        assert_eq!(decrypted, Vec::<u8>::new());
+    }
+
+    #[tokio::test]
+    async fn streaming_decrypt_tampered_fails_at_finalize() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(TenantId("foo".to_string()));
+        let plaintext = vec![1u8; 500];
+        let (edek, mut edoc) = stream_encrypt(&client, &metadata, &[&plaintext]).await;
+        // Flip a ciphertext byte (after the 0IRON + IV prefix).
+        edoc[20] ^= 0xff;
+        let result = stream_decrypt(&client, &metadata, edek, &edoc, 64).await;
+        assert!(matches!(result, Err(AlloyError::DecryptError { .. })));
     }
 }

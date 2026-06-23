@@ -27,6 +27,7 @@ pub mod saas_shield;
 pub mod standalone;
 pub mod standard;
 pub mod standard_attached;
+pub mod streaming;
 mod tenant_security_client;
 mod util;
 pub mod vector;

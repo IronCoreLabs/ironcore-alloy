@@ -1175,6 +1175,7 @@ checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
 name = "ironcore-alloy"
 version = "0.15.3-pre.9"
 dependencies = [
+ "aes",
  "aes-gcm",
  "aes-siv",
  "approx",
@@ -1189,7 +1190,9 @@ dependencies = [
  "cargo_metadata",
  "convert_case",
  "criterion",
+ "ctr",
  "futures",
+ "ghash",
  "hex",
  "hex-literal",
  "hmac 0.12.1",
@@ -1209,6 +1212,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
+ "subtle",
  "thiserror 2.0.18",
  "tokio",
  "uniffi",

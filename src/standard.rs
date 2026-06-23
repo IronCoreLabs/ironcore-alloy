@@ -1,7 +1,9 @@
 use crate::{
     AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
-    alloy_client_trait::AlloyClient, create_batch_result_struct,
-    create_batch_result_struct_using_newtype, errors::AlloyError,
+    alloy_client_trait::AlloyClient,
+    create_batch_result_struct, create_batch_result_struct_using_newtype,
+    errors::AlloyError,
+    streaming::{StreamingStandardDecryptor, StreamingStandardEncryptor},
 };
 use ironcore_documents::{
     aes::{EncryptionKey, IvAndCiphertext, decrypt_document_with_attached_iv},
@@ -173,6 +175,30 @@ pub trait StandardDocumentOps: Send + Sync + AlloyClient {
         plaintext_documents: PlaintextDocumentsWithEdeks,
         metadata: &AlloyMetadata,
     ) -> Result<StandardEncryptBatchResult, AlloyError>;
+    /// Create a streaming encryptor for a single large value. A DEK is generated/acquired and a fresh
+    /// EDEK is produced, both available immediately from the returned object. Drive the returned
+    /// object with repeated `encrypt_chunk` calls followed by a single `finish`; the concatenated
+    /// output is a standard V5 edoc that decrypts with either streaming or one-shot decrypt. The
+    /// EDEK must be stored separately (see `StreamingStandardEncryptor.edek`).
+    ///
+    /// Streaming always writes the V5 format, ignoring the `legacy_tsc_write_format` setting.
+    async fn create_streaming_encryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardEncryptor>, AlloyError>;
+    /// Create a streaming decryptor for a value encrypted with `create_streaming_encryptor` (or the
+    /// one-shot `encrypt`, since the formats are identical). Both the current V5 format and the
+    /// legacy V3 (TSC) format are read. The DEK is unwrapped from the provided EDEK at construction.
+    /// Feed the streamed edoc with repeated `decrypt_chunk` calls and call `finish` once at the end
+    /// to verify authentication.
+    ///
+    /// WARNING: `decrypt_chunk` releases plaintext before the authentication tag is verified. See
+    /// `StreamingStandardDecryptor` for the rollback-on-failure contract you must follow.
+    async fn create_streaming_decryptor(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardDecryptor>, AlloyError>;
 }
 
 pub(crate) fn verify_sig(

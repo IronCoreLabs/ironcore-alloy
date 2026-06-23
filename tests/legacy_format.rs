@@ -307,4 +307,51 @@ mod tests {
         assert_eq!(prefix, vec![0, 0, 0, 1, 2, 0]);
         Ok(())
     }
+
+    // ---- streaming: honors the configured format, like one-shot encrypt ----
+
+    #[rstest]
+    #[tokio::test]
+    async fn streaming_produces_configured_format_and_round_trips(
+        #[values(EdekFormat::V3, EdekFormat::V5)] format: EdekFormat,
+    ) -> TestResult {
+        let sdk = format.sdk();
+        let encryptor = sdk
+            .standard()
+            .create_streaming_encryptor(&get_metadata())
+            .await?;
+        let mut edoc = encryptor.encrypt_chunk(vec![1, 2, 3])?;
+        edoc.extend(encryptor.finish()?);
+        // The EDEK and the streamed document are in the configured format, just like one-shot
+        // `encrypt` — the legacy compatibility concerns apply to streaming too.
+        format.assert(&encryptor.edek());
+        let expected_magic: &[u8] = match format {
+            EdekFormat::V3 => &[3, 73, 82, 79, 78],
+            EdekFormat::V5 => &[0, 73, 82, 79, 78],
+        };
+        assert_eq!(&edoc[..5], expected_magic);
+
+        // Round-trips through the one-shot decrypt path...
+        let document = EncryptedDocument {
+            edek: encryptor.edek(),
+            document: [(FieldId("field".to_string()), EncryptedBytes(edoc.clone()))].into(),
+        };
+        assert_eq!(
+            sdk.standard().decrypt(document, &get_metadata()).await?,
+            get_plaintext()
+        );
+
+        // ...and through streaming decrypt, which reads both V3 and V5.
+        let decryptor = sdk
+            .standard()
+            .create_streaming_decryptor(encryptor.edek(), &get_metadata())
+            .await?;
+        let mut out = Vec::new();
+        for piece in edoc.chunks(7) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec())?);
+        }
+        out.extend(decryptor.finish()?);
+        assert_eq!(out, vec![1, 2, 3]);
+        Ok(())
+    }
 }
