@@ -4,8 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Streaming is not yet on a published release, so this points at the in-repo crate. Once it ships,
-# replace this with a versioned dependency, e.g. `ironcore-alloy = "0.16"`.
 ironcore-alloy = { path = "../../../../" }
 tokio = { version = "1", features = [
     "rt-multi-thread",
