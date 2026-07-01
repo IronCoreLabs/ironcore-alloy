@@ -87,7 +87,7 @@ lazy_static = "1.5"
 proptest = "1.11.0"
 rstest = "0.26"
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = "0.31.0"
+uniffi_bindgen = "0.32.0"
 z85 = "3.0.7"
 
 [[bench]]
