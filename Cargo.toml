@@ -41,6 +41,7 @@ integration_tests = []
 bindgen = ["uniffi/cli", "dep:uniffi-bindgen-java"]
 
 [dependencies]
+aes = "0.8"
 aes-gcm = "0.10"
 aes-siv = "0.7"
 async-trait = "0.1.89"
@@ -48,7 +49,9 @@ base64 = "0.22"
 base64_type = "0.2"
 bytes = { version = "1.11.1", features = ["serde"] }
 convert_case = "0.11.0"
+ctr = "0.9"
 futures = "0.3.32"
+ghash = "0.5"
 hmac = { version = "0.12.1", features = ["std"] }
 ironcore-documents = "0.3.1"
 itertools = "0.14"
@@ -66,6 +69,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 ring = "0.17"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["float_roundtrip"] }
+subtle = "2"
 thiserror = "2.0.18"
 uniffi = { version = "0.31.0", features = ["tokio"] }
 uniffi-bindgen-java = { version = "0.4.1", optional = true }

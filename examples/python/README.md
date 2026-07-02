@@ -46,3 +46,13 @@ the document, then decrypting it.
 ```
 python standard-roundtrip.py
 ```
+
+### Standard streaming roundtrip
+
+This example streams a file through standard encryption to disk and back, in 64 KiB chunks, so the whole file never has
+to be held in memory at once. It also demonstrates the release-of-unverified-plaintext contract: decrypted chunks are
+written to a temporary file and only committed once the authentication tag is verified.
+
+```
+python streaming-roundtrip.py
+```

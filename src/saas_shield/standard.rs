@@ -7,11 +7,17 @@ use crate::standard::{
     StandardEncryptBatchResult, decrypt_document_core, encrypt_document_core, encrypt_map,
     verify_sig,
 };
+use crate::streaming::{
+    IV_LEN, StreamingDekUnwrapper, StreamingStandardDecryptor, StreamingStandardEncryptor,
+};
 use crate::tenant_security_client::{
     BatchUnwrapKeyResponse, BatchWrapKeyResponse, RequestMetadata, TenantSecurityClient,
     UnwrapKeyResponse, WrapKeyResponse,
 };
-use crate::util::{BatchResult, OurReseedingRng, perform_batch_action, v4_proto_from_bytes};
+use crate::util::{
+    BatchResult, OurReseedingRng, generate_streaming_iv, perform_batch_action, take_lock,
+    v4_proto_from_bytes,
+};
 use crate::{
     AlloyMetadata, DocumentId, EncryptedBytes, FieldId, PlaintextBytes, TenantId,
     alloy_client_trait::AlloyClient,
@@ -23,6 +29,7 @@ use ironcore_documents::cmk_edek;
 use ironcore_documents::cmk_edek::EncryptedDek;
 use ironcore_documents::icl_header_v4::v4document_header::EdekWrapper;
 use ironcore_documents::icl_header_v4::{self, V4DocumentHeader};
+use ironcore_documents::v3;
 use ironcore_documents::v4::validate_v4_header;
 use ironcore_documents::v5::key_id_header::{
     EdekType, KeyId, KeyIdHeader, PayloadType, decode_version_prefixed_value,
@@ -257,6 +264,57 @@ impl SaasShieldStandardClient {
             .batch_unwrap_keys(edeks, &request_metadata)
             .await?;
         Ok((batch_unwrap_response, edek_failures))
+    }
+
+    /// Acquire a fresh DEK and a V5 EDEK for streaming encryption. This is the non-legacy path used
+    /// by standard-attached (which is always V5) and by non-attached when `legacy_tsc_write_format`
+    /// is off; the legacy V3 path is handled inline in `create_streaming_encryptor`.
+    pub(crate) async fn streaming_acquire_dek_and_edek(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<(EncryptionKey, EdekWithKeyIdHeader), AlloyError> {
+        let WrapKeyResponse {
+            dek,
+            edek: tsc_edek,
+        } = self
+            .tenant_security_client
+            .wrap_key(&metadata.clone().try_into()?)
+            .await?;
+        let enc_key = tsc_dek_to_encryption_key(dek.0)?;
+        // Reuse the tested V5 encrypt path with an empty document to produce just the EDEK.
+        let edek = self
+            .encrypt_document_v5(
+                self.rng.clone(),
+                tsc_edek.0,
+                enc_key,
+                &metadata.tenant_id,
+                HashMap::new(),
+            )?
+            .edek;
+        Ok((enc_key, edek))
+    }
+
+    /// Generate a fresh IV for streaming encryption using this client's RNG.
+    pub(crate) fn streaming_generate_iv(&self) -> [u8; IV_LEN] {
+        generate_streaming_iv(&self.rng)
+    }
+
+    /// Unwrap the DEK from an EDEK for streaming decryption, validating the EDEK signature.
+    pub(crate) async fn streaming_acquire_decrypt_dek(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptionKey, AlloyError> {
+        let request_metadata = metadata.clone().try_into()?;
+        let edek_parts = self.decompose_edek_header(edek)?;
+        let edek_bytes = edek_parts.get_edek_bytes()?;
+        let UnwrapKeyResponse { dek } = self
+            .tenant_security_client
+            .unwrap_key(edek_bytes, &request_metadata)
+            .await?;
+        let enc_key = tsc_dek_to_encryption_key(dek.0)?;
+        edek_parts.validate_signature(enc_key)?;
+        Ok(enc_key)
     }
 }
 
@@ -558,6 +616,57 @@ impl StandardDocumentOps for SaasShieldStandardClient {
         ))
         .into()
     }
+
+    async fn create_streaming_encryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardEncryptor>, AlloyError> {
+        let iv = generate_streaming_iv(&self.rng);
+        if self.legacy_tsc_write_format {
+            // Streaming honors `legacy_tsc_write_format` exactly like one-shot `encrypt`: the same
+            // TSC-compatibility concerns apply. Write the legacy V3 format — raw TSC EDEK and a
+            // `3IRON` header — with the document body streamed as ordinary AES-GCM.
+            let WrapKeyResponse {
+                dek,
+                edek: tsc_edek,
+            } = self
+                .tenant_security_client
+                .wrap_key(&metadata.clone().try_into()?)
+                .await?;
+            let enc_key = tsc_dek_to_encryption_key(dek.0)?;
+            let header_prefix = build_v3_stream_header(&self.rng, enc_key, &metadata.tenant_id)?;
+            let edek = EdekWithKeyIdHeader(EncryptedBytes(tsc_edek.0));
+            Ok(StreamingStandardEncryptor::new_with_header_prefix(
+                enc_key,
+                edek,
+                iv,
+                header_prefix,
+            ))
+        } else {
+            let (dek, edek) = self.streaming_acquire_dek_and_edek(metadata).await?;
+            Ok(StreamingStandardEncryptor::new(dek, edek, iv))
+        }
+    }
+
+    async fn create_streaming_decryptor(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardDecryptor>, AlloyError> {
+        let dek = self.streaming_acquire_decrypt_dek(edek, metadata).await?;
+        Ok(StreamingStandardDecryptor::new(dek))
+    }
+}
+
+#[async_trait::async_trait]
+impl StreamingDekUnwrapper for SaasShieldStandardClient {
+    async fn unwrap_streaming_dek(
+        &self,
+        edek: EdekWithKeyIdHeader,
+        metadata: &AlloyMetadata,
+    ) -> Result<EncryptionKey, AlloyError> {
+        self.streaming_acquire_decrypt_dek(edek, metadata).await
+    }
 }
 
 #[uniffi::export]
@@ -651,6 +760,41 @@ fn fix_encrypted_dek(
         encryptedDeks: encrypted_deks,
         ..Default::default()
     })
+}
+
+/// Build the legacy V3 (TSC) stream header that prefixes a streamed legacy document:
+/// `3IRON || header_len || V3DocumentHeader`. The document IV is appended separately by the
+/// encryptor, and the streamed body is byte-identical to the one-shot V3 body (plain AES-GCM, no
+/// AAD). A valid header — including the signature over the tenant header, which depends only on the
+/// DEK and tenant, not the document body — is obtained by encrypting an empty document with the
+/// public V3 helper and keeping only the header portion.
+fn build_v3_stream_header(
+    rng: &Mutex<OurReseedingRng>,
+    dek: EncryptionKey,
+    tenant_id: &TenantId,
+) -> Result<Vec<u8>, AlloyError> {
+    let template = v3::encrypt_detached_document(
+        &mut *take_lock(rng),
+        dek,
+        &tenant_id.0,
+        // `aes::PlaintextDocument` (the raw-bytes type) is distinct from the alloy field-map
+        // `PlaintextDocument` imported above, so it's spelled out here.
+        ironcore_documents::aes::PlaintextDocument(Vec::new()),
+    )?;
+    // Layout: [3][IRON][header_len: u16 BE][V3DocumentHeader][document_iv][ciphertext+tag].
+    const MAGIC_AND_LEN: usize = 7; // 3IRON (5) + u16 length (2)
+    let header_len = template
+        .get(5..7)
+        .map(|b| u16::from_be_bytes([b[0], b[1]]) as usize)
+        .ok_or_else(|| AlloyError::EncryptError {
+            msg: "V3 header template was too short.".to_string(),
+        })?;
+    template
+        .get(..MAGIC_AND_LEN + header_len)
+        .map(<[u8]>::to_vec)
+        .ok_or_else(|| AlloyError::EncryptError {
+            msg: "V3 header template was truncated.".to_string(),
+        })
 }
 
 /// V3 encrypt: EDEK is the raw EncryptedDeks protobuf from the TSP (no V4DocumentHeader or
@@ -853,5 +997,70 @@ mod test {
             test_client().get_searchable_edek_prefix(1),
             vec![0, 0, 0, 1, 2, 0]
         );
+    }
+
+    // Legacy V3 streaming doesn't need the TSP: the header is built locally from the DEK + tenant,
+    // and the streaming encryptor/decryptor take the DEK directly. This exercises the full legacy
+    // streaming round-trip plus interop with the one-shot V3 path.
+    #[test]
+    fn legacy_v3_streaming_roundtrips_and_interops_with_one_shot() {
+        let rng = crate::util::create_test_seeded_rng(42);
+        let dek = EncryptionKey([7u8; 32]);
+        let tenant = TenantId("tenant".to_string());
+
+        let header_prefix = build_v3_stream_header(&rng, dek, &tenant).unwrap();
+        assert!(header_prefix.starts_with(&v3::VERSION_AND_MAGIC));
+
+        let iv = [9u8; 12];
+        // The EDEK bytes are opaque to the body; any value works for this body-focused test.
+        let edek = EdekWithKeyIdHeader(EncryptedBytes(vec![1, 2, 3]));
+        let encryptor =
+            StreamingStandardEncryptor::new_with_header_prefix(dek, edek, iv, header_prefix);
+        let plaintext = vec![42u8; 500];
+        let mut edoc = encryptor.encrypt_chunk(plaintext.clone()).unwrap();
+        edoc.extend(encryptor.finish().unwrap());
+        // The streamed document is a real V3 document.
+        assert!(edoc.starts_with(&v3::VERSION_AND_MAGIC));
+
+        // It decrypts via the one-shot V3 path (signature verified + body decrypted).
+        let one_shot = v3::EncryptedPayload::try_from(edoc.clone())
+            .unwrap()
+            .decrypt(&dek)
+            .unwrap();
+        assert_eq!(one_shot.0, plaintext);
+
+        // And via streaming decrypt across odd chunk boundaries.
+        let decryptor = StreamingStandardDecryptor::new(dek);
+        let mut out = Vec::new();
+        for piece in edoc.chunks(7) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec()).unwrap());
+        }
+        out.extend(decryptor.finish().unwrap());
+        assert_eq!(out, plaintext);
+    }
+
+    // A tampered V3 body must fail the body GCM tag at finalize.
+    #[test]
+    fn legacy_v3_streaming_decrypt_detects_body_tampering() {
+        let rng = crate::util::create_test_seeded_rng(42);
+        let dek = EncryptionKey([7u8; 32]);
+        let tenant = TenantId("tenant".to_string());
+        let header_prefix = build_v3_stream_header(&rng, dek, &tenant).unwrap();
+        let iv = [9u8; 12];
+        let edek = EdekWithKeyIdHeader(EncryptedBytes(vec![1, 2, 3]));
+        let encryptor =
+            StreamingStandardEncryptor::new_with_header_prefix(dek, edek, iv, header_prefix);
+        let mut edoc = encryptor.encrypt_chunk(vec![1u8; 200]).unwrap();
+        edoc.extend(encryptor.finish().unwrap());
+        // Flip a byte in the body (after the V3 header + IV).
+        let body_index = edoc.len() - 20;
+        edoc[body_index] ^= 0xff;
+
+        let decryptor = StreamingStandardDecryptor::new(dek);
+        let _ = decryptor.decrypt_chunk(edoc).unwrap();
+        assert!(matches!(
+            decryptor.finish(),
+            Err(AlloyError::DecryptError { .. })
+        ));
     }
 }

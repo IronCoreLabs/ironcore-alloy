@@ -1,4 +1,5 @@
 use super::{config::StandaloneConfiguration, standard::StandaloneStandardClient};
+use crate::streaming::{StreamingStandardAttachedDecryptor, StreamingStandardAttachedEncryptor};
 use crate::{
     AlloyMetadata, TenantId,
     errors::AlloyError,
@@ -11,16 +12,19 @@ use crate::{
         encrypt_core, rekey_core,
     },
 };
+use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct StandaloneStandardAttachedClient {
-    standard_client: StandaloneStandardClient,
+    // Behind an `Arc` so it can be handed to the streaming attached decryptor as the
+    // `StreamingDekUnwrapper` that unwraps the inline EDEK once it's parsed off the stream.
+    standard_client: Arc<StandaloneStandardClient>,
 }
 
 impl StandaloneStandardAttachedClient {
     pub(crate) fn new(config: StandaloneConfiguration) -> Self {
         Self {
-            standard_client: StandaloneStandardClient::new(config),
+            standard_client: Arc::new(StandaloneStandardClient::new(config)),
         }
     }
 }
@@ -36,7 +40,12 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
         plaintext_document: PlaintextAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedAttachedDocument, AlloyError> {
-        encrypt_core(&self.standard_client, plaintext_document.0, metadata).await
+        encrypt_core(
+            self.standard_client.as_ref(),
+            plaintext_document.0,
+            metadata,
+        )
+        .await
     }
 
     /// Encrypt multiple documents with the provided metadata.
@@ -46,7 +55,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
         plaintext_documents: PlaintextAttachedDocuments,
         metadata: &AlloyMetadata,
     ) -> Result<StandardAttachedEncryptBatchResult, AlloyError> {
-        encrypt_batch_core(&self.standard_client, plaintext_documents, metadata).await
+        encrypt_batch_core(self.standard_client.as_ref(), plaintext_documents, metadata).await
     }
 
     /// Decrypt a document that was encrypted with the provided metadata.
@@ -56,7 +65,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
         encrypted_document: EncryptedAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
-        decrypt_core(&self.standard_client, encrypted_document, metadata)
+        decrypt_core(self.standard_client.as_ref(), encrypted_document, metadata)
             .await
             .map(PlaintextAttachedDocument)
     }
@@ -68,7 +77,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
         encrypted_documents: EncryptedAttachedDocuments,
         metadata: &AlloyMetadata,
     ) -> Result<StandardAttachedDecryptBatchResult, AlloyError> {
-        decrypt_batch_core(&self.standard_client, encrypted_documents, metadata).await
+        decrypt_batch_core(self.standard_client.as_ref(), encrypted_documents, metadata).await
     }
 
     /// Decrypt the provided documents and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
@@ -80,7 +89,7 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyAttachedDocumentsBatchResult, AlloyError> {
         rekey_core(
-            &self.standard_client,
+            self.standard_client.as_ref(),
             encrypted_documents,
             metadata,
             new_tenant_id,
@@ -97,6 +106,27 @@ impl StandardAttachedDocumentOps for StandaloneStandardAttachedClient {
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         self.standard_client.get_searchable_edek_prefix(id)
     }
+
+    async fn create_streaming_attached_encryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardAttachedEncryptor>, AlloyError> {
+        let (dek, edek) = self
+            .standard_client
+            .streaming_acquire_dek_and_edek(metadata)?;
+        let iv = self.standard_client.streaming_generate_iv();
+        StreamingStandardAttachedEncryptor::new(dek, edek, iv)
+    }
+
+    async fn create_streaming_attached_decryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardAttachedDecryptor>, AlloyError> {
+        Ok(StreamingStandardAttachedDecryptor::new(
+            self.standard_client.clone(),
+            metadata.clone(),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -109,7 +139,9 @@ mod test {
 
     fn new_client(primary_secret_id: Option<u32>) -> StandaloneStandardAttachedClient {
         StandaloneStandardAttachedClient {
-            standard_client: crate::standalone::standard::test::new_client(primary_secret_id),
+            standard_client: Arc::new(crate::standalone::standard::test::new_client(
+                primary_secret_id,
+            )),
         }
     }
     #[tokio::test]
@@ -219,5 +251,115 @@ mod test {
             .unwrap();
         let result = client.decrypt(encrypted, &metadata).await.unwrap();
         assert_eq!(result.0, plaintext);
+    }
+
+    async fn stream_attached_encrypt(
+        client: &StandaloneStandardAttachedClient,
+        metadata: &AlloyMetadata,
+        chunks: &[&[u8]],
+    ) -> Vec<u8> {
+        let encryptor = client
+            .create_streaming_attached_encryptor(metadata)
+            .await
+            .unwrap();
+        let mut blob = Vec::new();
+        for chunk in chunks {
+            blob.extend(encryptor.encrypt_chunk(chunk.to_vec()).unwrap());
+        }
+        blob.extend(encryptor.finish().unwrap());
+        blob
+    }
+
+    // Feed the whole attached document through the decryptor in `chunk`-sized pieces. The inline
+    // EDEK + IV are parsed off the front of the stream internally — the caller never splits them out.
+    async fn stream_attached_decrypt(
+        client: &StandaloneStandardAttachedClient,
+        metadata: &AlloyMetadata,
+        blob: &[u8],
+        chunk: usize,
+    ) -> Result<Vec<u8>, AlloyError> {
+        let decryptor = client.create_streaming_attached_decryptor(metadata).await?;
+        let mut out = Vec::new();
+        for piece in blob.chunks(chunk.max(1)) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec()).await?);
+        }
+        out.extend(decryptor.finish().await?);
+        Ok(out)
+    }
+
+    #[tokio::test]
+    async fn streaming_attached_encrypt_then_one_shot_decrypt() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
+        let plaintext = vec![55u8; 4000];
+        let blob = stream_attached_encrypt(
+            &client,
+            &metadata,
+            &[&plaintext[..1500], &plaintext[1500..]],
+        )
+        .await;
+        // The streamed blob is a normal V5 attached document the one-shot path decrypts.
+        let decrypted = client
+            .decrypt(EncryptedAttachedDocument(blob.into()), &metadata)
+            .await
+            .unwrap();
+        assert_eq!(decrypted.0, PlaintextBytes(plaintext));
+    }
+
+    #[tokio::test]
+    async fn one_shot_attached_encrypt_then_streaming_decrypt() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
+        let plaintext = vec![9u8; 4000];
+        let encrypted = client
+            .encrypt(
+                PlaintextAttachedDocument(PlaintextBytes(plaintext.clone())),
+                &metadata,
+            )
+            .await
+            .unwrap();
+        let blob = encrypted.0.0;
+        // Whole blob fed normally, parsed off the front for us.
+        let decrypted = stream_attached_decrypt(&client, &metadata, &blob, 64)
+            .await
+            .unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[tokio::test]
+    async fn streaming_attached_roundtrip() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
+        let plaintext: Vec<u8> = (0..800u32).map(|i| i as u8).collect();
+        let blob = stream_attached_encrypt(&client, &metadata, &[&plaintext]).await;
+        let decrypted = stream_attached_decrypt(&client, &metadata, &blob, 33)
+            .await
+            .unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[tokio::test]
+    async fn streaming_attached_decrypt_handles_one_byte_chunks() {
+        // Feeding the stream a byte at a time exercises the internal header buffering: the caller
+        // never has to know where the inline EDEK ends.
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
+        let plaintext: Vec<u8> = (0..300u32).map(|i| i as u8).collect();
+        let blob = stream_attached_encrypt(&client, &metadata, &[&plaintext]).await;
+        let decrypted = stream_attached_decrypt(&client, &metadata, &blob, 1)
+            .await
+            .unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[tokio::test]
+    async fn streaming_attached_tampered_fails_at_finalize() {
+        let client = default_client();
+        let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
+        let mut blob = stream_attached_encrypt(&client, &metadata, &[&[3u8; 300]]).await;
+        let last = blob.len() - 1;
+        blob[last] ^= 0x01; // corrupt the tag
+        let result = stream_attached_decrypt(&client, &metadata, &blob, 64).await;
+        assert!(matches!(result, Err(AlloyError::DecryptError { .. })));
     }
 }

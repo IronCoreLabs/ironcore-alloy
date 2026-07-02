@@ -7,6 +7,7 @@ use crate::{
         EdekWithKeyIdHeader, EncryptedDocument, EncryptedDocuments, PlaintextDocument,
         PlaintextDocuments, StandardDocumentOps,
     },
+    streaming::{StreamingStandardAttachedDecryptor, StreamingStandardAttachedEncryptor},
     util::{BatchResult, perform_batch_action, v4_proto_from_bytes},
 };
 use bytes::Bytes;
@@ -21,6 +22,7 @@ use ironcore_documents::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::collections::HashMap;
+use std::sync::Arc;
 use uniffi::custom_newtype;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,6 +105,26 @@ pub trait StandardAttachedDocumentOps: Send + Sync {
     /// Note that this will not work for matching values that don't use our key_id_header format, such as Cloaked Search
     /// or legacy TSC data.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8>;
+    /// Create a streaming encryptor for a single large attached value. A DEK is generated/acquired
+    /// and the EDEK is written inline at the front of the stream (so there is nothing separate to
+    /// store). Drive the returned object with repeated `encrypt_chunk` calls followed by a single
+    /// `finish`; the concatenated output is a standard V5 attached document that decrypts with
+    /// either streaming or one-shot decrypt.
+    async fn create_streaming_attached_encryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardAttachedEncryptor>, AlloyError>;
+    /// Create a streaming decryptor for an attached value. Feed the attached document to the
+    /// returned object's `decrypt_chunk` exactly as it comes off the wire, from the very start — the
+    /// inline EDEK and IV are parsed off the front of the stream for you, so you never need to know
+    /// or split the attached header format. Only the V5 attached format is supported.
+    ///
+    /// WARNING: `decrypt_chunk` releases plaintext before the authentication tag is verified. See
+    /// `StreamingStandardAttachedDecryptor` for the rollback-on-failure contract you must follow.
+    async fn create_streaming_attached_decryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardAttachedDecryptor>, AlloyError>;
 }
 
 /// Turns the encrypted document into an attached document.

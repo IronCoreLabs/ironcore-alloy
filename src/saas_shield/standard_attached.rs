@@ -13,18 +13,21 @@ use crate::{
 };
 
 use super::{SaasShieldSecurityEventOps, SecurityEvent, standard::SaasShieldStandardClient};
+use crate::streaming::{StreamingStandardAttachedDecryptor, StreamingStandardAttachedEncryptor};
 use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardAttachedClient {
-    standard_client: SaasShieldStandardClient,
+    // Behind an `Arc` so it can be handed to the streaming attached decryptor as the
+    // `StreamingDekUnwrapper` that unwraps the inline EDEK once it's parsed off the stream.
+    standard_client: Arc<SaasShieldStandardClient>,
 }
 
 impl SaasShieldStandardAttachedClient {
     pub(crate) fn new(tenant_security_client: Arc<TenantSecurityClient>) -> Self {
         Self {
             // Attached always uses V5. There is no TSC equivalent of attached encryption.
-            standard_client: SaasShieldStandardClient::new(tenant_security_client, false),
+            standard_client: Arc::new(SaasShieldStandardClient::new(tenant_security_client, false)),
         }
     }
 }
@@ -40,7 +43,12 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
         plaintext_document: PlaintextAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<EncryptedAttachedDocument, AlloyError> {
-        encrypt_core(&self.standard_client, plaintext_document.0, metadata).await
+        encrypt_core(
+            self.standard_client.as_ref(),
+            plaintext_document.0,
+            metadata,
+        )
+        .await
     }
 
     /// Encrypt multiple documents with the provided metadata.
@@ -50,7 +58,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
         plaintext_documents: PlaintextAttachedDocuments,
         metadata: &AlloyMetadata,
     ) -> Result<StandardAttachedEncryptBatchResult, AlloyError> {
-        encrypt_batch_core(&self.standard_client, plaintext_documents, metadata).await
+        encrypt_batch_core(self.standard_client.as_ref(), plaintext_documents, metadata).await
     }
 
     /// Decrypt a document that was encrypted with the provided metadata.
@@ -60,7 +68,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
         attached_document: EncryptedAttachedDocument,
         metadata: &AlloyMetadata,
     ) -> Result<PlaintextAttachedDocument, AlloyError> {
-        decrypt_core(&self.standard_client, attached_document, metadata)
+        decrypt_core(self.standard_client.as_ref(), attached_document, metadata)
             .await
             .map(PlaintextAttachedDocument)
     }
@@ -72,7 +80,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
         encrypted_documents: EncryptedAttachedDocuments,
         metadata: &AlloyMetadata,
     ) -> Result<StandardAttachedDecryptBatchResult, AlloyError> {
-        decrypt_batch_core(&self.standard_client, encrypted_documents, metadata).await
+        decrypt_batch_core(self.standard_client.as_ref(), encrypted_documents, metadata).await
     }
 
     /// Decrypt the provided documents and re-encrypt them using the tenant's current key. If `new_tenant_id` is `None`,
@@ -84,7 +92,7 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
         new_tenant_id: Option<TenantId>,
     ) -> Result<RekeyAttachedDocumentsBatchResult, AlloyError> {
         rekey_core(
-            &self.standard_client,
+            self.standard_client.as_ref(),
             encrypted_documents,
             metadata,
             new_tenant_id,
@@ -100,6 +108,28 @@ impl StandardAttachedDocumentOps for SaasShieldStandardAttachedClient {
     /// Note that this will not work for matching values that don't use our key_id_header format, such as cloaked search.
     fn get_searchable_edek_prefix(&self, id: i32) -> Vec<u8> {
         self.standard_client.get_searchable_edek_prefix(id)
+    }
+
+    async fn create_streaming_attached_encryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardAttachedEncryptor>, AlloyError> {
+        let (dek, edek) = self
+            .standard_client
+            .streaming_acquire_dek_and_edek(metadata)
+            .await?;
+        let iv = self.standard_client.streaming_generate_iv();
+        StreamingStandardAttachedEncryptor::new(dek, edek, iv)
+    }
+
+    async fn create_streaming_attached_decryptor(
+        &self,
+        metadata: &AlloyMetadata,
+    ) -> Result<Arc<StreamingStandardAttachedDecryptor>, AlloyError> {
+        Ok(StreamingStandardAttachedDecryptor::new(
+            self.standard_client.clone(),
+            metadata.clone(),
+        ))
     }
 }
 

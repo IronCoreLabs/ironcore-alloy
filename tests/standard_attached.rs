@@ -225,4 +225,74 @@ mod tests {
         assert_eq!(decrypted, get_plaintext());
         Ok(())
     }
+
+    #[tokio::test]
+    async fn standard_attached_streaming_encrypt_then_one_shot_decrypt() -> TestResult {
+        let metadata = get_metadata();
+        let plaintext = vec![55u8; 4000];
+        let encryptor = get_client()
+            .standard_attached()
+            .create_streaming_attached_encryptor(&metadata)
+            .await?;
+        let mut blob = encryptor.encrypt_chunk(plaintext[..1500].to_vec())?;
+        blob.extend(encryptor.encrypt_chunk(plaintext[1500..].to_vec())?);
+        blob.extend(encryptor.finish()?);
+        // The streamed blob is a normal V5 attached document one-shot decrypt handles.
+        let decrypted = get_client()
+            .standard_attached()
+            .decrypt(EncryptedAttachedDocument(blob.into()), &metadata)
+            .await?;
+        assert_eq!(decrypted.0, PlaintextBytes(plaintext));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_attached_one_shot_encrypt_then_streaming_decrypt() -> TestResult {
+        let metadata = get_metadata();
+        let plaintext = vec![9u8; 4000];
+        let encrypted = get_client()
+            .standard_attached()
+            .encrypt(
+                PlaintextAttachedDocument(PlaintextBytes(plaintext.clone())),
+                &metadata,
+            )
+            .await?;
+        let blob = encrypted.0.0;
+        // Feed the blob to the decryptor exactly as it comes off the wire; the inline EDEK + IV are
+        // parsed off the front for us.
+        let decryptor = get_client()
+            .standard_attached()
+            .create_streaming_attached_decryptor(&metadata)
+            .await?;
+        let mut out = Vec::new();
+        for piece in blob.chunks(7) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec()).await?);
+        }
+        out.extend(decryptor.finish().await?);
+        assert_eq!(out, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_attached_streaming_roundtrip() -> TestResult {
+        let metadata = get_metadata();
+        let plaintext: Vec<u8> = (0..2500u32).map(|i| i as u8).collect();
+        let encryptor = get_client()
+            .standard_attached()
+            .create_streaming_attached_encryptor(&metadata)
+            .await?;
+        let mut blob = encryptor.encrypt_chunk(plaintext.clone())?;
+        blob.extend(encryptor.finish()?);
+        let decryptor = get_client()
+            .standard_attached()
+            .create_streaming_attached_decryptor(&metadata)
+            .await?;
+        let mut out = Vec::new();
+        for piece in blob.chunks(33) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec()).await?);
+        }
+        out.extend(decryptor.finish().await?);
+        assert_eq!(out, plaintext);
+        Ok(())
+    }
 }

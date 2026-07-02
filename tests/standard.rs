@@ -430,6 +430,107 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn standard_streaming_encrypt_then_one_shot_decrypt() -> TestResult {
+        let metadata = get_metadata();
+        let plaintext = vec![42u8; 5000];
+        let encryptor = get_client()
+            .standard()
+            .create_streaming_encryptor(&metadata)
+            .await?;
+        let mut edoc = encryptor.encrypt_chunk(plaintext[..2000].to_vec())?;
+        edoc.extend(encryptor.encrypt_chunk(plaintext[2000..].to_vec())?);
+        edoc.extend(encryptor.finish()?);
+        // The streamed edoc is a normal V5 edoc that one-shot decrypt handles.
+        let document = EncryptedDocument {
+            edek: encryptor.edek(),
+            document: [(FieldId("field".to_string()), EncryptedBytes(edoc))].into(),
+        };
+        let decrypted = get_client().standard().decrypt(document, &metadata).await?;
+        assert_eq!(
+            decrypted.0.get(&FieldId("field".to_string())).unwrap().0,
+            plaintext
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_one_shot_encrypt_then_streaming_decrypt() -> TestResult {
+        let metadata = get_metadata();
+        let plaintext = vec![7u8; 5000];
+        let encrypted = get_client()
+            .standard()
+            .encrypt(
+                PlaintextDocument(
+                    [(FieldId("field".to_string()), plaintext.clone().into())].into(),
+                ),
+                &metadata,
+            )
+            .await?;
+        let edoc = encrypted
+            .document
+            .get(&FieldId("field".to_string()))
+            .unwrap()
+            .0
+            .clone();
+        let decryptor = get_client()
+            .standard()
+            .create_streaming_decryptor(encrypted.edek, &metadata)
+            .await?;
+        let mut out = Vec::new();
+        for piece in edoc.chunks(13) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec())?);
+        }
+        out.extend(decryptor.finish()?);
+        assert_eq!(out, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_streaming_roundtrip() -> TestResult {
+        let metadata = get_metadata();
+        let plaintext: Vec<u8> = (0..3000u32).map(|i| i as u8).collect();
+        let encryptor = get_client()
+            .standard()
+            .create_streaming_encryptor(&metadata)
+            .await?;
+        let mut edoc = encryptor.encrypt_chunk(plaintext.clone())?;
+        edoc.extend(encryptor.finish()?);
+        let decryptor = get_client()
+            .standard()
+            .create_streaming_decryptor(encryptor.edek(), &metadata)
+            .await?;
+        let mut out = Vec::new();
+        for piece in edoc.chunks(17) {
+            out.extend(decryptor.decrypt_chunk(piece.to_vec())?);
+        }
+        out.extend(decryptor.finish()?);
+        assert_eq!(out, plaintext);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn standard_streaming_decrypt_tampered_fails() -> TestResult {
+        let metadata = get_metadata();
+        let encryptor = get_client()
+            .standard()
+            .create_streaming_encryptor(&metadata)
+            .await?;
+        let mut edoc = encryptor.encrypt_chunk(vec![1u8; 500])?;
+        edoc.extend(encryptor.finish()?);
+        edoc[20] ^= 0xff; // corrupt a ciphertext byte after the 0IRON + IV prefix
+        let decryptor = get_client()
+            .standard()
+            .create_streaming_decryptor(encryptor.edek(), &metadata)
+            .await?;
+        let _ = decryptor.decrypt_chunk(edoc)?;
+        assert!(matches!(
+            decryptor.finish(),
+            Err(AlloyError::DecryptError { .. })
+        ));
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_error_variant() -> TestResult {
         let encrypted = get_ciphertext();
         let metadata = AlloyMetadata::new_simple(TenantId("fake-tenant".to_string()));
