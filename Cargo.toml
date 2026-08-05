@@ -43,7 +43,7 @@ bindgen = ["uniffi/cli", "dep:uniffi-bindgen-java"]
 [dependencies]
 aes-siv = "0.7"
 async-trait = "0.1.89"
-base64 = "0.22"
+base64 = "0.23"
 base64_type = "0.2"
 bytes = { version = "1.11.1", features = ["serde"] }
 convert_case = "0.11.0"
@@ -73,7 +73,7 @@ z85 = "3.0.7"
 approx = "0.5.1"
 ascii85 = "0.2.1"
 assertables = "10.1.0"
-base64 = "0.22.0"
+base64 = "0.23.0"
 base85 = "2.0.0"
 camino = "1.2"
 # must be the same as uniffi/uniffi-bindgen-java
