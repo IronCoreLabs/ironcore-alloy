@@ -28,10 +28,11 @@ jobs:
           cache-provider: github
       - name: Build Rust examples
         run: |
-          mapfile -t manifests < <(find examples/rust -mindepth 2 -name Cargo.toml | sort)
+          mapfile -t manifests < <(find examples/rust example-integrations \
+            -mindepth 2 -name Cargo.toml -not -path '*/target/*' | sort)
           # Guard against a silently-passing job if the examples ever move.
           if [ ${#manifests[@]} -eq 0 ]; then
-            echo "No example crates found under examples/rust" >&2
+            echo "No example crates found" >&2
             exit 1
           fi
           for manifest in "${manifests[@]}"; do
