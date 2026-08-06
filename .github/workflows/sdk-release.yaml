@@ -19,7 +19,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           path: ${{ github.workspace }}/kotlin/src/main/resources/
@@ -55,7 +55,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -95,7 +95,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           path: ${{ github.workspace }}/python/ironcore-alloy
@@ -132,7 +132,7 @@ jobs:
     needs: generate-cdylibs
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: ubuntu-24.04-
@@ -197,7 +197,7 @@ jobs:
     needs: [kotlin-release, python-release, java-release, rust-release, build-docs]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.tag_name }}
       - name: Mark GitHub release as not prerelease

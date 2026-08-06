@@ -802,7 +802,7 @@ mod test {
     const KEY: [u8; 32] = [7u8; 32];
     const IV: [u8; IV_LEN] = [9u8; IV_LEN];
 
-    /// One-shot AES-256-GCM via the same `aes-gcm` crate alloy/ironcore-documents use, producing
+    /// One-shot AES-256-GCM via the same `aes-gcm` crate ironcore-documents uses, producing
     /// `ciphertext || tag` — the load-bearing reference for byte-compatibility.
     fn one_shot(key: &[u8; 32], iv: &[u8; IV_LEN], plaintext: &[u8]) -> Vec<u8> {
         let cipher = Aes256Gcm::new(GenericArray::from_slice(key));

@@ -3,7 +3,7 @@ use crate::{
     TenantId, create_batch_result_struct, create_batch_result_struct_using_newtype,
     errors::AlloyError, util,
 };
-use aes_gcm::KeyInit;
+use aes_siv::KeyInit;
 use aes_siv::siv::Aes256Siv;
 use bytes::Bytes;
 use ironcore_documents::{impl_secret_debug, v5::key_id_header::KeyIdHeader};

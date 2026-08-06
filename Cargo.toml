@@ -1,6 +1,6 @@
 [package]
 name = "ironcore-alloy"
-version = "0.15.3-pre.9"
+version = "0.15.3-pre.16"
 description = "IronCore Labs SDK for all your different Application Layer Encryption needs"
 authors = ["IronCore Labs <info@ironcorelabs.com>"]
 edition = "2024"
@@ -42,19 +42,17 @@ bindgen = ["uniffi/cli", "dep:uniffi-bindgen-java"]
 
 [dependencies]
 aes = "0.8"
-aes-gcm = "0.10"
 aes-siv = "0.7"
 async-trait = "0.1.89"
-base64 = "0.22"
+base64 = "0.23"
 base64_type = "0.2"
 bytes = { version = "1.11.1", features = ["serde"] }
 convert_case = "0.11.0"
 ctr = "0.9"
 futures = "0.3.32"
 ghash = "0.5"
-hmac = { version = "0.12.1", features = ["std"] }
-ironcore-documents = "0.3.1"
-itertools = "0.14"
+ironcore-documents = "0.3.2"
+itertools = "0.15"
 ndarray = "0.17"
 protobuf = { version = "3.3", features = ["with-bytes"] }
 rand = "0.10"
@@ -76,10 +74,11 @@ uniffi-bindgen-java = { version = "0.4.1", optional = true }
 z85 = "3.0.7"
 
 [dev-dependencies]
+aes-gcm = "0.10"
 approx = "0.5.1"
 ascii85 = "0.2.1"
 assertables = "10.1.0"
-base64 = "0.22.0"
+base64 = "0.23.0"
 base85 = "2.0.0"
 camino = "1.2"
 # must be the same as uniffi/uniffi-bindgen-java
