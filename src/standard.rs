@@ -178,10 +178,10 @@ pub trait StandardDocumentOps: Send + Sync + AlloyClient {
     /// Create a streaming encryptor for a single large value. A DEK is generated/acquired and a fresh
     /// EDEK is produced, both available immediately from the returned object. Drive the returned
     /// object with repeated `encrypt_chunk` calls followed by a single `finish`; the concatenated
-    /// output is a standard V5 edoc that decrypts with either streaming or one-shot decrypt. The
+    /// output is a standard edoc that decrypts with either streaming or one-shot decrypt. The
     /// EDEK must be stored separately (see `StreamingStandardEncryptor.edek`).
     ///
-    /// Streaming always writes the V5 format, ignoring the `legacy_tsc_write_format` setting.
+    /// The written format follows `legacy_tsc_write_format` exactly as one-shot `encrypt` does.
     async fn create_streaming_encryptor(
         &self,
         metadata: &AlloyMetadata,

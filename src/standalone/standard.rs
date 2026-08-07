@@ -194,12 +194,10 @@ impl StandaloneStandardClient {
         Ok((aes_dek, edek))
     }
 
-    /// Generate a fresh IV for streaming encryption using this client's RNG.
     pub(crate) fn streaming_generate_iv(&self) -> [u8; IV_LEN] {
         generate_streaming_iv(&self.rng)
     }
 
-    /// Decrypt the DEK from an EDEK for streaming decryption.
     pub(crate) fn streaming_acquire_decrypt_dek(
         &self,
         edek: EdekWithKeyIdHeader,
@@ -754,7 +752,6 @@ pub(crate) mod test {
         assert_eq!(result, vec![0, 0, 0, 100, 130, 0]);
     }
 
-    // Drive a streaming encryptor over the given plaintext chunks and return (edek, full edoc).
     async fn stream_encrypt(
         client: &StandaloneStandardClient,
         metadata: &AlloyMetadata,
@@ -769,7 +766,6 @@ pub(crate) mod test {
         (encryptor.edek(), edoc)
     }
 
-    // Drive a streaming decryptor over the edoc, splitting into `chunk`-sized pieces.
     async fn stream_decrypt(
         client: &StandaloneStandardClient,
         metadata: &AlloyMetadata,
@@ -804,7 +800,6 @@ pub(crate) mod test {
             &[&plaintext[..2000], &plaintext[2000..]],
         )
         .await;
-        // The streamed edoc is a normal V5 edoc that the one-shot path decrypts.
         let document = EncryptedDocument {
             edek,
             document: [(field(), EncryptedBytes(edoc))].into(),
@@ -826,7 +821,7 @@ pub(crate) mod test {
             .await
             .unwrap();
         let edoc = encrypted.document[&field()].0.clone();
-        // Decrypt the one-shot edoc via streaming across odd chunk boundaries.
+        // 13 straddles both the 16-byte block boundary and the held-back tag.
         let decrypted = stream_decrypt(&client, &metadata, encrypted.edek, &edoc, 13)
             .await
             .unwrap();

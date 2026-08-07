@@ -440,7 +440,6 @@ mod tests {
         let mut edoc = encryptor.encrypt_chunk(plaintext[..2000].to_vec())?;
         edoc.extend(encryptor.encrypt_chunk(plaintext[2000..].to_vec())?);
         edoc.extend(encryptor.finish()?);
-        // The streamed edoc is a normal V5 edoc that one-shot decrypt handles.
         let document = EncryptedDocument {
             edek: encryptor.edek(),
             document: [(FieldId("field".to_string()), EncryptedBytes(edoc))].into(),

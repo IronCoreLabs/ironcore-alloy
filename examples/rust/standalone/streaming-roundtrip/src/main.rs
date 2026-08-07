@@ -130,7 +130,7 @@ async fn encrypt_file(
 ///
 /// IMPORTANT: streaming decrypt releases plaintext chunks *before* the authentication tag is
 /// verified (the tag is at the very end of the stream). We therefore write to a temporary file and
-/// only commit it — rename it into place — once `finish` confirms the tag. If verification fails the
+/// only commit it (rename it into place) once `finish` confirms the tag. If verification fails the
 /// temp file is deleted, so unverified plaintext is never exposed as the real output. Any program
 /// that acts on streamed plaintext as it arrives must be able to roll back like this on failure.
 async fn decrypt_file(

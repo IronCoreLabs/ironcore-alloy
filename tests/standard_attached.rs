@@ -237,7 +237,6 @@ mod tests {
         let mut blob = encryptor.encrypt_chunk(plaintext[..1500].to_vec())?;
         blob.extend(encryptor.encrypt_chunk(plaintext[1500..].to_vec())?);
         blob.extend(encryptor.finish()?);
-        // The streamed blob is a normal V5 attached document one-shot decrypt handles.
         let decrypted = get_client()
             .standard_attached()
             .decrypt(EncryptedAttachedDocument(blob.into()), &metadata)
@@ -258,8 +257,6 @@ mod tests {
             )
             .await?;
         let blob = encrypted.0.0;
-        // Feed the blob to the decryptor exactly as it comes off the wire; the inline EDEK + IV are
-        // parsed off the front for us.
         let decryptor = get_client()
             .standard_attached()
             .create_streaming_attached_decryptor(&metadata)

@@ -18,8 +18,8 @@ use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct SaasShieldStandardAttachedClient {
-    // Behind an `Arc` so it can be handed to the streaming attached decryptor as the
-    // `StreamingDekUnwrapper` that unwraps the inline EDEK once it's parsed off the stream.
+    // Behind an `Arc` so it can be handed to the streaming attached decryptor as its
+    // `StreamingDekUnwrapper`.
     standard_client: Arc<SaasShieldStandardClient>,
 }
 

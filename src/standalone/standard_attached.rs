@@ -16,8 +16,8 @@ use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct StandaloneStandardAttachedClient {
-    // Behind an `Arc` so it can be handed to the streaming attached decryptor as the
-    // `StreamingDekUnwrapper` that unwraps the inline EDEK once it's parsed off the stream.
+    // Behind an `Arc` so it can be handed to the streaming attached decryptor as its
+    // `StreamingDekUnwrapper`.
     standard_client: Arc<StandaloneStandardClient>,
 }
 
@@ -270,8 +270,6 @@ mod test {
         blob
     }
 
-    // Feed the whole attached document through the decryptor in `chunk`-sized pieces. The inline
-    // EDEK + IV are parsed off the front of the stream internally — the caller never splits them out.
     async fn stream_attached_decrypt(
         client: &StandaloneStandardAttachedClient,
         metadata: &AlloyMetadata,
@@ -298,7 +296,6 @@ mod test {
             &[&plaintext[..1500], &plaintext[1500..]],
         )
         .await;
-        // The streamed blob is a normal V5 attached document the one-shot path decrypts.
         let decrypted = client
             .decrypt(EncryptedAttachedDocument(blob.into()), &metadata)
             .await
@@ -319,7 +316,6 @@ mod test {
             .await
             .unwrap();
         let blob = encrypted.0.0;
-        // Whole blob fed normally, parsed off the front for us.
         let decrypted = stream_attached_decrypt(&client, &metadata, &blob, 64)
             .await
             .unwrap();
@@ -340,8 +336,7 @@ mod test {
 
     #[tokio::test]
     async fn streaming_attached_decrypt_handles_one_byte_chunks() {
-        // Feeding the stream a byte at a time exercises the internal header buffering: the caller
-        // never has to know where the inline EDEK ends.
+        // A chunk smaller than the inline EDEK would fail without the decryptor's header buffering.
         let client = default_client();
         let metadata = AlloyMetadata::new_simple(crate::TenantId("tenant".to_string()));
         let plaintext: Vec<u8> = (0..300u32).map(|i| i as u8).collect();

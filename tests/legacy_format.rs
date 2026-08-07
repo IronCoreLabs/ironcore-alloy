@@ -322,8 +322,6 @@ mod tests {
             .await?;
         let mut edoc = encryptor.encrypt_chunk(vec![1, 2, 3])?;
         edoc.extend(encryptor.finish()?);
-        // The EDEK and the streamed document are in the configured format, just like one-shot
-        // `encrypt` — the legacy compatibility concerns apply to streaming too.
         format.assert(&encryptor.edek());
         let expected_magic: &[u8] = match format {
             EdekFormat::V3 => &[3, 73, 82, 79, 78],

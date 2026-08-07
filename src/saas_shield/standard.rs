@@ -266,9 +266,8 @@ impl SaasShieldStandardClient {
         Ok((batch_unwrap_response, edek_failures))
     }
 
-    /// Acquire a fresh DEK and a V5 EDEK for streaming encryption. This is the non-legacy path used
-    /// by standard-attached (which is always V5) and by non-attached when `legacy_tsc_write_format`
-    /// is off; the legacy V3 path is handled inline in `create_streaming_encryptor`.
+    /// Acquire a fresh DEK and a V5 EDEK for streaming encryption. The legacy V3 counterpart lives
+    /// inline in `create_streaming_encryptor`.
     pub(crate) async fn streaming_acquire_dek_and_edek(
         &self,
         metadata: &AlloyMetadata,
@@ -281,7 +280,7 @@ impl SaasShieldStandardClient {
             .wrap_key(&metadata.clone().try_into()?)
             .await?;
         let enc_key = tsc_dek_to_encryption_key(dek.0)?;
-        // Reuse the tested V5 encrypt path with an empty document to produce just the EDEK.
+        // Reuse the V5 encrypt path with an empty document to produce just the EDEK.
         let edek = self
             .encrypt_document_v5(
                 self.rng.clone(),
@@ -294,7 +293,6 @@ impl SaasShieldStandardClient {
         Ok((enc_key, edek))
     }
 
-    /// Generate a fresh IV for streaming encryption using this client's RNG.
     pub(crate) fn streaming_generate_iv(&self) -> [u8; IV_LEN] {
         generate_streaming_iv(&self.rng)
     }
@@ -623,9 +621,8 @@ impl StandardDocumentOps for SaasShieldStandardClient {
     ) -> Result<Arc<StreamingStandardEncryptor>, AlloyError> {
         let iv = generate_streaming_iv(&self.rng);
         if self.legacy_tsc_write_format {
-            // Streaming honors `legacy_tsc_write_format` exactly like one-shot `encrypt`: the same
-            // TSC-compatibility concerns apply. Write the legacy V3 format — raw TSC EDEK and a
-            // `3IRON` header — with the document body streamed as ordinary AES-GCM.
+            // Legacy V3: a raw TSC EDEK and a `3IRON` header, with the body streamed as ordinary
+            // AES-GCM just like V5.
             let WrapKeyResponse {
                 dek,
                 edek: tsc_edek,
@@ -763,11 +760,11 @@ fn fix_encrypted_dek(
 }
 
 /// Build the legacy V3 (TSC) stream header that prefixes a streamed legacy document:
-/// `3IRON || header_len || V3DocumentHeader`. The document IV is appended separately by the
-/// encryptor, and the streamed body is byte-identical to the one-shot V3 body (plain AES-GCM, no
-/// AAD). A valid header — including the signature over the tenant header, which depends only on the
-/// DEK and tenant, not the document body — is obtained by encrypting an empty document with the
-/// public V3 helper and keeping only the header portion.
+/// `3IRON || header_len || V3DocumentHeader`. The IV is appended separately by the encryptor.
+///
+/// Encrypting an empty document and keeping only the header is a valid way to get one because the
+/// header's signature covers the tenant header alone: it depends on the DEK and tenant, not the
+/// document body.
 fn build_v3_stream_header(
     rng: &Mutex<OurReseedingRng>,
     dek: EncryptionKey,
@@ -777,8 +774,7 @@ fn build_v3_stream_header(
         &mut *take_lock(rng),
         dek,
         &tenant_id.0,
-        // `aes::PlaintextDocument` (the raw-bytes type) is distinct from the alloy field-map
-        // `PlaintextDocument` imported above, so it's spelled out here.
+        // Spelled out: distinct from the alloy field-map `PlaintextDocument` imported above.
         ironcore_documents::aes::PlaintextDocument(Vec::new()),
     )?;
     // Layout: [3][IRON][header_len: u16 BE][V3DocumentHeader][document_iv][ciphertext+tag].
@@ -999,9 +995,8 @@ mod test {
         );
     }
 
-    // Legacy V3 streaming doesn't need the TSP: the header is built locally from the DEK + tenant,
-    // and the streaming encryptor/decryptor take the DEK directly. This exercises the full legacy
-    // streaming round-trip plus interop with the one-shot V3 path.
+    // Unit-testable without the TSP: the V3 header is built locally from the DEK + tenant, and the
+    // streaming encryptor/decryptor take the DEK directly.
     #[test]
     fn legacy_v3_streaming_roundtrips_and_interops_with_one_shot() {
         let rng = crate::util::create_test_seeded_rng(42);
@@ -1019,10 +1014,9 @@ mod test {
         let plaintext = vec![42u8; 500];
         let mut edoc = encryptor.encrypt_chunk(plaintext.clone()).unwrap();
         edoc.extend(encryptor.finish().unwrap());
-        // The streamed document is a real V3 document.
         assert!(edoc.starts_with(&v3::VERSION_AND_MAGIC));
 
-        // It decrypts via the one-shot V3 path (signature verified + body decrypted).
+        // The one-shot V3 path verifies the signature as well as the body.
         let one_shot = v3::EncryptedPayload::try_from(edoc.clone())
             .unwrap()
             .decrypt(&dek)
@@ -1039,7 +1033,6 @@ mod test {
         assert_eq!(out, plaintext);
     }
 
-    // A tampered V3 body must fail the body GCM tag at finalize.
     #[test]
     fn legacy_v3_streaming_decrypt_detects_body_tampering() {
         let rng = crate::util::create_test_seeded_rng(42);

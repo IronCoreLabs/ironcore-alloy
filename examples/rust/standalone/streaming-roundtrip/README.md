@@ -28,12 +28,12 @@ Success: decrypted.bin matches plaintext.bin (5242880 bytes).
 4. Confirms `decrypted.bin` is identical to the original.
 
 The streamed output is byte-identical to the one-shot format, so `plaintext.bin.enc` could just as
-well be decrypted with the one-shot `decrypt` API (and a one-shot–encrypted document can be decrypted
+well be decrypted with the one-shot `decrypt` API (and a one-shot-encrypted document can be decrypted
 with the streaming API).
 
 ## ⚠️ The release-of-unverified-plaintext contract
 
-Streaming decryption returns plaintext chunks **before** the authentication tag is verified — the tag
+Streaming decryption returns plaintext chunks **before** the authentication tag is verified. The tag
 is at the very end of the stream, so there is no way to check it until everything has been read. If
 `finish()` returns an error, every chunk already produced was never authenticated and may have been
 attacker-controlled.
@@ -48,4 +48,4 @@ plaintext as it arrives must be able to roll back its effects the same way.
 This example uses standard (detached) encryption, where the EDEK is stored separately. There is also
 a standard-*attached* streaming API (`create_streaming_attached_encryptor` /
 `create_streaming_attached_decryptor`) that writes the EDEK inline at the front of the stream, so
-there is nothing separate to store — you just feed the whole blob back in to decrypt.
+there is nothing separate to store; you just feed the whole blob back in to decrypt.

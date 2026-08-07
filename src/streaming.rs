@@ -1,15 +1,16 @@
 //! Streaming standard / standard-attached encryption and decryption.
 //!
 //! This module provides truly streaming AES-256-GCM for large payloads, where neither side needs
-//! to hold the whole document in memory. The output is **byte-identical to the one-shot V5 format**
-//! (`[0][IRON][IV][ciphertext+tag]`), so a streamed document is just a normal V5 document:
-//! encrypt-streaming -> decrypt-one-shot and encrypt-one-shot -> decrypt-streaming both work.
+//! to hold the whole document in memory. The output is **byte-identical to the one-shot format**
+//! (V5 `[0][IRON][IV][ciphertext+tag]`, or legacy V3 when the client is configured for it), so a
+//! streamed document is just a normal document: encrypt-streaming -> decrypt-one-shot and
+//! encrypt-one-shot -> decrypt-streaming both work.
 //!
 //! # How it works
 //!
 //! `aes-gcm` (RustCrypto), used elsewhere in alloy/ironcore-documents, only exposes a one-shot
 //! `aead::Aead` API that requires the entire plaintext up front. To stream, we decompose GCM into
-//! its two incremental parts (the same approach IronOxide/DCP uses):
+//! its two incremental parts:
 //!
 //! > AES-GCM = AES-CTR (encryption) + GHASH (authentication)
 //!
@@ -20,8 +21,8 @@
 //!   may be the tag. Everything before `held_back` is run through CTR (producing plaintext) and
 //!   GHASH. At finalize the final 16 bytes are the tag, verified with a constant-time comparison.
 //!
-//! Because this hand-assembles GCM internals (J0 derivation, the data counter starting at 2, the
-//! trailing length block) it is proven byte-compatible with the one-shot path by test.
+//! The GCM internals hand-assembled here (J0 derivation, the data counter starting at 2, the
+//! trailing length block) are what byte-compatibility with the one-shot path rests on.
 //!
 //! # ⚠️ Security: decrypt releases UNVERIFIED plaintext
 //!
@@ -33,8 +34,8 @@
 //! Callers **may** process decrypted chunks as they arrive (that is the benefit of streaming), but
 //! **must** be able to undo whatever they did with them if `finish()` returns `Err`. A failure
 //! from `finish()` means every chunk already produced was unauthenticated and may have been
-//! attacker-controlled, so any side effect derived from them — a file written, rows inserted, bytes
-//! forwarded downstream — must be rolled back, deleted, or otherwise invalidated. The canonical
+//! attacker-controlled, so any side effect derived from them (a file written, rows inserted, bytes
+//! forwarded downstream) must be rolled back, deleted, or otherwise invalidated. The canonical
 //! safe pattern is to write decrypted chunks to a temporary file and only commit/rename it after
 //! `finish()` succeeds.
 
@@ -59,23 +60,16 @@ use ironcore_documents::v5::key_id_header::{self, KeyIdHeader};
 use std::sync::{Arc, Mutex};
 use subtle::ConstantTimeEq;
 
-/// AES-GCM IV length in bytes.
 pub(crate) const IV_LEN: usize = 12;
-/// AES-GCM authentication tag length in bytes.
 pub(crate) const TAG_LEN: usize = 16;
-/// AES block size in bytes.
 const BLOCK_SIZE: usize = 16;
 /// Length of the V5 detached header (`0IRON`) that prefixes a non-attached edoc.
 const DETACHED_HEADER_LEN: usize = VERSION_AND_MAGIC.len();
 /// Length of the key id header that prefixes a V5 attached document.
 const KEY_ID_HEADER_LEN: usize = 6;
 
-/// Default streaming chunk / IO block size (64 KiB), matching the DCP default.
-///
-/// This is the recommended chunk size for caller read loops; it is **not** a constructor parameter
-/// in this release. It is exposed as a single named constant (rather than hardcoded into framing or
-/// buffer math anywhere downstream) so that making it a tunable constructor argument later is a
-/// purely additive change with no format or logic impact.
+/// Recommended chunk size for caller read loops (64 KiB), matching the DCP default. Nothing in the
+/// format depends on it: chunk boundaries are invisible to the output.
 pub const DEFAULT_CHUNK_SIZE: usize = 64 * 1024;
 
 type Ctr = Ctr32BE<Aes256>;
@@ -249,8 +243,7 @@ impl GcmStreamDecryptor {
     }
 
     /// Verify the authentication tag (constant time). On success returns any remaining plaintext
-    /// (always empty for CTR, kept for API symmetry). On failure the previously released plaintext
-    /// was never authenticated and must not be trusted.
+    /// (always empty for CTR, kept for API symmetry).
     pub(crate) fn finalize(self) -> Result<Vec<u8>, AlloyError> {
         if self.held_back.len() != TAG_LEN {
             return Err(AlloyError::DecryptError {
@@ -423,7 +416,7 @@ fn try_start_non_attached_decrypt(
         return Ok(None);
     }
     // For V3, verify the header signature (over the tenant header, not the body) before releasing
-    // any plaintext — matching the one-shot V3 decrypt path.
+    // any plaintext, matching the one-shot V3 decrypt path.
     if let Some(header_bytes) = header_to_verify {
         let header: V3DocumentHeader = protobuf::Message::parse_from_bytes(header_bytes)?;
         if !v3::verify_signature(dek.0, &header) {
@@ -567,7 +560,7 @@ impl StreamingStandardEncryptor {
 ///
 /// The authentication tag is at the end of the stream, so plaintext is released before it is
 /// verified. You **may** use chunks as they arrive, but you **must** be able to undo everything you
-/// did with them if `finish` returns `Err` — a failure means the released plaintext was never
+/// did with them if `finish` returns `Err`: a failure means the released plaintext was never
 /// authenticated and may have been attacker-controlled. Prefer writing to a temp file and only
 /// committing it after `finish` succeeds. See the module documentation for details.
 #[derive(uniffi::Object)]
@@ -596,7 +589,7 @@ impl StreamingStandardDecryptor {
 
     /// Verify the authentication tag and return any remaining plaintext. An `Err` means the
     /// plaintext already released from `decrypt_chunk` was never authenticated and must not be
-    /// trusted; roll back any side effects derived from it.
+    /// trusted.
     pub fn finish(&self) -> Result<Vec<u8>, AlloyError> {
         take_lock(&self.state).finalize()
     }
@@ -671,7 +664,7 @@ enum AttachedDecryptState {
 
 /// A streaming standard-attached decryptor.
 ///
-/// Feed the attached document to `decrypt_chunk` exactly as it comes off the wire — the leading
+/// Feed the attached document to `decrypt_chunk` exactly as it comes off the wire. The leading
 /// EDEK and IV are parsed off the front of the stream for you, so you never need to know or split
 /// the header format. Early chunks may return empty while that header is buffered. Because the
 /// inline EDEK must be unwrapped before any ciphertext can be decrypted (a TSP call under SaaS
@@ -803,7 +796,7 @@ mod test {
     const IV: [u8; IV_LEN] = [9u8; IV_LEN];
 
     /// One-shot AES-256-GCM via the same `aes-gcm` crate ironcore-documents uses, producing
-    /// `ciphertext || tag` — the load-bearing reference for byte-compatibility.
+    /// `ciphertext || tag`.
     fn one_shot(key: &[u8; 32], iv: &[u8; IV_LEN], plaintext: &[u8]) -> Vec<u8> {
         let cipher = Aes256Gcm::new(GenericArray::from_slice(key));
         cipher
@@ -840,12 +833,9 @@ mod test {
 
     #[test]
     fn stream_encrypt_chunk_boundaries_are_irrelevant() {
-        // 100 bytes split many ways must all equal the one-shot output.
         let plaintext: Vec<u8> = (0..100u8).collect();
         let expected = one_shot(&KEY, &IV, &plaintext);
-        // single giant chunk
         assert_eq!(stream_encrypt_all(&KEY, IV, &[&plaintext]), expected);
-        // 1-byte chunks
         let singles: Vec<&[u8]> = plaintext.iter().map(std::slice::from_ref).collect();
         assert_eq!(stream_encrypt_all(&KEY, IV, &singles), expected);
         // straddling the 16-byte block boundary
@@ -922,7 +912,6 @@ mod test {
     }
 
     proptest! {
-        // Streamed output equals one-shot output exactly for random plaintext and chunking.
         #[test]
         fn prop_stream_equals_one_shot(
             plaintext in proptest::collection::vec(any::<u8>(), 0..2000usize),
@@ -936,7 +925,6 @@ mod test {
             };
             let streamed = stream_encrypt_all(&KEY, IV, &chunks);
             prop_assert_eq!(&streamed, &expected);
-            // And it decrypts back, regardless of decrypt chunking.
             let decrypted = stream_decrypt_all(&KEY, IV, &streamed, chunk_size);
             prop_assert_eq!(decrypted, plaintext);
         }

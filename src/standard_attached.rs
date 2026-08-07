@@ -115,7 +115,7 @@ pub trait StandardAttachedDocumentOps: Send + Sync {
         metadata: &AlloyMetadata,
     ) -> Result<Arc<StreamingStandardAttachedEncryptor>, AlloyError>;
     /// Create a streaming decryptor for an attached value. Feed the attached document to the
-    /// returned object's `decrypt_chunk` exactly as it comes off the wire, from the very start — the
+    /// returned object's `decrypt_chunk` exactly as it comes off the wire, from the very start. The
     /// inline EDEK and IV are parsed off the front of the stream for you, so you never need to know
     /// or split the attached header format. Only the V5 attached format is supported.
     ///
