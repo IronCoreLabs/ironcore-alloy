@@ -6,8 +6,8 @@ use base64::Engine;
 use ironcore_alloy::standalone::config::{
     RotatableSecret, StandaloneConfiguration, StandaloneSecret, StandardSecrets, VectorSecret,
 };
-use ironcore_alloy::standard_attached::StandardAttachedDocumentOps;
-use ironcore_alloy::vector::{PlaintextVector, VectorOps};
+use ironcore_alloy::standard_attached::{PlaintextAttachedDocument, StandardAttachedDocumentOps};
+use ironcore_alloy::vector::{PlaintextVector, PlaintextVectors, VectorId, VectorOps};
 use ironcore_alloy::{AlloyMetadata, DerivationPath, Secret, SecretPath, Standalone, TenantId};
 use qdrant_client::prelude::*;
 use qdrant_client::qdrant::vectors_config::Config;
@@ -77,14 +77,18 @@ async fn main() -> Result<()> {
     let mut query_vectors = alloy_client
         .vector()
         .generate_query_vectors(
-            HashMap::from([("".to_string(), create_plaintext_vector(&[11.; 10]))]),
+            PlaintextVectors(HashMap::from([(
+                VectorId("".to_string()),
+                create_plaintext_vector(&[11.; 10]),
+            )])),
             &alloy_metadata,
         )
         .await?;
 
     // Since we don't have keys in rotation we can just get the first vector.
     let query_vector = query_vectors
-        .remove("")
+        .0
+        .remove(&VectorId("".to_string()))
         .unwrap()
         .into_iter()
         .next()
@@ -166,13 +170,13 @@ async fn main() -> Result<()> {
     let decrypted_document = alloy_client
         .standard_attached()
         .decrypt(
-            ironcore_alloy::standard_attached::EncryptedAttachedDocument(encrypted_bytes),
+            ironcore_alloy::standard_attached::EncryptedAttachedDocument(encrypted_bytes.into()),
             &alloy_metadata,
         )
         .await?;
     println!(
         "Decrypted document: {}",
-        std::str::from_utf8(&decrypted_document)?
+        std::str::from_utf8(decrypted_document.0.as_ref())?
     );
 
     Ok(())
@@ -228,10 +232,13 @@ async fn encrypt_to_point(
     let encrypted_json = alloy_client
         .standard_attached()
         .encrypt(
-            serde_json::to_string(&book_json)
-                .unwrap()
-                .as_bytes()
-                .to_vec(),
+            PlaintextAttachedDocument(
+                serde_json::to_string(&book_json)
+                    .unwrap()
+                    .as_bytes()
+                    .to_vec()
+                    .into(),
+            ),
             &alloy_metadata,
         )
         .await?;

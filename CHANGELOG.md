@@ -1,3 +1,28 @@
+## 0.16.0
+
+- Dependency updates.
+- Added streaming encryption and decryption for standard and standard-attached documents. Deterministic and vector encryption do not support streaming.
+
+### Streaming
+
+New methods on `StandardDocumentOps`:
+
+- `create_streaming_encryptor(metadata)` returns a `StreamingStandardEncryptor`. Call `edek()` for the EDEK to store alongside the output, `encrypt_chunk(bytes)` for each chunk of plaintext, and `finish()` to flush the final bytes and the authentication tag.
+- `create_streaming_decryptor(edek, metadata)` returns a `StreamingStandardDecryptor`. Feed the encrypted document to `decrypt_chunk(bytes)` and call `finish()` once at the end to verify authentication.
+
+New methods on `StandardAttachedDocumentOps`:
+
+- `create_streaming_attached_encryptor(metadata)` returns a `StreamingStandardAttachedEncryptor`. The EDEK is written inline at the front of the stream, so there is nothing separate to store. Use `encrypt_chunk(bytes)` and `finish()` as above.
+- `create_streaming_attached_decryptor(metadata)` returns a `StreamingStandardAttachedDecryptor`. Feed the attached document to `decrypt_chunk(bytes)` exactly as it comes off the wire (the inline EDEK and IV are parsed off the front of the stream for you) and call `finish()` at the end.
+
+Things to know:
+
+- **⚠️ Streaming decryption releases UNVERIFIED plaintext.** The authentication tag is at the very end of the stream, so `decrypt_chunk` returns plaintext _before_ it can be verified. If `finish()` returns an error, every chunk already produced was never authenticated and may have been attacker-controlled. Callers that act on decrypted chunks as they arrive **must be able to roll those effects back**, for example by writing decrypted chunks to a temporary file and only committing it after `finish()` succeeds.
+- **The streaming output is byte-identical to the one-shot format**, so streaming and one-shot encrypt/decrypt interoperate in any combination.
+- **The constructors are async; the chunk methods are synchronous**, because the constructor does the DEK acquisition (a TSP call for SaaS Shield). The exception is `StreamingStandardAttachedDecryptor`, whose `decrypt_chunk`/`finish` are async: the EDEK embedded in the stream can only be unwrapped once enough of the stream has arrived. Each language uses its usual async shape (Kotlin `suspend`, Python `async`, Java `CompletableFuture`).
+- **Legacy format:** SaaS Shield standard streaming honors `legacy_tsc_write_format` exactly like one-shot `encrypt`, and streaming decryption reads both V5 and legacy V3. Standard-attached has no legacy format and always uses V5.
+- New `streaming-roundtrip` examples show file-to-file streaming in Rust (`examples/rust/standalone/streaming-roundtrip`) and Python (`examples/python/standalone/streaming-roundtrip.py`), including the temp-file-and-commit pattern for the rollback contract above.
+
 ## 0.15.2
 
 - Fix a check on API key that was too strict

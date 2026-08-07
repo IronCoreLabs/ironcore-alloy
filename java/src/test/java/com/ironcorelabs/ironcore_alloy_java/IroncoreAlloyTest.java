@@ -7,6 +7,7 @@ import okhttp3.*;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.CompletableFuture;
+import java.io.ByteArrayOutputStream;
 
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -217,6 +218,39 @@ public class IroncoreAlloyTest {
     }
 
     @Test
+    public void sdkStandardStreamingRoundtrip()
+            throws InterruptedException, ExecutionException, AlloyException {
+        byte[] plaintext = new byte[2048];
+        for (int i = 0; i < plaintext.length; i++) {
+            plaintext[i] = (byte) (i % 256);
+        }
+        FieldId testFieldId = new FieldId("foo");
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+
+        StreamingStandardEncryptor encryptor = sdk.standard().createStreamingEncryptor(metadata).get();
+        ByteArrayOutputStream edocStream = new ByteArrayOutputStream();
+        edocStream.writeBytes(encryptor.encryptChunk(Arrays.copyOfRange(plaintext, 0, 1000)));
+        edocStream.writeBytes(encryptor.encryptChunk(Arrays.copyOfRange(plaintext, 1000, plaintext.length)));
+        edocStream.writeBytes(encryptor.finish());
+        byte[] edoc = edocStream.toByteArray();
+        EdekWithKeyIdHeader edek = encryptor.edek();
+
+        // The streamed edoc is a normal document that one-shot decrypt reads.
+        EncryptedDocument document = new EncryptedDocument(edek, Map.of(testFieldId, new EncryptedBytes(edoc)));
+        PlaintextDocument oneShot = sdk.standard().decrypt(document, metadata).get();
+        assertArrayEquals(plaintext, oneShot.value().get(testFieldId).value());
+
+        // Streaming decrypt round-trips across odd chunk boundaries.
+        StreamingStandardDecryptor decryptor = sdk.standard().createStreamingDecryptor(edek, metadata).get();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (int i = 0; i < edoc.length; i += 13) {
+            out.writeBytes(decryptor.decryptChunk(Arrays.copyOfRange(edoc, i, Math.min(i + 13, edoc.length))));
+        }
+        out.writeBytes(decryptor.finish());
+        assertArrayEquals(plaintext, out.toByteArray());
+    }
+
+    @Test
     public void seededSdkStandardEncrypt() throws InterruptedException, ExecutionException {
         FieldId testFieldId = new FieldId("foo");
         PlaintextDocument plaintextDocument = new PlaintextDocument(Map.of(testFieldId, new PlaintextBytes("My data".getBytes())));
@@ -251,6 +285,37 @@ public class IroncoreAlloyTest {
         EncryptedAttachedDocument encrypted = sdk.standardAttached().encrypt(plaintextDocument, metadata).get();
         PlaintextAttachedDocument decrypted = sdk.standardAttached().decrypt(encrypted, metadata).get();
         assertArrayEquals(plaintextDocument.value().value(), decrypted.value().value());
+    }
+
+    @Test
+    public void sdkStandardAttachedStreamingRoundtrip()
+            throws InterruptedException, ExecutionException, AlloyException {
+        byte[] plaintext = new byte[2048];
+        for (int i = 0; i < plaintext.length; i++) {
+            plaintext[i] = (byte) (i % 256);
+        }
+        AlloyMetadata metadata = AlloyMetadata.newSimple(new TenantId("tenant"));
+
+        StreamingStandardAttachedEncryptor encryptor = sdk.standardAttached().createStreamingAttachedEncryptor(metadata).get();
+        ByteArrayOutputStream blobStream = new ByteArrayOutputStream();
+        blobStream.writeBytes(encryptor.encryptChunk(Arrays.copyOfRange(plaintext, 0, 1000)));
+        blobStream.writeBytes(encryptor.encryptChunk(Arrays.copyOfRange(plaintext, 1000, plaintext.length)));
+        blobStream.writeBytes(encryptor.finish());
+        byte[] blob = blobStream.toByteArray();
+
+        // one-shot attached decrypt reads the streamed blob.
+        PlaintextAttachedDocument oneShot = sdk.standardAttached()
+                .decrypt(new EncryptedAttachedDocument(new EncryptedBytes(blob)), metadata).get();
+        assertArrayEquals(plaintext, oneShot.value().value());
+
+        // Streaming attached decrypt: decryptChunk/finish return CompletableFuture.
+        StreamingStandardAttachedDecryptor decryptor = sdk.standardAttached().createStreamingAttachedDecryptor(metadata).get();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (int i = 0; i < blob.length; i += 7) {
+            out.writeBytes(decryptor.decryptChunk(Arrays.copyOfRange(blob, i, Math.min(i + 7, blob.length))).get());
+        }
+        out.writeBytes(decryptor.finish().get());
+        assertArrayEquals(plaintext, out.toByteArray());
     }
 
     @Test
