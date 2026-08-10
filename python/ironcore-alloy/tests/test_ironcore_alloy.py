@@ -278,6 +278,30 @@ class TestIroncoreAlloy:
         assert decrypted == document
 
     @pytest.mark.asyncio
+    async def test_roundtrip_standard_streaming(self, standalone_sdk):
+        metadata = AlloyMetadata.new_simple("tenant")
+        plaintext = bytes(i % 256 for i in range(2048))
+        encryptor = await standalone_sdk.standard().create_streaming_encryptor(metadata)
+        edoc = encryptor.encrypt_chunk(plaintext[:1000])
+        edoc += encryptor.encrypt_chunk(plaintext[1000:])
+        edoc += encryptor.finish()
+        edek = encryptor.edek()
+        # The streamed edoc is a normal document that one-shot decrypt reads.
+        one_shot = await standalone_sdk.standard().decrypt(
+            EncryptedDocument(edek=edek, document={"foo": edoc}), metadata
+        )
+        assert one_shot == {"foo": plaintext}
+        # Streaming decrypt round-trips across odd chunk boundaries.
+        decryptor = await standalone_sdk.standard().create_streaming_decryptor(
+            edek, metadata
+        )
+        out = bytearray()
+        for i in range(0, len(edoc), 13):
+            out += decryptor.decrypt_chunk(edoc[i : i + 13])
+        out += decryptor.finish()
+        assert bytes(out) == plaintext
+
+    @pytest.mark.asyncio
     async def test_seeded_sdk_standard_encrypt(self, standalone_seeded_sdk):
         document = {"foo": b"My data"}
         metadata = AlloyMetadata.new_simple("tenant")
@@ -319,6 +343,29 @@ class TestIroncoreAlloy:
             encrypted, metadata
         )
         assert decrypted == document
+
+    @pytest.mark.asyncio
+    async def test_roundtrip_standard_attached_streaming(self, standalone_sdk):
+        metadata = AlloyMetadata.new_simple("tenant")
+        plaintext = bytes(i % 256 for i in range(2048))
+        encryptor = await standalone_sdk.standard_attached().create_streaming_attached_encryptor(
+            metadata
+        )
+        blob = encryptor.encrypt_chunk(plaintext[:1000])
+        blob += encryptor.encrypt_chunk(plaintext[1000:])
+        blob += encryptor.finish()
+        # one-shot attached decrypt reads the streamed blob.
+        one_shot = await standalone_sdk.standard_attached().decrypt(blob, metadata)
+        assert one_shot == plaintext
+        # Streaming attached decrypt: feed the whole blob; decrypt_chunk/finish are async.
+        decryptor = await standalone_sdk.standard_attached().create_streaming_attached_decryptor(
+            metadata
+        )
+        out = bytearray()
+        for i in range(0, len(blob), 7):
+            out += await decryptor.decrypt_chunk(blob[i : i + 7])
+        out += await decryptor.finish()
+        assert bytes(out) == plaintext
 
     @pytest.mark.asyncio
     async def test_decrypt_v4_standard_attached(self, standalone_sdk):

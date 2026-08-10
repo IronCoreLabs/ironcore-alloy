@@ -16,3 +16,27 @@ jobs:
       minimum_coverage: "50"
       cargo_command_test_args: "--lib" # Doesn't generate or test Python/Kotlin
     secrets: inherit
+
+  # The examples take ironcore-alloy as a path dependency, so an API change breaks them
+  # without anything in the main crate failing to build.
+  examples:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-provider: github
+      - name: Build Rust examples
+        run: |
+          mapfile -t manifests < <(find examples/rust example-integrations \
+            -mindepth 2 -name Cargo.toml -not -path '*/target/*' | sort)
+          # Guard against a silently-passing job if the examples ever move.
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "No example crates found" >&2
+            exit 1
+          fi
+          for manifest in "${manifests[@]}"; do
+            echo "::group::$manifest"
+            cargo build --manifest-path "$manifest"
+            echo "::endgroup::"
+          done

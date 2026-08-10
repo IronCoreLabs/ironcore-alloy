@@ -264,6 +264,32 @@ class IroncoreAlloyTest {
     }
 
     @Test
+    fun sdkStandardStreamingRoundtrip() {
+        val plaintext = ByteArray(2048) { (it % 256).toByte() }
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encryptor = sdk.standard().createStreamingEncryptor(metadata)
+            var edoc = encryptor.encryptChunk(plaintext.copyOfRange(0, 1000))
+            edoc += encryptor.encryptChunk(plaintext.copyOfRange(1000, plaintext.size))
+            edoc += encryptor.finish()
+            val edek = encryptor.edek()
+            // The streamed edoc is a normal document that one-shot decrypt reads.
+            val oneShot = sdk.standard().decrypt(EncryptedDocument(edek, mapOf("foo" to edoc)), metadata)
+            assertContentEquals(oneShot.get("foo"), plaintext)
+            // Streaming decrypt round-trips across odd chunk boundaries.
+            val decryptor = sdk.standard().createStreamingDecryptor(edek, metadata)
+            var out = ByteArray(0)
+            var i = 0
+            while (i < edoc.size) {
+                out += decryptor.decryptChunk(edoc.copyOfRange(i, minOf(i + 13, edoc.size)))
+                i += 13
+            }
+            out += decryptor.finish()
+            assertContentEquals(out, plaintext)
+        }
+    }
+
+    @Test
     fun sdkStandardBatchRoundtrip() {
         val plaintextDocument = mapOf("foo" to "My data".toByteArray())
         val plaintextDocuments = mapOf("doc" to plaintextDocument)
@@ -286,6 +312,31 @@ class IroncoreAlloyTest {
             val encrypted = sdk.standardAttached().encrypt(plaintextDocument, metadata)
             val decrypted = sdk.standardAttached().decrypt(encrypted, metadata)
             assertContentEquals(decrypted, plaintextDocument)
+        }
+    }
+
+    @Test
+    fun sdkStandardAttachedStreamingRoundtrip() {
+        val plaintext = ByteArray(2048) { (it % 256).toByte() }
+        val metadata = AlloyMetadata.newSimple("tenant")
+        runBlocking {
+            val encryptor = sdk.standardAttached().createStreamingAttachedEncryptor(metadata)
+            var blob = encryptor.encryptChunk(plaintext.copyOfRange(0, 1000))
+            blob += encryptor.encryptChunk(plaintext.copyOfRange(1000, plaintext.size))
+            blob += encryptor.finish()
+            // one-shot attached decrypt reads the streamed blob.
+            val oneShot = sdk.standardAttached().decrypt(blob, metadata)
+            assertContentEquals(oneShot, plaintext)
+            // Streaming attached decrypt: feed the whole blob; decryptChunk/finish are suspend.
+            val decryptor = sdk.standardAttached().createStreamingAttachedDecryptor(metadata)
+            var out = ByteArray(0)
+            var i = 0
+            while (i < blob.size) {
+                out += decryptor.decryptChunk(blob.copyOfRange(i, minOf(i + 7, blob.size)))
+                i += 7
+            }
+            out += decryptor.finish()
+            assertContentEquals(out, plaintext)
         }
     }
 

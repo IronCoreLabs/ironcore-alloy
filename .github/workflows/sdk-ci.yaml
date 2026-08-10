@@ -25,7 +25,7 @@ jobs:
         # This should stay in sync with the `os_matrix` above
         runs-on: [ "ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "macos-15" ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -53,7 +53,7 @@ jobs:
         # This should stay in sync with the `os_matrix` above
         runs-on: [ "ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "macos-15" ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
         with:
           distribution: "temurin"
@@ -82,7 +82,7 @@ jobs:
         # This should stay in sync with the `os_matrix` above and the `runs-on` from the other jobs in this file
         runs-on: [ "ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "macos-15" ]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: ${{ join(matrix.runs-on) }}-
@@ -111,11 +111,46 @@ jobs:
           name: python-bindings
           path: python/ironcore-alloy/ironcore_alloy/ironcore_alloy.py
 
+  # The examples import ironcore_alloy directly, so an API change breaks them without any
+  # of the test suites failing. Only the standalone examples run here; the saas-shield ones
+  # need a running TSP and are covered by integration-test.yaml.
+  python-examples:
+    needs: python-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: ubuntu-24.04-
+          path: python/ironcore-alloy/ironcore_alloy/
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-bindings
+          path: python/ironcore-alloy/ironcore_alloy/
+      - name: Run standalone Python examples
+        # Resolves `import ironcore_alloy` to the package the artifacts above were unpacked into.
+        env:
+          PYTHONPATH: ${{ github.workspace }}/python/ironcore-alloy
+        working-directory: examples/python/standalone
+        run: |
+          shopt -s nullglob
+          examples=(*.py)
+          # Guard against a silently-passing job if the examples ever move.
+          if [ ${#examples[@]} -eq 0 ]; then
+            echo "No Python examples found" >&2
+            exit 1
+          fi
+          for example in "${examples[@]}"; do
+            echo "::group::$example"
+            python3 "$example"
+            echo "::endgroup::"
+          done
+
   build-docs:
     needs: python-test
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           name: python-bindings

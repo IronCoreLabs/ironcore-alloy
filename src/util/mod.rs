@@ -6,7 +6,7 @@ pub(crate) use reseeding_rng::{
     OurReseedingRng, create_reseeding_rng, create_rng, create_rng_maybe_seeded,
 };
 
-use crate::{AlloyMetadata, TenantId, VectorEncryptionKey, errors::AlloyError};
+use crate::{AlloyMetadata, TenantId, VectorEncryptionKey, errors::AlloyError, streaming::IV_LEN};
 use ironcore_documents::v5::key_id_header::KeyId;
 use itertools::Either;
 use protobuf::Message;
@@ -192,6 +192,14 @@ pub(crate) fn v4_proto_from_bytes<B: AsRef<[u8]>>(
     b: B,
 ) -> Result<ironcore_documents::icl_header_v4::V4DocumentHeader, AlloyError> {
     Ok(Message::parse_from_bytes(b.as_ref())?)
+}
+
+/// Generate a fresh random AES-GCM IV from the provided RNG, for streaming encryption.
+pub(crate) fn generate_streaming_iv(rng: &Mutex<OurReseedingRng>) -> [u8; IV_LEN] {
+    use rand::Rng;
+    let mut iv = [0u8; IV_LEN];
+    take_lock(rng).fill_bytes(&mut iv);
+    iv
 }
 
 #[cfg(test)]
