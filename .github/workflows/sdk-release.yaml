@@ -125,7 +125,7 @@ jobs:
         working-directory: python/ironcore-alloy/ironcore_alloy
 
   rust-release:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-release.yaml@rust-release-v1
+    uses: IronCoreLabs/workflows/.github/workflows/rust-release.yaml@rust-release-v2
     secrets: inherit
 
   build-docs:
