@@ -17,7 +17,7 @@ jobs:
           distribution: "temurin"
           java-version: "25"
       - name: Start the TSP
-        uses: IronCoreLabs/workflows/.github/actions/start-tsp@start-tsp-v1
+        uses: IronCoreLabs/workflows/.github/actions/start-tsp@start-tsp-v1.0.0
         with:
           gcloud-auth: ${{ secrets.GCLOUD_AUTH }}
           env-file-path: tests/demo-tsp.conf
