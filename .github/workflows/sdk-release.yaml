@@ -9,7 +9,7 @@ on:
 
 jobs:
   generate-cdylibs:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
+    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0.0.0
     with:
       os_matrix: '["ubuntu-24.04", "ubuntu-24.04-arm", "macos-15-intel", "macos-15"]'
       build_profile: "release"
@@ -125,7 +125,7 @@ jobs:
         working-directory: python/ironcore-alloy/ironcore_alloy
 
   rust-release:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-release.yaml@rust-release-v2
+    uses: IronCoreLabs/workflows/.github/workflows/rust-release.yaml@rust-release-v2.0.0
     secrets: inherit
 
   build-docs:

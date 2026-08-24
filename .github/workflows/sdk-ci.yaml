@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   generate-cdylibs:
-    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0
+    uses: IronCoreLabs/workflows/.github/workflows/rust-artifact.yaml@rust-artifact-v0.0.0
     with:
       # This should stay in sync with the `runs-on` from the other jobs in this file
       os_matrix: "[\"ubuntu-24.04\", \"ubuntu-24.04-arm\", \"macos-15-intel\",
