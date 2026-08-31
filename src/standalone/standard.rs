@@ -118,7 +118,7 @@ impl StandaloneStandardClient {
                     .ok_or_else(|| AlloyError::InvalidConfiguration {
                         msg: format!(
                             "Provided secret id `{}` does not exist in the standard configuration.",
-                            &key_id.0
+                            key_id.0
                         ),
                     })?;
             vec![secret]
