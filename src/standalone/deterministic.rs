@@ -39,7 +39,7 @@ impl StandaloneDeterministicClient {
             .ok_or_else(|| AlloyError::InvalidConfiguration {
                 msg: format!(
                     "Provided secret path `{}` does not exist in the deterministic configuration.",
-                    &plaintext_field.secret_path.0
+                    plaintext_field.secret_path.0
                 ),
             })?;
         let current_secret =
@@ -74,7 +74,7 @@ impl StandaloneDeterministicClient {
             .ok_or_else(|| AlloyError::InvalidConfiguration {
                 msg: format!(
                     "Provided secret path `{}` does not exist in the deterministic configuration.",
-                    &encrypted_field.secret_path.0
+                    encrypted_field.secret_path.0
                 ),
             })?;
         let standalone_secret =
@@ -179,7 +179,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                     .ok_or_else(|| {
                         AlloyError::InvalidConfiguration{msg: format!(
                             "Provided secret path `{}` does not exist in the deterministic configuration.",
-                            &plaintext_field.secret_path.0
+                            plaintext_field.secret_path.0
                         )}
                     })?;
                 let RotatableSecret {
@@ -233,7 +233,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
                 .ok_or_else(|| {
                     AlloyError::InvalidConfiguration{msg: format!(
                         "Provided secret path `{}` does not exist in the deterministic configuration.",
-                        &encrypted_field.secret_path.0
+                        encrypted_field.secret_path.0
                     )}
                 })?.current_secret;
             if check_rotation_no_op(
@@ -268,7 +268,7 @@ impl DeterministicFieldOps for StandaloneDeterministicClient {
             AlloyError::InvalidConfiguration {
                 msg: format!(
                     "Provided secret path `{}` does not exist in the deterministic configuration.",
-                    &secret_path.0
+                    secret_path.0
                 ),
             }
         })?;

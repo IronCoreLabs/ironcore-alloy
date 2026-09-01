@@ -40,7 +40,7 @@ pub(crate) struct AuthHash(pub(crate) [u8; 32]);
 /// }; // lock released here
 /// ```
 ///
-pub fn take_lock<T>(m: &Mutex<T>) -> MutexGuard<T> {
+pub fn take_lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| {
         let error = format!("Error when acquiring lock: {e}");
         panic!("{error}");

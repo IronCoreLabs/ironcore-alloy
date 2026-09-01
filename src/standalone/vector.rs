@@ -48,7 +48,7 @@ impl StandaloneVectorClient {
             .ok_or_else(|| AlloyError::InvalidConfiguration {
                 msg: format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
-                    &encrypted_vector.secret_path.0
+                    encrypted_vector.secret_path.0
                 ),
             })?;
         let standalone_secret = vector_secret
@@ -79,7 +79,7 @@ impl StandaloneVectorClient {
             .ok_or_else(|| AlloyError::InvalidConfiguration {
                 msg: format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
-                    &plaintext_vector.secret_path.0
+                    plaintext_vector.secret_path.0
                 ),
             })?;
         let standalone_secret = vector_secret
@@ -120,7 +120,7 @@ impl StandaloneVectorClient {
             .ok_or_else(|| AlloyError::InvalidConfiguration {
                 msg: format!(
                     "Provided secret path `{}` does not exist in the vector configuration.",
-                    &encrypted_vector.secret_path.0
+                    encrypted_vector.secret_path.0
                 ),
             })?;
         let standalone_secret = vector_secret
@@ -232,7 +232,7 @@ impl VectorOps for StandaloneVectorClient {
                     || AlloyError::InvalidConfiguration {
                         msg: format!(
                             "Provided secret path `{}` does not exist in the vector configuration.",
-                            &plaintext_vector.secret_path.0
+                            plaintext_vector.secret_path.0
                         ),
                     },
                 )?;
@@ -291,7 +291,7 @@ impl VectorOps for StandaloneVectorClient {
                 .ok_or_else(|| AlloyError::InvalidConfiguration {
                     msg: format!(
                         "Provided secret path `{}` does not exist in the vector configuration.",
-                        &secret_path.0
+                        secret_path.0
                     ),
                 })?;
         let in_rotation_secret = vector_secret
