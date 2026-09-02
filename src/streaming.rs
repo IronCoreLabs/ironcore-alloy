@@ -44,8 +44,7 @@ use crate::errors::AlloyError;
 use crate::standard::EdekWithKeyIdHeader;
 use crate::util::{take_lock, v4_proto_from_bytes};
 use aes::Aes256;
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{BlockEncrypt, KeyInit, KeyIvInit, StreamCipher};
+use aes::cipher::{BlockCipherEncrypt, KeyInit, KeyIvInit, StreamCipher};
 use bytes::{Buf, Bytes};
 use ctr::Ctr32BE;
 use futures::lock::Mutex as AsyncMutex;
@@ -85,13 +84,13 @@ fn build_counter_block(iv: &[u8; IV_LEN], counter: u32) -> [u8; BLOCK_SIZE] {
 /// Derive the GHASH subkey `H = AES_K(0^128)` and the encrypted initial counter block
 /// `AES_K(J0)` where `J0 = IV || 0^31 || 1` (used to mask the final tag).
 fn init_gcm_state(key: &[u8; 32], iv: &[u8; IV_LEN]) -> (GHash, [u8; TAG_LEN]) {
-    let cipher = Aes256::new(GenericArray::from_slice(key));
+    let cipher = Aes256::new(key.into());
     // H = AES_K(0^128)
     let mut h = Block::default();
     cipher.encrypt_block(&mut h);
     let ghash = GHash::new(&h);
     // encrypted J0 = AES_K(IV || 0^31 || 1)
-    let mut j0 = Block::clone_from_slice(&build_counter_block(iv, 1));
+    let mut j0 = Block::from(build_counter_block(iv, 1));
     cipher.encrypt_block(&mut j0);
     let mut encrypted_j0 = [0u8; TAG_LEN];
     encrypted_j0.copy_from_slice(&j0);
@@ -101,10 +100,7 @@ fn init_gcm_state(key: &[u8; 32], iv: &[u8; IV_LEN]) -> (GHash, [u8; TAG_LEN]) {
 /// Build a CTR cipher whose counter starts at `J0 + 1 = IV || 0^31 || 2`, matching GCM.
 fn ctr_cipher(key: &[u8; 32], iv: &[u8; IV_LEN]) -> Ctr {
     let ctr_block = build_counter_block(iv, 2);
-    Ctr::new(
-        GenericArray::from_slice(key),
-        GenericArray::from_slice(&ctr_block),
-    )
+    Ctr::new(key.into(), (&ctr_block).into())
 }
 
 /// Finalize the GCM tag: append the standard length block `[len(AAD) || len(ciphertext)]` in bits
@@ -146,10 +142,9 @@ impl GhashAccumulator {
 
     fn update(&mut self, data: &[u8]) {
         self.pending.extend_from_slice(data);
-        let complete_len = (self.pending.len() / BLOCK_SIZE) * BLOCK_SIZE;
-        for chunk in self.pending[..complete_len].chunks_exact(BLOCK_SIZE) {
-            self.ghash.update(&[Block::clone_from_slice(chunk)]);
-        }
+        let (blocks, _) = Block::slice_as_chunks(&self.pending);
+        let complete_len = blocks.len() * BLOCK_SIZE;
+        self.ghash.update(blocks);
         self.pending.drain(..complete_len);
     }
 
@@ -798,10 +793,8 @@ mod test {
     /// One-shot AES-256-GCM via the same `aes-gcm` crate ironcore-documents uses, producing
     /// `ciphertext || tag`.
     fn one_shot(key: &[u8; 32], iv: &[u8; IV_LEN], plaintext: &[u8]) -> Vec<u8> {
-        let cipher = Aes256Gcm::new(GenericArray::from_slice(key));
-        cipher
-            .encrypt(GenericArray::from_slice(iv), plaintext)
-            .unwrap()
+        let cipher = Aes256Gcm::new(key.into());
+        cipher.encrypt(iv.into(), plaintext).unwrap()
     }
 
     fn stream_encrypt_all(key: &[u8; 32], iv: [u8; IV_LEN], chunks: &[&[u8]]) -> Vec<u8> {
