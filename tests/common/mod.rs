@@ -11,7 +11,7 @@ use std::{
     process::{Command, ExitStatus, Stdio},
     sync::Arc,
 };
-use uniffi_bindgen::{BindgenLoader, BindgenPaths};
+use uniffi_bindgen::{BindgenLoader, BindgenPaths, GlobalConfig};
 
 pub type TestResult = Result<(), AlloyError>;
 
@@ -104,7 +104,7 @@ pub(crate) fn clean_generated_dir(dir: &Path) -> Result<(), Box<dyn Error>> {
 pub(crate) fn create_bindgen_loader() -> Result<BindgenLoader, Box<dyn Error>> {
     let mut paths = BindgenPaths::default();
     paths.add_cargo_metadata_layer(false)?;
-    Ok(BindgenLoader::new(paths))
+    Ok(BindgenLoader::new(paths, GlobalConfig::default()))
 }
 
 pub(crate) fn generate_kotlin_bindings(
