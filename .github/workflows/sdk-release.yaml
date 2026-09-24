@@ -161,11 +161,19 @@ jobs:
 
           # Sync versions so RTD discovers the tag and updates stable
           curl -sf -X POST -H "$AUTH" "$RTD_API/sync-versions/"
-          # Wait for tag version to appear
-          for i in $(seq 1 10); do
-            curl -sf -H "$AUTH" "$RTD_API/versions/$TAG/" > /dev/null 2>&1 && break
+          # Wait for tag version to appear. Sync is async and has taken over 50s.
+          FOUND=false
+          for i in $(seq 1 60); do
+            if curl -sf -H "$AUTH" "$RTD_API/versions/$TAG/" > /dev/null 2>&1; then
+              FOUND=true
+              break
+            fi
             sleep 5
           done
+          if [ "$FOUND" != "true" ]; then
+            echo "RTD never discovered version $TAG after sync"
+            exit 1
+          fi
 
           # Activate the tag version
           curl -sf -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
