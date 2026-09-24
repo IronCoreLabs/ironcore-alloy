@@ -41,7 +41,7 @@ integration_tests = []
 bindgen = ["uniffi/cli", "dep:uniffi-bindgen-java"]
 
 [dependencies]
-aes = "0.9"
+aes = "0.9.3"
 aes-siv = "0.8"
 async-trait = "0.1.89"
 base64 = "0.23"
@@ -61,16 +61,16 @@ rand_distr = "0.6"
 rayon = "1.11.0"
 regex = "1.12.3"
 reqwest = { version = "0.12", default-features = false, features = [
-    "json",
-    "rustls-tls",
+  "json",
+  "rustls-tls",
 ] }
 ring = "0.17"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.150", features = ["float_roundtrip"] }
 subtle = "2"
 thiserror = "2.0.18"
-uniffi = { version = "0.31.0", features = ["tokio"] }
-uniffi-bindgen-java = { version = "0.4.1", optional = true }
+uniffi = { version = "0.32.0", features = ["tokio"] }
+uniffi-bindgen-java = { version = "0.5.2", optional = true }
 z85 = "3.0.7"
 
 [dev-dependencies]
@@ -82,15 +82,15 @@ base64 = "0.23.0"
 base85 = "2.0.0"
 camino = "1.2"
 # must be the same as uniffi/uniffi-bindgen-java
-cargo_metadata = "0.19"
-criterion = { version = "0.7", features = ["async_tokio"] }
+cargo_metadata = "0.23"
+criterion = { version = "0.8", features = ["async_tokio"] }
 hex = "0.4.3"
 hex-literal = "1.1.0"
 lazy_static = "1.5"
 proptest = "1.11.0"
-rstest = "0.26"
+rstest = "0.27"
 tokio = { version = "1.52", features = ["macros", "rt-multi-thread"] }
-uniffi_bindgen = "0.31.0"
+uniffi_bindgen = "0.32.0"
 z85 = "3.0.7"
 
 [[bench]]

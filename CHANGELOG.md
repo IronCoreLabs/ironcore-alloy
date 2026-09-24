@@ -1,3 +1,7 @@
+## 0.16.1
+
+- Update to uniffi-bindgen-java 0.5.2, which fixes a race in Java async cancellation that could double-free or use-after-free the Rust future.
+
 ## 0.16.0
 
 - Dependency updates.
