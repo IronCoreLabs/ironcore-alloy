@@ -100,6 +100,9 @@ impl TenantSecurityProxyError {
             209 => Self::Kms {
                 error: KmsThrottled,
             },
+            210 => Self::Kms {
+                error: KmsAccountIssue,
+            },
             301 => Self::SecurityEvent {
                 error: SecurityEventRejected,
             },
@@ -222,6 +225,121 @@ impl Display for TenantSecretError {
                 f,
                 "Tenant Security Proxy failed to create a secret for the provided tenant"
             ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        KmsError, SecurityEventError, ServiceError, TenantSecretError, TenantSecurityProxyError,
+    };
+
+    #[test]
+    fn known_error_codes_round_trip() {
+        // Keep this table in sync with get_code so every known wire code decodes.
+        let cases = [
+            (
+                100,
+                TenantSecurityProxyError::Service {
+                    error: ServiceError::UnknownError,
+                },
+            ),
+            (
+                101,
+                TenantSecurityProxyError::Service {
+                    error: ServiceError::UnauthorizedRequest,
+                },
+            ),
+            (
+                102,
+                TenantSecurityProxyError::Service {
+                    error: ServiceError::InvalidRequestBody,
+                },
+            ),
+            (
+                200,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::NoPrimaryKmsConfiguration,
+                },
+            ),
+            (
+                201,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::UnknownTenantOrNoActiveKmsConfigurations,
+                },
+            ),
+            (
+                202,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsConfigurationDisabled,
+                },
+            ),
+            (
+                203,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::InvalidProvidedEdek,
+                },
+            ),
+            (
+                204,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsWrapFailed,
+                },
+            ),
+            (
+                205,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsUnwrapFailed,
+                },
+            ),
+            (
+                206,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsAuthorizationFailed,
+                },
+            ),
+            (
+                207,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsConfigurationInvalid,
+                },
+            ),
+            (
+                208,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsUnreachable,
+                },
+            ),
+            (
+                209,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsThrottled,
+                },
+            ),
+            (
+                210,
+                TenantSecurityProxyError::Kms {
+                    error: KmsError::KmsAccountIssue,
+                },
+            ),
+            (
+                301,
+                TenantSecurityProxyError::SecurityEvent {
+                    error: SecurityEventError::SecurityEventRejected,
+                },
+            ),
+            (
+                401,
+                TenantSecurityProxyError::TenantSecret {
+                    error: TenantSecretError::SecretCreationFailed,
+                },
+            ),
+        ];
+
+        for (code, error) in cases {
+            assert_eq!(error.get_code(), code);
+            assert_eq!(TenantSecurityProxyError::code_to_error(code), error);
         }
     }
 }
