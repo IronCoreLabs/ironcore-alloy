@@ -1,3 +1,7 @@
+## 0.16.2
+
+- Update `rustls-webpki` to 0.103.16 and `webpki-roots` to 1.0.11 to distrust the compromised eMudhra (emSign) intermediate CAs. See the [advisory](https://emudhra.we-have-a-problem.com/).
+
 ## 0.16.1
 
 - Update to uniffi-bindgen-java 0.5.2, which fixes a race in Java async cancellation that could double-free or use-after-free the Rust future.
