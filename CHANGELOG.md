@@ -1,6 +1,7 @@
 ## 0.16.2
 
 - Update `rustls-webpki` to 0.103.16 and `webpki-roots` to 1.0.11 to distrust the compromised eMudhra (emSign) intermediate CAs. See the [advisory](https://emudhra.we-have-a-problem.com/).
+- TSP error code 210 now decodes as `KmsError::KmsAccountIssue` instead of `ServiceError::UnknownError`.
 
 ## 0.16.1
 

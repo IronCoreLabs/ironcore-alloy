@@ -100,6 +100,9 @@ impl TenantSecurityProxyError {
             209 => Self::Kms {
                 error: KmsThrottled,
             },
+            210 => Self::Kms {
+                error: KmsAccountIssue,
+            },
             301 => Self::SecurityEvent {
                 error: SecurityEventRejected,
             },
@@ -222,6 +225,70 @@ impl Display for TenantSecretError {
                 f,
                 "Tenant Security Proxy failed to create a secret for the provided tenant"
             ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        KmsError, SecurityEventError, ServiceError, TenantSecretError, TenantSecurityProxyError,
+    };
+
+    /// Expands to `(wire code, error)` pairs for every variant of `$enum`. The generated match has
+    /// no wildcard arm, so a variant added without a case here fails to compile.
+    macro_rules! cases {
+        ($enum:ident => $wrap:ident { $($variant:ident = $code:literal),+ $(,)? }) => {{
+            fn _exhaustive(error: &$enum) {
+                match error {
+                    $($enum::$variant)|+ => {}
+                }
+            }
+            [$(($code, TenantSecurityProxyError::$wrap { error: $enum::$variant })),+]
+        }};
+    }
+
+    /// A category added here also needs a `cases!` block below.
+    fn _exhaustive(error: &TenantSecurityProxyError) {
+        match error {
+            TenantSecurityProxyError::Service { .. }
+            | TenantSecurityProxyError::Kms { .. }
+            | TenantSecurityProxyError::SecurityEvent { .. }
+            | TenantSecurityProxyError::TenantSecret { .. } => {}
+        }
+    }
+
+    #[test]
+    fn known_error_codes_round_trip() {
+        let cases = cases!(ServiceError => Service {
+            UnknownError = 100,
+            UnauthorizedRequest = 101,
+            InvalidRequestBody = 102,
+        })
+        .into_iter()
+        .chain(cases!(KmsError => Kms {
+            NoPrimaryKmsConfiguration = 200,
+            UnknownTenantOrNoActiveKmsConfigurations = 201,
+            KmsConfigurationDisabled = 202,
+            InvalidProvidedEdek = 203,
+            KmsWrapFailed = 204,
+            KmsUnwrapFailed = 205,
+            KmsAuthorizationFailed = 206,
+            KmsConfigurationInvalid = 207,
+            KmsUnreachable = 208,
+            KmsThrottled = 209,
+            KmsAccountIssue = 210,
+        }))
+        .chain(cases!(SecurityEventError => SecurityEvent {
+            SecurityEventRejected = 301,
+        }))
+        .chain(cases!(TenantSecretError => TenantSecret {
+            SecretCreationFailed = 401,
+        }));
+
+        for (code, error) in cases {
+            assert_eq!(error.get_code(), code);
+            assert_eq!(TenantSecurityProxyError::code_to_error(code), error);
         }
     }
 }
