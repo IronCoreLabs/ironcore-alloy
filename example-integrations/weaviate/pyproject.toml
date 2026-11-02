@@ -7,7 +7,7 @@ requires-python = ">=3.9"
 dependencies = [
     "ironcore-alloy>=0.11.2,<0.12",
     "weaviate_client==4.4.0",
-    "sentence_transformers==2.3.1",
+    "sentence_transformers==5.6.0",
     "pydantic==2.6.1",
 ]
 dynamic = ["version"]
