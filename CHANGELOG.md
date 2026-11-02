@@ -1,3 +1,7 @@
+## 0.16.3
+
+- Standard document encryption no longer copies each field's plaintext before encrypting it.
+
 ## 0.16.2
 
 - Update `rustls-webpki` to 0.103.16 and `webpki-roots` to 1.0.11 to distrust the compromised eMudhra (emSign) intermediate CAs. See the [advisory](https://emudhra.we-have-a-problem.com/).

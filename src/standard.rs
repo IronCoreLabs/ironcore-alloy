@@ -240,8 +240,7 @@ pub(crate) fn encrypt_map<R: CryptoRng + Send>(
     let encrypted_document = document
         .into_par_iter()
         .map(|(label, plaintext)| {
-            let plaintext_doc =
-                ironcore_documents::aes::PlaintextDocument(plaintext.as_ref().to_vec());
+            let plaintext_doc = ironcore_documents::aes::PlaintextDocument(plaintext.0);
             let encrypted_bytes = if legacy_tsc_write_format {
                 v3::encrypt_detached_document(
                     &mut *crate::util::take_lock(&rng),
