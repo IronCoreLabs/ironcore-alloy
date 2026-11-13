@@ -4,6 +4,9 @@
 # Linux start script should use lf
 /gradlew        text eol=lf
 
-# These are Windows script files and should use crlf
-*.bat           text eol=crlf
+# These are Windows script files and should use crlf. The CRLF is stored in the
+# blob instead of applied by an eol=crlf entry: Nix hashes the working tree for
+# `self` but the git blob for an explicit rev, and a entry makes those two
+# disagree on narHash, which breaks `nix develop` and direnv here.
+*.bat           -text
 
